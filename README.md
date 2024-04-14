@@ -5,4 +5,5 @@ These are all continuations of mods from aedenthorn. The original code can be fo
 - [Catalogue Filter](https://www.nexusmods.com/stardewvalley/mods/22379)
 - [Custom Gift Limits](https://www.nexusmods.com/stardewvalley/mods/22385)
 - [Quest Time Limits](https://www.nexusmods.com/stardewvalley/mods/22349/)
+- [Seed Info](https://www.nexusmods.com/stardewvalley/mods/22519)
 - [Wall Television](https://www.nexusmods.com/stardewvalley/mods/22372)

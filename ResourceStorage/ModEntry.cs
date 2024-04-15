@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 using StardewModdingAPI;
 using StardewModdingAPI.Utilities;
 using StardewValley;
+using StardewValley.GameData.Shops;
 using StardewValley.Inventories;
 using StardewValley.Menus;
 using System;
@@ -44,6 +45,10 @@ namespace ResourceStorage
 
             harmony = new Harmony(ModManifest.UniqueID);
             harmony.PatchAll();
+
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Inventory), nameof(Inventory.GetById)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(Inventory_GetById_Postfix)));
         }
         public void GameLoop_Saving(object sender, StardewModdingAPI.Events.SavingEventArgs e)
         {

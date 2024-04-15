@@ -4,6 +4,7 @@ using Newtonsoft.Json;
 using StardewValley;
 using StardewValley.GameData.Objects;
 using StardewValley.Inventories;
+using StardewValley.ItemTypeDefinitions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -74,7 +75,7 @@ namespace ResourceStorage
 
             foreach(var kvp in oldDictionary)
             {
-                if(first && ItemRegistry.IsQualifiedItemId(kvp.Key)) // If the key starts with an open parentheses, it has already been migrated
+                if(first && ItemRegistry.IsQualifiedItemId(kvp.Key)) // If the is a qualified item id, it has already been migrated
                 {
                     SMonitor.Log($"The dictionary has already been migrated. The first key is {kvp.Key}.");
                     return oldDictionary;
@@ -113,7 +114,7 @@ namespace ResourceStorage
         public static bool CanStore(Object obj)
         {
             bool output = !(obj.Quality > 0 || obj.preserve.Value is not null || obj.orderData.Value is not null || obj.preservedParentSheetIndex.Value is not null || obj.bigCraftable.Value || obj.GetType() != typeof(Object) || obj.maximumStackSize() == 1);
-            //SMonitor.Log(output ? $"Can store {obj.DisplayName}" : $"Cannot store {obj.DisplayName}");
+            SMonitor.Log(output ? $"Can store {obj.DisplayName}" : $"Cannot store {obj.DisplayName}");
             return output;
         }
         public static bool CanAutoStore(Object obj)
@@ -126,18 +127,18 @@ namespace ResourceStorage
 
         public static bool CanAutoStore(string id)
         {
-            if (Game1.objectData.TryGetValue(DequalifyItemId(id), out ObjectData data))
+            ParsedItemData data = ItemRegistry.GetDataOrErrorItem(id);
+            string name = data.InternalName.ToLower();
+                
+            foreach (var str in Config.AutoStore.Split(','))
             {
-                foreach (var str in Config.AutoStore.Split(','))
+                if(str.Trim().ToLower() == name && data.Category != Object.litterCategory)
                 {
-                    if(str.Trim() == data.Name && data.Category != Object.litterCategory)
-                    {
-                        //SMonitor.Log($"Can astore {data.DisplayName}");
-                        return true;
-                    }
+                    SMonitor.Log($"Can astore {data.DisplayName}");
+                    return true;
                 }
-                //SMonitor.Log($"Cannot astore {data.DisplayName}");
             }
+            SMonitor.Log($"Cannot astore {data.DisplayName}");
             return false;
         }
 
@@ -148,7 +149,7 @@ namespace ResourceStorage
 
         private static int AddIngredientAmount(int ingredient_count, KeyValuePair<string, int> pair)
         {
-            if (!Config.ModEnabled || !Config.AutoUse || !Game1.objectData.ContainsKey(pair.Key))
+            if (!Config.ModEnabled || !Config.AutoUse)
                 return ingredient_count;
 
             return (int)(ingredient_count + GetResourceAmount(Game1.player, ItemRegistry.QualifyItemId(pair.Key)));

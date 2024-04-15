@@ -48,7 +48,7 @@ namespace ResourceStorage
             resources = ModEntry.GetFarmerResources(Game1.player);
             foreach (var resource in resources)
             {
-                Object obj = ItemRegistry.Create<Object>(resource.Key, (int)resource.Value);
+                Object obj = new Object(ModEntry.DequalifyItemId(resource.Key), (int)resource.Value);
                 //obj.stack.Value = obj.ParentSheetIndex * 193;
                 resourceList.Add(obj);
             }

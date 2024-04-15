@@ -93,6 +93,16 @@ namespace ResourceStorage
             }
         }
 
+        public static void Inventory_GetById_Postfix(Inventory __instance, string itemId, ref int __result)
+        {
+            if(!Config.ModEnabled || !Config.AutoUse || !TryGetInventoryOwner(__instance, out Farmer farmer))
+            {
+                return;
+            }
+
+            __result += (int)GetResourceAmount(farmer, ItemRegistry.QualifyItemId(itemId));
+        }
+
         [HarmonyPatch(typeof(Farmer), nameof(Farmer.couldInventoryAcceptThisItem), new Type[] {typeof(Item)})]
         public class Farmer_couldInventoryAcceptThisItem_Patch
         {

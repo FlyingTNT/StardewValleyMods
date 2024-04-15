@@ -55,6 +55,10 @@ namespace CatalogueFilter
                 original: AccessTools.Method(typeof(ShopMenu), nameof(ShopMenu.applyTab)),
                 postfix: new HarmonyMethod(typeof(ModEntry), nameof(ShopMenu_applyTab_Postfix)));
 
+            harmony.Patch(
+                original: AccessTools.Method(typeof(ShopMenu), nameof(ShopMenu.updatePosition)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(ShopMenu_updatePosition_Postfix)));
+
             harmony.PatchAll();
         }
 

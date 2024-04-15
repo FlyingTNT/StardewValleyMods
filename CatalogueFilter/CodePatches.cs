@@ -43,6 +43,15 @@ namespace CatalogueFilter
             allItems = new List<ISalable>(__instance.forSale);
         }
 
+        public static void ShopMenu_updatePosition_Postfix(ShopMenu __instance)
+        {
+            if (filterField == null) // This is called during the constructor, and we setup the field after the constructor, so the field might be null.
+                return;
+
+            filterField.X = __instance.xPositionOnScreen + 28;
+            filterField.Y = __instance.yPositionOnScreen + __instance.height - 88;
+        }
+
         [HarmonyPatch(typeof(ShopMenu), nameof(ShopMenu.drawCurrency))]
         public class ShopMenu_drawCurrency_Patch
         {
@@ -78,7 +87,8 @@ namespace CatalogueFilter
                     }
                     __instance.currentItemIndex = 0;
 
-                    __instance.gameWindowSizeChanged(Game1.graphics.GraphicsDevice.Viewport.Bounds, Game1.graphics.GraphicsDevice.Viewport.Bounds);
+                    if(!SHelper.ModRegistry.IsLoaded("spacechase0.BiggerBackpack"))
+                        __instance.gameWindowSizeChanged(Game1.graphics.GraphicsDevice.Viewport.Bounds, Game1.graphics.GraphicsDevice.Viewport.Bounds);
                 }
                 filterField.Draw(b);
                 if (Config.ShowLabel)

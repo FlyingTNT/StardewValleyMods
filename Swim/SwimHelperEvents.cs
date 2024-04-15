@@ -635,7 +635,7 @@ namespace Swim
                     }
                 }
 
-                Game1.player.canOnlyWalk = true;
+                Game1.player.canOnlyWalk = !Config.AllowActionsWhileInSwimsuit;
                 Game1.player.setRunning(false);
             }
 

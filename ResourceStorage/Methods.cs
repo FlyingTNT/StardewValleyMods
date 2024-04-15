@@ -16,9 +16,15 @@ namespace ResourceStorage
     {
         public static long ModifyResourceLevel(Farmer instance, string id, int amountToAdd, bool auto = true)
         {
+            id = ItemRegistry.QualifyItemId(id);
+            if(id == null)
+            {
+                return 0;
+            }
+
             Dictionary<string, long> dict = GetFarmerResources(instance);
-            
-            if(!dict.TryGetValue(id, out long oldAmount))
+
+            if (!dict.TryGetValue(id, out long oldAmount))
             {
                 if (auto && !CanAutoStore(id))
                     return 0;
@@ -107,6 +113,11 @@ namespace ResourceStorage
 
         public static long GetResourceAmount(Farmer instance, string id)
         {
+            if(id == null)
+            {
+                return 0;
+            }
+
             Dictionary<string, long> dict = GetFarmerResources(instance);
 
             return dict.TryGetValue(id, out long amount) ? amount : 0;
@@ -168,6 +179,51 @@ namespace ResourceStorage
 
             farmer = null;
             return false;
+        }
+
+        public static int GetMatchesForCrafting(Farmer farmer, string itemId)
+        {
+            if (!Config.ModEnabled || !Config.AutoUse)
+                return 0;
+
+            int output = 0;
+            foreach (var kvp in GetFarmerResources(farmer))
+            {
+                if (CraftingRecipe.ItemMatchesForCrafting(ItemRegistry.Create(kvp.Key), itemId))
+                {
+                    output += (int)kvp.Value;
+                }
+            }
+            return output;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="farmer"></param>
+        /// <param name="itemId"></param>
+        /// <param name="maxAmount"></param>
+        /// <returns>The amount removed from the storage.</returns>
+        public static int ConsumeItemsForCrafting(Farmer farmer, string itemId, int maxAmount)
+        {
+            if (!Config.ModEnabled || !Config.AutoUse)
+                return 0;
+
+            int totalConsumed = 0;
+
+            foreach(var kvp in GetFarmerResources(farmer))
+            {
+                if (CraftingRecipe.ItemMatchesForCrafting(ItemRegistry.Create(kvp.Key), itemId))
+                {
+                    totalConsumed -= (int)ModifyResourceLevel(farmer, kvp.Key, -(maxAmount - totalConsumed));
+                    if (totalConsumed == maxAmount)
+                    {
+                        return totalConsumed;
+                    }
+                }
+            }
+
+            return totalConsumed;
         }
     }
 }

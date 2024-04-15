@@ -57,15 +57,15 @@ namespace ResourceStorage
             }
         }
 
-        [HarmonyPatch(typeof(Farmer), nameof(Farmer.getItemCount))]
-        public class Farmer_getItemCount_Patch
+        [HarmonyPatch(typeof(Farmer), nameof(Farmer.getItemCountInList))]
+        public class Farmer_getItemCountInList_Patch
         {
             public static void Postfix(Farmer __instance, string itemId, ref int __result)
             {
                 if (!Config.ModEnabled || !Config.AutoUse)
                     return;
 
-                __result += (int)GetResourceAmount(__instance, ItemRegistry.QualifyItemId(itemId));
+                __result += GetMatchesForCrafting(__instance, itemId);
             }
         }
 
@@ -152,7 +152,7 @@ namespace ResourceStorage
                     return;
                 for(int i = 0; i < additionalRecipeItems.Count; i++)
                 {
-                    additionalRecipeItems[i] = new KeyValuePair<string, int>(additionalRecipeItems[i].Key, additionalRecipeItems[i].Value + (int)ModifyResourceLevel(Game1.player, ItemRegistry.QualifyItemId(additionalRecipeItems[i].Key), -additionalRecipeItems[i].Value));
+                    additionalRecipeItems[i] = new KeyValuePair<string, int>(additionalRecipeItems[i].Key, additionalRecipeItems[i].Value + ConsumeItemsForCrafting(Game1.player, additionalRecipeItems[i].Key, additionalRecipeItems[i].Value));
                 }
             }
         }
@@ -189,12 +189,7 @@ namespace ResourceStorage
                 Dictionary<string, int> dict = new();
                 foreach(var s in __state)
                 {
-                    if (!Game1.objectData.ContainsKey(s.Key))
-                    {
-                        dict.Add(s.Key, s.Value);
-                        continue;
-                    }
-                    int amount = s.Value + (int)ModifyResourceLevel(Game1.player, ItemRegistry.QualifyItemId(s.Key), -s.Value);
+                    int amount = s.Value + ConsumeItemsForCrafting(Game1.player, s.Key, s.Value);
                     if (amount <= 0)
                         continue;
                     dict.Add(s.Key, amount);
@@ -288,6 +283,7 @@ namespace ResourceStorage
                     Game1.playSound("bigSelect");
                     gameMenu = Game1.activeClickableMenu as GameMenu;
                     Game1.activeClickableMenu = new ResourceMenu();
+                    Game1.activeClickableMenu = new ResourceMenu();
                     return false;
                 }
                 return true;
@@ -332,7 +328,7 @@ namespace ResourceStorage
             var resDict = GetFarmerResources(who);
             foreach(var res in resDict)
             {
-                Object obj = ItemRegistry.Create<Object>(res.Key, (int)res.Value);
+                Object obj = new Object(DequalifyItemId(res.Key), (int)res.Value);
                 if (matcher(obj))
                 {
                     __result = (int.MaxValue - (int)res.Value < __result) ? int.MaxValue : (int)res.Value + __result;
@@ -348,7 +344,7 @@ namespace ResourceStorage
             var resDict = GetFarmerResources(Game1.player);
             foreach(var res in resDict)
             {
-                Object obj = ItemRegistry.Create<Object>(res.Key, (int)res.Value);
+                Object obj = new Object(DequalifyItemId(res.Key), (int)res.Value);
                 if (matcher(obj))
                 {
                     amount += (int)ModifyResourceLevel(Game1.player, res.Key, -amount);

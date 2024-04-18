@@ -26,6 +26,48 @@
         },
         {
             "Action": "EditData",
+            "Target": "Data/Shops",
+            "TargetField": ["HatMouse", "Items"],
+            "Entries":{
+                "Swim_ScubaMask":{
+                    "ActionsOnPurchase": null,
+                    "CustomFields": null,
+                    "TradeItemId": null,
+                    "TradeItemAmount": 1,
+                    "Price": 50000,
+                    "ApplyProfitMargins": null,
+                    "AvailableStock": -1,
+                    "AvailableStockLimit": "Global",
+                    "AvoidRepeat": false,
+                    "UseObjectDataPrice": false,
+                    "IgnoreShopPriceModifiers": false,
+                    "PriceModifiers": null,
+                    "PriceModifierMode": "Stack",
+                    "AvailableStockModifiers": null,
+                    "AvailableStockModifierMode": "Stack",
+                    "Condition": "PLAYER_HAS_MAIL Current ScubaMask",
+                    "Id": "Swim_ScubaMask",
+                    "ItemId": "Swim_ScubaMask",
+                    "RandomItemId": null,
+                    "MaxItems": null,
+                    "MinStack": -1,
+                    "MaxStack": -1,
+                    "Quality": -1,
+                    "ObjectInternalName": null,
+                    "ObjectDisplayName": null,
+                    "ToolUpgradeLevel": -1,
+                    "IsRecipe": false,
+                    "StackModifiers": null,
+                    "StackModifierMode": "Stack",
+                    "QualityModifiers": null,
+                    "QualityModifierMode": "Stack",
+                    "ModData": null,
+                    "PerItemCondition": null
+                  }
+            }
+        },
+        {
+            "Action": "EditData",
             "Target": "Data/Boots",
             "Entries":{
                 "Swim_ScubaFins":

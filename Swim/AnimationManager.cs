@@ -14,6 +14,51 @@ using StardewModdingAPI.Utilities;
 
 namespace Swim
 {
+    /// <summary>
+    /// A set of patches that fix the Farmer's animations when swimming, and when in a bathing suit.
+    /// 
+    /// In order to make this code somewhat maintaiable, I am going to try to document it very well. Here, I am going to give an overview of the code. I am going to start with how the game
+    /// manages animating the farmer and then I will discuss the problems I encountered as I was making this and the ways in which this class solves them.
+    /// 
+    /// 1. Overview of rendering
+    /// The actual rendering of the Farmer happens in FarmerRenderer.draw, so that is the focus of most of the patches.
+    /// The rendering is split into pieces - the FarmerRenderer draws the body and pants and hair and eyes etc. sepatately
+    /// Each frame of an animation is represented by an AnimationFrame object, which defines things like whether the frame should be flipped, if the player should be offset,...
+    /// Each frame has a frame number, and there are 126 animation frames.
+    /// Nine of these frames correspond to bathing suit frames - three in each direction (right is just left but flipped, or maybe vice versa)
+    /// The frame number dictates which farmer body and arm sprites are drawn
+    /// The farmer's current pants item dictates which pants are drawn, the shirt item the shirt, etc
+    /// The bathing suit differs from the other frames in two very significant ways, which are 100% of the reason I had to make this 1000-lines-of-code file:
+    /// (i) The entire bathing suit is on the pants sprite sheet - when the game draws the bathing suit, it draws the whole thing as the pants and no shirt
+    ///     - The player's shirt and hat are not displayed when the player is wearing their bathing clothes
+    /// (ii) The bathing suit body model has the arms included in it (no arms are drawn), while all other models are armless and have the arms drawn separately
+    /// 
+    /// 2. Problems and solutions
+    /// To start, there are two problems that predate this file:
+    /// 
+    /// (i) Footsteps display while swimming
+    ///  - aedenthorn added a prefix to FarmerRenderer.checkForFootstep to prevent footprints from displaying when the player is swimming
+    ///  
+    /// (ii) The scuba mask is not displayed while swimming
+    ///  - In general, no hats are displayed while swimming, but it would make sense for the scuba mask to be displyed
+    ///  - Notably, the above isn't actually true; when swimming, the player's body below the neck and their pants aren't displayed
+    ///  - However, their shirt and hat are only not displayed when they are wearing bathing clothes
+    ///  - This makes sense when you remember bathing clothes are displayed as pants
+    ///  - As such, aedenthorn solved this problem by forcing the player to not wear bathing clothes when they were wearing the scuba gear
+    ///  - This worked, but it also caused the player's shirt to be displayed in addition to their mask, causing a limbless torso to appear while they swam
+    ///  - I didn't like this, so I added a transpiler to FarmerRenderer.drawHairAndAccesories (where the player's hat and shirt are drawn)
+    ///    - This transplier modified the check that prevented the hat from displaying when the player was wearing a bathing suit so that it is tied to a config option
+    ///    - This allows the player to wear hats while they swim (I was originally going to do just the mask, but I thought support for all hats was better)
+    /// 
+    /// Then, the problem that prompted the creation of this file: 
+    /// When the player performs any action that isn't walking while wearing a bathing suit, the bathing suit is not displayed.
+    /// As mentioned above, of the 126 animation frames only 9 correspond to the bathing suit. Notably, this means that the each pant in the pants texture sheet has 126 textures, 9 of which
+    /// are the bathing suit. If the current frame index is a bthing suit frame, the bating suit is displayed as the pants. If the index corresponds to any other frame (such as swinging a tool
+    /// or running), the normal pants are displayed (look at the pants texture sheet if you don't understand; the nine bathing suit frames are in the bottom left of each pants item). For example, say
+    /// my pants item is a skirt and I am currently wearing a bathing suit: while I walk around, the bathing suit animation shows just fine. However, if I use my axe or grab a forage or do anything
+    /// else the skirt is displayed instead of the bathing suit. Additionally, because I am still technically wearing a bathing suit, my shirt is not displayed. Is such, it looks like I am wearing
+    /// a skirt and no shirt, while it should ideally still display the bathing suit.
+    /// </summary>
     internal class AnimationManager
     {
         private static IMonitor SMonitor;
@@ -113,44 +158,44 @@ namespace Swim
             {
                 harmony.Patch(
                     original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(FarmerSprite.endOfAnimationBehavior), typeof(int), typeof(bool) }),
-                    prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor2_Prefix)),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                    prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
+                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
 
                 harmony.Patch(
                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(int), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(FarmerSprite.endOfAnimationBehavior), typeof(int) }),
-                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor2_Prefix)),
-                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
+                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
 
                 harmony.Patch(
                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(bool), typeof(int) }),
-                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor2_Prefix)),
-                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
+                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
 
                 harmony.Patch(
                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(bool) }),
-                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor2_Prefix)),
-                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
+                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
 
                 harmony.Patch(
                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(bool) }),
-                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor2_Prefix)),
-                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
+                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
 
                 harmony.Patch(
                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool) }),
-                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor2_Prefix)),
-                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
+                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
 
                 harmony.Patch(
                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int) }),
-                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor2_Prefix)),
-                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
+                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
             }
 
@@ -158,37 +203,37 @@ namespace Swim
             {
                 harmony.Patch(
                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(int), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(FarmerSprite.endOfAnimationBehavior), typeof(int) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
 
                 harmony.Patch(
                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(bool), typeof(int) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
 
                 harmony.Patch(
                     original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(FarmerSprite.endOfAnimationBehavior), typeof(int), typeof(bool) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
 
                 harmony.Patch(
                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(bool) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
 
                 harmony.Patch(
                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
 
                 harmony.Patch(
                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
 
                 harmony.Patch(
                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(bool) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor3_Postfix))
+                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
                 );
 
                 harmony.Patch(
@@ -450,7 +495,7 @@ namespace Swim
             return true;
         }
 
-        public static void AnimationFrame_Constructor3_Postfix(ref FarmerSprite.AnimationFrame __instance, int frame)
+        public static void AnimationFrame_Constructor_Postfix(ref FarmerSprite.AnimationFrame __instance, int frame)
         {
             try
             {
@@ -464,11 +509,11 @@ namespace Swim
             }
             catch (Exception ex)
             {
-                SMonitor.Log($"Failed in {nameof(AnimationFrame_Constructor3_Postfix)}:\n{ex}", LogLevel.Error);
+                SMonitor.Log($"Failed in {nameof(AnimationFrame_Constructor_Postfix)}:\n{ex}", LogLevel.Error);
             }
         }
 
-        public static void AnimationFrame_Constructor2_Prefix(ref int frame)
+        public static void AnimationFrame_Constructor_Prefix(ref int frame)
         {
             MapAnimationFrameToBathingSuitAnimation(Game1.player, ref frame);
         }

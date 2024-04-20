@@ -28,9 +28,11 @@ namespace Swim
     /// Nine of these frames correspond to bathing suit frames - three in each direction (right is just left but flipped, or maybe vice versa)
     /// The frame number dictates which farmer body and arm sprites are drawn
     /// The farmer's current pants item dictates which pants are drawn, the shirt item the shirt, etc
+    /// Within each pants texture, there are 126 individual sprites (not the shirt; they're done differently), each of which corresponds to an animation frame.
     /// The bathing suit differs from the other frames in two very significant ways, which are 100% of the reason I had to make this 1000-lines-of-code file:
     /// (i) The entire bathing suit is on the pants sprite sheet - when the game draws the bathing suit, it draws the whole thing as the pants and no shirt
-    ///     - The player's shirt and hat are not displayed when the player is wearing their bathing clothes
+    ///    - Of those 126 sprites on each pants texture, 9 of them are the bathing suit
+    ///    - The player's shirt and hat are not displayed when the player is wearing their bathing clothes (even the bikini part of the bthing suit is in the pants texture)
     /// (ii) The bathing suit body model has the arms included in it (no arms are drawn), while all other models are armless and have the arms drawn separately
     /// 
     /// 2. Problems and solutions
@@ -53,11 +55,41 @@ namespace Swim
     /// Then, the problem that prompted the creation of this file: 
     /// When the player performs any action that isn't walking while wearing a bathing suit, the bathing suit is not displayed.
     /// As mentioned above, of the 126 animation frames only 9 correspond to the bathing suit. Notably, this means that the each pant in the pants texture sheet has 126 textures, 9 of which
-    /// are the bathing suit. If the current frame index is a bthing suit frame, the bating suit is displayed as the pants. If the index corresponds to any other frame (such as swinging a tool
+    /// are the bathing suit. If the current frame index is a bathing suit frame, the bating suit is displayed as the pants. If the index corresponds to any other frame (such as swinging a tool
     /// or running), the normal pants are displayed (look at the pants texture sheet if you don't understand; the nine bathing suit frames are in the bottom left of each pants item). For example, say
     /// my pants item is a skirt and I am currently wearing a bathing suit: while I walk around, the bathing suit animation shows just fine. However, if I use my axe or grab a forage or do anything
-    /// else the skirt is displayed instead of the bathing suit. Additionally, because I am still technically wearing a bathing suit, my shirt is not displayed. Is such, it looks like I am wearing
+    /// else the skirt is displayed instead of the bathing suit. Additionally, because I am still technically wearing a bathing suit, my shirt is not displayed. As such, it looks like I am wearing
     /// a skirt and no shirt, while it should ideally still display the bathing suit.
+    /// 
+    /// To solve this, I added a prefix to the AnimationFrame constructors - AnimationFrame has seven constructors, but they all take in the frame's frame index as an argument; the prefix
+    /// takes that frame index and maps it through AnimationFrameToBathingSuitFrameMap. AnimationFrameToBathingSuitFrameMap is an array whose indicies are the 126 animation frames and whose values
+    /// are the indicies of the bathing suit animation frame I thought best represented the frame. Some frames are unmapped, either because I didn't think a bathing suit frame
+    /// would do them justice, or because I simply haven't encountered them yet in my testing.
+    /// This solution is pretty good - the player's bathing suit doesn't 'fall off' (except in the unmapped frames), and the animations are generally pretty reasonable. However there is one flaw:
+    /// as I mentioned earlier, the animation frame index dictates three things: which player body sprite is drawn, which pant sprite is drawn, and which arm sprite is drawn. The map does fix the first
+    /// two - we want the bathing suit pants and body to be drawn. However, normally no arms are drawn when drawing the bathing suit, so when say using a tool, it looks like the tool is being controlled
+    /// by telepathy. In fact, it is slightly worse because of the specifics of how the player body spritesheet is laid out: in general, each body frame's arms are located to the right of it in the spritesheet.
+    /// Which specific arm is to be drawn is specified by an AnimationFrame's armOffset parameter (corresponds to the number of frames to the right to look). Note that we do not patch this value in the prefix
+    ///  - because each bathing suit has its arms baked in to the body sprite, its arm sprite is blank and so it doesn't matter. However, ConcernedApe has made use of the fact that the bathing suits don't
+    /// need arm frames by storing the pan arm frames in the bathing suit arm slots. (this is necessary because there needs to be a frame for each quality of pan, and that is too many frames to fit in the 
+    /// normal allotted space. Normally this isn't a problem because the bathing suit frames' arm offsets are usually set to -1 (less than zero offsets are not drawn). However, because these frames we
+    /// are mapping were not originally meant to be bathing suit frames, their arm offsets are usually not -1. This has the effect of causing the player to look like they are holding a pan behind their
+    /// back when they are walking upward. We fix this by adding a postfix to the constructor to set the arm offset to -1 if the frame is a bathing suit frame. The reason we don't do this in the prefix is that
+    /// not all of the constructors take in an armOffset as a parameter - many of them decide it based on other factors - and I don't want to write seven different prefixes.
+    /// This prefix and postfix combined makes it so that the player's bathing suit doesn't fall off, although their arms are always at their sides no matter the frame, so frames in which they are using
+    /// tools look kind of wonky.
+    /// 
+    /// At this point, I will mention that these patches are divided into three levels, which are configuralble with a config option. Level 0 is just the old patches that predate this file - the patch to prevent
+    /// footsteps while swimming and the pach to allow hats while in the bathing suit. Level 1 includes those patches, plus the AnimationFrame constructor prefix and postfix I just mentioned. Level 2 includes the
+    /// level 0 patches, plus a set of fixes that allows the correct arms to be displayed when wearing the bathing suit, which I will get into shortly. The reason I made this a config option is compatibility - the
+    /// level 0 patches are pretty tame and unliely to break compatibility with anything. The level 1 patches are more intrusive, but I feel they're still pretty safe. However, the level 2 patches really go off
+    /// the deep end. They transpile FarmerRenderer methods in like 45 additional places (although, 43 of those are just the same two pathches over and over, and I have plans to minimize their footprints), and
+    /// they add fairly intrusive pre- and post- fixes to FarmerRenderer.draw. Additionally, the pathces that allow the arms to be drawn will not work natively with mods that add custom bathing suit sprites,
+    /// although as I will talk about later, adding support should be fairly simple on their end and it's not like it would crash; just in frames where we are fixing the arms, the custom bathing suit would not 
+    /// display.
+    /// 
+    /// So without further ado, the level 2 patches:
+    /// 
     /// </summary>
     internal class AnimationManager
     {

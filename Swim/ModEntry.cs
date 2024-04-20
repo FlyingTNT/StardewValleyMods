@@ -87,6 +87,7 @@ namespace Swim
             SwimMaps.Initialize(Monitor, helper, Config);
             SwimHelperEvents.Initialize(Monitor, helper, Config);
             SwimUtils.Initialize(Monitor, helper, Config);
+            AnimationManager.Initialize(Monitor, helper, Config);
 
             helper.Events.GameLoop.UpdateTicked += SwimHelperEvents.GameLoop_UpdateTicked;
             helper.Events.Input.ButtonPressed += SwimHelperEvents.Input_ButtonPressed;
@@ -101,15 +102,6 @@ namespace Swim
 
             var harmony = new Harmony(this.ModManifest.UniqueID);
 
-            harmony.Patch(
-               original: AccessTools.Method(typeof(FarmerRenderer), nameof(FarmerRenderer.draw), new Type[] { typeof(SpriteBatch), typeof(FarmerSprite.AnimationFrame), typeof(int), typeof(Rectangle), typeof(Vector2), typeof(Vector2), typeof(float), typeof(int), typeof(Color), typeof(float), typeof(float), typeof(Farmer) }),
-               prefix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.FarmerRenderer_draw_Prefix)),
-               postfix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.FarmerRenderer_draw_Postfix))
-            );
-            harmony.Patch(
-               original: AccessTools.Method(typeof(FarmerSprite), "checkForFootstep"),
-               prefix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.FarmerSprite_checkForFootstep_Prefix))
-            );
             harmony.Patch(
                original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.startEvent)),
                postfix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.GameLocation_StartEvent_Postfix))
@@ -193,10 +185,7 @@ namespace Swim
                postfix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.GameLocation_sinkDebris_Postfix))
             );
 
-            harmony.Patch(
-               original: AccessTools.Method(typeof(FarmerRenderer), nameof(FarmerRenderer.drawHairAndAccesories)),
-               transpiler: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.FarmerRenderer_drawHairAndAccessories_Transpiler))
-            );
+            AnimationManager.Patch(harmony);
         }
 
         private void Content_AssetRequested(object sender, AssetRequestedEventArgs e)
@@ -208,6 +197,10 @@ namespace Swim
             else if (e.NameWithoutLocale.IsEquivalentTo("Portraits\\Mariner"))
             {
                 e.LoadFrom(() => {return Game1.content.Load<Texture2D>("Portraits\\Gil");}, AssetLoadPriority.Low);
+            }
+            else
+            {
+                AnimationManager.EditAssets(sender, e);
             }
         }
 

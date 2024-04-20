@@ -44,6 +44,7 @@ namespace Swim
         public int TriggerDistanceDown { get; set; }
         public int TriggerDistanceLeft { get; set; }
         public int TriggerDistanceRight { get; set; }
+        public int AnimationPatches { get; set; }
 
         public ModConfig()
         {
@@ -92,6 +93,8 @@ namespace Swim
             TriggerDistanceDown = 96;
             TriggerDistanceLeft = 130;
             TriggerDistanceRight = 130;
+
+            AnimationPatches = 3;
         }
     }
 }

@@ -503,6 +503,18 @@ namespace Swim
             if (Game1.player.currentLocation == null || Game1.player == null || !Game1.displayFarmer || Game1.player.position == null)
                 return;
 
+
+            // Code to slow down the game to see individual animation frames
+            /*if(Helper.Input.IsDown(SButton.X))
+            {
+                Monitor.Log($"Animation frame {Game1.player.FarmerSprite.CurrentAnimationFrame.frame} {Game1.player.FarmerSprite.CurrentAnimationFrame.armOffset} {Game1.player.FarmerSprite.CurrentAnimationFrame.positionOffset} {Game1.player.FarmerSprite.CurrentAnimationFrame.xOffset} {Game1.player.FarmerSprite.CurrentAnimationFrame.positionOffset} {Game1.player.FarmerSprite.CurrentAnimationFrame.frameEndBehavior} {Game1.player.FarmerRenderer.textureName}");
+                GameRunner.instance.TargetElapsedTime = TimeSpan.FromSeconds(1 / 3d);
+            }
+            else
+            {
+                GameRunner.instance.TargetElapsedTime = TimeSpan.FromSeconds(1 / 60d);
+            }*/
+
             ModEntry.isUnderwater.Value = SwimUtils.IsMapUnderwater(Game1.player.currentLocation.Name);
 
             if (Game1.player.currentLocation.Name == "Custom_ScubaAbigailCave")

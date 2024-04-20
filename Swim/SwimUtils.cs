@@ -5,9 +5,11 @@ using Netcode;
 using StardewModdingAPI;
 using StardewModdingAPI.Utilities;
 using StardewValley;
+using StardewValley.GameData.HomeRenovations;
 using StardewValley.Locations;
 using StardewValley.TerrainFeatures;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -132,19 +134,19 @@ namespace Swim
             }
 
             // Player state checks
-            if(!Context.IsPlayerFree || !Context.CanPlayerMove || Game1.player.isRidingHorse())
+            if (!Context.IsPlayerFree || !Context.CanPlayerMove || Game1.player.isRidingHorse())
             {
                 return false;
             }
 
             // Modded player state checks
-            if(Game1.player.millisecondsPlayed - SwimHelperEvents.lastJump.Value < 250 || IsMapUnderwater(Game1.player.currentLocation.Name))
+            if (Game1.player.millisecondsPlayed - SwimHelperEvents.lastJump.Value < 250 || IsMapUnderwater(Game1.player.currentLocation.Name))
             {
                 return false;
             }
 
             // Player input checks
-            if(!((Game1.player.isMoving() && Config.ReadyToSwim) || (Helper.Input.IsDown(Config.ManualJumpButton) && Config.EnableClickToSwim)) || Helper.Input.IsDown(SButton.LeftShift))
+            if (!((Game1.player.isMoving() && Config.ReadyToSwim) || (Helper.Input.IsDown(Config.ManualJumpButton) && Config.EnableClickToSwim)) || Helper.Input.IsDown(SButton.LeftShift))
             {
                 return false;
             }
@@ -287,7 +289,7 @@ namespace Swim
                 return false;
             }
 
-            bool output =  IsMapUnderwater(Game1.player.currentLocation.Name)
+            bool output = IsMapUnderwater(Game1.player.currentLocation.Name)
                 ||
                 (
                     tiles != null
@@ -520,7 +522,7 @@ namespace Swim
             bool result = (!Config.SwimIndoors || location.IsOutdoors) && location is not VolcanoDungeon && location is not BathHousePool && !ModEntry.locationIsPool.Value;
             if (!result)
                 return false;
-            
+
             Point playerPosition = Game1.player.TilePoint;
 
             string property = doesTileHaveProperty(location.Map, playerPosition.X, playerPosition.Y, "TouchAction", "Back");
@@ -533,11 +535,6 @@ namespace Swim
             }
 
             return true;
-        }
-
-        public static bool ShouldNotDrawHat(Farmer farmer)
-        {
-            return (!Config.DisplayHatWithSwimsuit) && farmer.bathingClothes.Value;
         }
 
         /// <summary>

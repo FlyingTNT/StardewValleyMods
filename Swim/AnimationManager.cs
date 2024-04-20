@@ -91,13 +91,23 @@ namespace Swim
                transpiler: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_drawHairAndAccessories_Transpiler))
             );
             
-            // Always run pre and post fixes, only run transpiler if AnimationPatches is AllPatches
-            harmony.Patch(
-               original: AccessTools.Method(typeof(FarmerRenderer), nameof(FarmerRenderer.draw), new Type[] { typeof(SpriteBatch), typeof(FarmerSprite.AnimationFrame), typeof(int), typeof(Rectangle), typeof(Vector2), typeof(Vector2), typeof(float), typeof(int), typeof(Color), typeof(float), typeof(float), typeof(Farmer) }),
-               prefix: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_Prefix)),
-               postfix: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_Postfix)),
-               transpiler: Config.AnimationPatches == AllPatches ? new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_Transpiler)) : null
-            );
+            if(Config.AnimationPatches == AllPatches)
+            {
+                harmony.Patch(
+                   original: AccessTools.Method(typeof(FarmerRenderer), nameof(FarmerRenderer.draw), new Type[] { typeof(SpriteBatch), typeof(FarmerSprite.AnimationFrame), typeof(int), typeof(Rectangle), typeof(Vector2), typeof(Vector2), typeof(float), typeof(int), typeof(Color), typeof(float), typeof(float), typeof(Farmer) }),
+                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_AllPatches_Prefix)),
+                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_AllPatches_Postfix)),
+                   transpiler: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_Transpiler))
+                );
+            }
+            else
+            {
+                harmony.Patch(
+                   original: AccessTools.Method(typeof(FarmerRenderer), nameof(FarmerRenderer.draw), new Type[] { typeof(SpriteBatch), typeof(FarmerSprite.AnimationFrame), typeof(int), typeof(Rectangle), typeof(Vector2), typeof(Vector2), typeof(float), typeof(int), typeof(Color), typeof(float), typeof(float), typeof(Farmer) }),
+                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_Prefix)),
+                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_Postfix))
+                );
+            }
 
             if(Config.AnimationPatches == MediumPatches)
             {
@@ -226,7 +236,7 @@ namespace Swim
             public FarmerRendererDrawState(){}
         }
 
-        public static void FarmerRenderer_draw_Prefix(FarmerRenderer __instance, Farmer who, int currentFrame, ref NetString ___textureName, ref bool ____spriteDirty, ref bool ____eyesDirty, ref bool ____skinDirty, ref bool ____shirtDirty, ref bool ____pantsDirty, ref bool ____shoesDirty, ref bool ____baseTextureDirty, ref FarmerRendererDrawState __state)
+        public static void FarmerRenderer_draw_AllPatches_Prefix(FarmerRenderer __instance, Farmer who, int currentFrame, ref NetString ___textureName, ref bool ____spriteDirty, ref bool ____eyesDirty, ref bool ____skinDirty, ref bool ____shirtDirty, ref bool ____pantsDirty, ref bool ____shoesDirty, ref bool ____baseTextureDirty, ref FarmerRendererDrawState __state)
         {
             try
             {
@@ -305,11 +315,11 @@ namespace Swim
             }
             catch (Exception ex)
             {
-                SMonitor.Log($"Failed in {nameof(FarmerRenderer_draw_Prefix)}:\n{ex}", LogLevel.Error);
+                SMonitor.Log($"Failed in {nameof(FarmerRenderer_draw_AllPatches_Prefix)}:\n{ex}", LogLevel.Error);
             }
         }
 
-        internal static void FarmerRenderer_draw_Postfix(FarmerRenderer __instance, Farmer who, ref NetString ___textureName, ref bool ____spriteDirty, ref bool ____eyesDirty, ref bool ____skinDirty, ref bool ____shirtDirty, ref bool ____pantsDirty, ref bool ____shoesDirty, ref bool ____baseTextureDirty, FarmerRendererDrawState __state)
+        internal static void FarmerRenderer_draw_AllPatches_Postfix(FarmerRenderer __instance, Farmer who, ref NetString ___textureName, ref bool ____spriteDirty, ref bool ____eyesDirty, ref bool ____skinDirty, ref bool ____shirtDirty, ref bool ____pantsDirty, ref bool ____shoesDirty, ref bool ____baseTextureDirty, FarmerRendererDrawState __state)
         {
             try
             {
@@ -355,6 +365,38 @@ namespace Swim
                 }
 
                 ____baseTextureDirty = __state.wasBaseTextureDirty;
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(FarmerRenderer_draw_AllPatches_Postfix)}:\n{ex}", LogLevel.Error);
+            }
+        }
+
+        public static void FarmerRenderer_draw_Prefix(Farmer who, ref bool __state)
+        {
+            try
+            {
+                if (who.swimming.Value && Game1.player.currentLocation.Name.StartsWith("Custom_Underwater"))
+                {
+                    who.swimming.Value = false;
+                    __state = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(FarmerRenderer_draw_Prefix)}:\n{ex}", LogLevel.Error);
+            }
+        }
+
+        internal static void FarmerRenderer_draw_Postfix(Farmer who, bool __state)
+        {
+            try
+            {
+                if (__state)
+                {
+                    who.swimming.Value = true;
+                }
+
             }
             catch (Exception ex)
             {

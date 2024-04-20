@@ -28,6 +28,10 @@ namespace Swim
         private static readonly PerScreen<bool> pantsDirty = new PerScreen<bool>(()=>true);
         private static readonly PerScreen<Texture2D> texture = new PerScreen<Texture2D>(()=>null);
 
+        const int LegacyPatches = 0;
+        const int MediumPatches = 1;
+        const int AllPatches = 2;
+
         public static void Initialize(IMonitor monitor, IModHelper helper, ModConfig config)
         {
             SMonitor = monitor;
@@ -37,7 +41,7 @@ namespace Swim
 
         public static void EditAssets(object sender, AssetRequestedEventArgs e)
         {
-            if (Config.AnimationPatches != 3)
+            if (Config.AnimationPatches != AllPatches)
                 return;
 
             if(e.NameWithoutLocale.StartsWith("FlyingTNT.Swim/DisarmedModels"))
@@ -87,21 +91,15 @@ namespace Swim
                transpiler: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_drawHairAndAccessories_Transpiler))
             );
             
-            // Always run pre and post fixes, only run transpiler if AnimationPatches is 3 
+            // Always run pre and post fixes, only run transpiler if AnimationPatches is AllPatches
             harmony.Patch(
                original: AccessTools.Method(typeof(FarmerRenderer), nameof(FarmerRenderer.draw), new Type[] { typeof(SpriteBatch), typeof(FarmerSprite.AnimationFrame), typeof(int), typeof(Rectangle), typeof(Vector2), typeof(Vector2), typeof(float), typeof(int), typeof(Color), typeof(float), typeof(float), typeof(Farmer) }),
                prefix: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_Prefix)),
                postfix: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_Postfix)),
-               transpiler: Config.AnimationPatches == 3 ? new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_Transpiler)) : null
+               transpiler: Config.AnimationPatches == AllPatches ? new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_Transpiler)) : null
             );
 
-            if(Config.AnimationPatches == 1)
-            harmony.Patch(
-               original: AccessTools.Method(typeof(FarmerSprite), nameof(FarmerSprite.animate), new Type[] { typeof(int), typeof(int) }),
-               prefix: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerSprite_animate_Prefix))
-            );
-
-            if(Config.AnimationPatches == 2)
+            if(Config.AnimationPatches == MediumPatches)
             {
                 harmony.Patch(
                     original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(FarmerSprite.endOfAnimationBehavior), typeof(int), typeof(bool) }),
@@ -146,7 +144,7 @@ namespace Swim
                 );
             }
 
-            if (Config.AnimationPatches == 3)
+            if (Config.AnimationPatches == AllPatches)
             {
                 harmony.Patch(
                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(int), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(FarmerSprite.endOfAnimationBehavior), typeof(int) }),
@@ -238,7 +236,7 @@ namespace Swim
                     __state.wasSwimming = true;
                 }
 
-                if(who.bathingClothes.Value && Config.AnimationPatches == 3 && TryGetShouldUseArmless(currentFrame, out bool shouldUseArmless) && shouldUseArmless)
+                if(who.bathingClothes.Value && Config.AnimationPatches == AllPatches && TryGetShouldUseArmless(currentFrame, out bool shouldUseArmless) && shouldUseArmless)
                 {
                     string which = SplitPath(__instance.textureName.Value)[2];
 
@@ -410,17 +408,6 @@ namespace Swim
             return true;
         }
 
-        public static void FarmerSprite_animate_Prefix(AnimatedSprite __instance, ref int whichAnimation)
-        {
-            if (__instance.Owner is not Farmer farmer)
-                return;
-
-            if (!farmer.bathingClothes.Value)
-                return;
-
-            MapMetaAnimationToBathingSuitAnimation(ref whichAnimation);
-        }
-
         public static void AnimationFrame_Constructor3_Postfix(ref FarmerSprite.AnimationFrame __instance, int frame)
         {
             try
@@ -509,7 +496,7 @@ namespace Swim
                     }
 
                     // Only edit the feature offset if animation patches = 3
-                    if (Config.AnimationPatches == 3 && codes[i].opcode == OpCodes.Ldsfld && codes[i].operand is FieldInfo info && info == AccessTools.Field(typeof(FarmerRenderer), nameof(FarmerRenderer.featureYOffsetPerFrame)))
+                    if (Config.AnimationPatches == AllPatches && codes[i].opcode == OpCodes.Ldsfld && codes[i].operand is FieldInfo info && info == AccessTools.Field(typeof(FarmerRenderer), nameof(FarmerRenderer.featureYOffsetPerFrame)))
                     {
                         SMonitor.Log($"Editing the feature offset ({hatCount})");
 
@@ -522,7 +509,7 @@ namespace Swim
                         hatCount++;
                     }
 
-                    if (Config.AnimationPatches == 3 && codes[i].opcode == OpCodes.Ldsfld && codes[i].operand is FieldInfo info2 && info2 == AccessTools.Field(typeof(FarmerRenderer), nameof(FarmerRenderer.featureXOffsetPerFrame)))
+                    if (Config.AnimationPatches == AllPatches && codes[i].opcode == OpCodes.Ldsfld && codes[i].operand is FieldInfo info2 && info2 == AccessTools.Field(typeof(FarmerRenderer), nameof(FarmerRenderer.featureXOffsetPerFrame)))
                     {
                         SMonitor.Log($"Editing the feature offset ({hatCount})");
 
@@ -631,81 +618,6 @@ namespace Swim
         public static bool ShouldNotDrawHat(Farmer farmer)
         {
             return (!Config.DisplayHatWithSwimsuit) && farmer.bathingClothes.Value;
-        }
-
-        public static void MapMetaAnimationToBathingSuitAnimation(ref int animation)
-        {
-            switch (animation)
-            {
-                case FarmerSprite.carryRunLeft:
-                case FarmerSprite.fishingDoneLeft:
-                case FarmerSprite.fishingLeft:
-                case FarmerSprite.grabLeft:
-                case FarmerSprite.harvestItemLeft:
-                case FarmerSprite.milkLeft:
-                case FarmerSprite.punchLeft:
-                case FarmerSprite.runLeft:
-                case FarmerSprite.seedThrowLeft:
-                case FarmerSprite.shearLeft:
-                case FarmerSprite.swordswipeLeft:
-                case FarmerSprite.toolChooseLeft:
-                case FarmerSprite.toolLeft:
-                case FarmerSprite.walkLeft:
-                    animation = FarmerSprite.carryWalkLeft;
-                    return;
-
-                case FarmerSprite.carryRunRight:
-                case FarmerSprite.fishingDoneRight:
-                case FarmerSprite.fishingRight:
-                case FarmerSprite.grabRight:
-                case FarmerSprite.harvestItemRight:
-                case FarmerSprite.milkRight:
-                case FarmerSprite.punchRight:
-                case FarmerSprite.runRight:
-                case FarmerSprite.seedThrowRight:
-                case FarmerSprite.shearRight:
-                case FarmerSprite.swordswipeRight:
-                case FarmerSprite.toolChooseRight:
-                case FarmerSprite.toolRight:
-                case FarmerSprite.walkRight:
-                    animation = FarmerSprite.carryWalkRight;
-                    return;
-
-                case FarmerSprite.carryRunDown:
-                case FarmerSprite.fishingDoneDown:
-                case FarmerSprite.fishingDown:
-                case FarmerSprite.grabDown:
-                case FarmerSprite.harvestItemDown:
-                case FarmerSprite.milkDown:
-                case FarmerSprite.punchDown:
-                case FarmerSprite.runDown:
-                case FarmerSprite.seedThrowDown:
-                case FarmerSprite.shearDown:
-                case FarmerSprite.swordswipeDown:
-                case FarmerSprite.toolChooseDown:
-                case FarmerSprite.toolDown:
-                case FarmerSprite.walkDown:
-                    animation = FarmerSprite.carryWalkDown;
-                    return;
-
-
-                case FarmerSprite.carryRunUp:
-                case FarmerSprite.fishingDoneUp:
-                case FarmerSprite.fishingUp:
-                case FarmerSprite.grabUp:
-                case FarmerSprite.harvestItemUp:
-                case FarmerSprite.milkUp:
-                case FarmerSprite.punchUp:
-                case FarmerSprite.runUp:
-                case FarmerSprite.seedThrowUp:
-                case FarmerSprite.shearUp:
-                case FarmerSprite.swordswipeUp:
-                case FarmerSprite.toolChooseUp:
-                case FarmerSprite.toolUp:
-                case FarmerSprite.walkUp:
-                    animation = FarmerSprite.carryWalkUp;
-                    return;
-            }
         }
 
         private const int sidewaysStandstill = 114;

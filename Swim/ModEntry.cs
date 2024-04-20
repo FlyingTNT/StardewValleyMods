@@ -301,6 +301,15 @@ namespace Swim
                     getValue: () => Config.SwimRestoresVitals,
                     setValue: value => Config.SwimRestoresVitals = value
                 );
+                configMenu.AddNumberOption(
+                    mod: ModEntry.context.ModManifest,
+                    name: () => "Animation Patches",
+                    tooltip: () => "Dictates the level at which to modify the bathing suit animations. Default 2 (all modifications). With level 0, the bathing suit will only be displayed when walking. With level 1, it will be displayed during most animations, although the arms will be weird. With level 2 (default), the arms will look reasonable in most animations. Each level increases the chance of breaking compatibility with other mods that edit the player's animations.",
+                    getValue: () => Config.AnimationPatches,
+                    setValue: value => Config.AnimationPatches = value,
+                    min: 0,
+                    max: 2
+                );
                 #endregion
 
                 #region Region: Key Binds.

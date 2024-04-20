@@ -94,7 +94,7 @@ namespace Swim
             TriggerDistanceLeft = 130;
             TriggerDistanceRight = 130;
 
-            AnimationPatches = 3;
+            AnimationPatches = 2;
         }
     }
 }

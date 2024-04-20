@@ -1,16 +1,10 @@
 ﻿{
   "Name": "Swim Mod",
   "Author": "aedenthorn",
-  "Version": "3.5.5",
+  "Version": "3.5.5-unofficial.10-FlyingTNT",
   "Description": "Allows you to swim.",
   "UniqueID": "aedenthorn.Swim",
   "EntryDll": "Swim.dll",
   "MinimumApiVersion": "4.0.0",
-  "UpdateKeys": [ "Nexus:6326" ],
-  "Dependencies": [
-    {
-      "UniqueID": "spacechase0.JsonAssets",
-      "IsRequired": false
-    }
-  ]
+  "UpdateKeys": [ "Nexus:6326" ]
 }

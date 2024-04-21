@@ -58,8 +58,8 @@ namespace ResourceStorage
             }
         }
 
-        [HarmonyPatch(typeof(Farmer), nameof(Farmer.getItemCountInList))]
-        public class Farmer_getItemCountInList_Patch
+        [HarmonyPatch(typeof(Farmer), nameof(Farmer.getItemCount))]
+        public class Farmer_getItemCount_Patch
         {
             public static void Postfix(Farmer __instance, string itemId, ref int __result)
             {

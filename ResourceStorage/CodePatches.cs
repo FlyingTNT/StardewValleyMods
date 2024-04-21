@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using StardewModdingAPI;
 using StardewValley;
 using StardewValley.GameData.Objects;
 using StardewValley.Inventories;
@@ -277,18 +278,38 @@ namespace ResourceStorage
             {
                 if (!Config.ModEnabled || Game1.activeClickableMenu is not GameMenu)
                     return true;
-                if(key == (Keys)Config.ResourcesKey)
+                if(SButtonExtensions.ToSButton(key) == Config.ResourcesKey)
                 {
                     ___hoverText = "";
                     Game1.playSound("bigSelect");
                     gameMenu = Game1.activeClickableMenu as GameMenu;
-                    Game1.activeClickableMenu = new ResourceMenu();
                     Game1.activeClickableMenu = new ResourceMenu();
                     return false;
                 }
                 return true;
             }
         }
+
+        [HarmonyPatch(typeof(InventoryPage), nameof(InventoryPage.receiveGamePadButton))]
+        public class InventoryPage_receiveGamePadButton_Patch
+        {
+            public static bool Prefix(InventoryPage __instance, Buttons b, ref string ___hoverText)
+            {
+                if (!Config.ModEnabled || Game1.activeClickableMenu is not GameMenu)
+                    return true;
+                if (SButtonExtensions.ToSButton(b) == Config.ResourcesKey)
+                {
+                    ___hoverText = "";
+                    Game1.playSound("bigSelect");
+                    gameMenu = Game1.activeClickableMenu as GameMenu;
+                    Game1.activeClickableMenu = new ResourceMenu();
+                    return false;
+                }
+                return true;
+            }
+        }
+
+
         [HarmonyPatch(typeof(InventoryPage), nameof(InventoryPage.receiveLeftClick))]
         public class InventoryPage_receiveLeftClick_Patch
         {

@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using StardewModdingAPI;
 using StardewValley;
 using StardewValley.BellsAndWhistles;
 using StardewValley.Menus;
@@ -287,13 +288,24 @@ namespace ResourceStorage
 
         public override void receiveKeyPress(Keys key)
         {
-            if((Game1.options.doesInputListContain(Game1.options.menuButton, key) || key == (Keys)ModEntry.Config.ResourcesKey) && readyToClose())
+            if((Game1.options.doesInputListContain(Game1.options.menuButton, key) || SButtonExtensions.ToSButton(key) == ModEntry.Config.ResourcesKey) && readyToClose())
             {
                 exitThisMenu();
                 Game1.activeClickableMenu = ModEntry.gameMenu;
                 return;
             }
             base.receiveKeyPress(key);
+        }
+
+        public override void receiveGamePadButton(Buttons button)
+        {
+            if (SButtonExtensions.ToSButton(button) == ModEntry.Config.ResourcesKey && readyToClose())
+            {
+                exitThisMenu();
+                Game1.activeClickableMenu = ModEntry.gameMenu;
+                return;
+            }
+            base.receiveGamePadButton(button);
         }
 
 

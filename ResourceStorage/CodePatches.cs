@@ -147,13 +147,13 @@ namespace ResourceStorage
         [HarmonyPatch(typeof(CraftingRecipe), nameof(CraftingRecipe.ConsumeAdditionalIngredients))]
         public class CraftingRecipe_ConsumeAdditionalIngredients_Patch
         {
-            public static void Prefix(List<KeyValuePair<string, int>> additionalRecipeItems)
+            public static void Prefix(ref List<KeyValuePair<string, int>> additionalRecipeItems)
             {
                 if (!Config.ModEnabled || !Config.AutoUse)
                     return;
                 for(int i = 0; i < additionalRecipeItems.Count; i++)
                 {
-                    additionalRecipeItems[i] = new KeyValuePair<string, int>(additionalRecipeItems[i].Key, additionalRecipeItems[i].Value + ConsumeItemsForCrafting(Game1.player, additionalRecipeItems[i].Key, additionalRecipeItems[i].Value));
+                    additionalRecipeItems[i] = new KeyValuePair<string, int>(additionalRecipeItems[i].Key, additionalRecipeItems[i].Value - ConsumeItemsForCrafting(Game1.player, additionalRecipeItems[i].Key, additionalRecipeItems[i].Value));
                 }
             }
         }
@@ -190,7 +190,7 @@ namespace ResourceStorage
                 Dictionary<string, int> dict = new();
                 foreach(var s in __state)
                 {
-                    int amount = s.Value + ConsumeItemsForCrafting(Game1.player, s.Key, s.Value);
+                    int amount = s.Value - ConsumeItemsForCrafting(Game1.player, s.Key, s.Value);
                     if (amount <= 0)
                         continue;
                     dict.Add(s.Key, amount);
@@ -360,7 +360,7 @@ namespace ResourceStorage
                 }
             }
         }
-        public static void Leclair_Stardew_Common_InventoryHelper_ConsumeItem_Prefix(Func<Item, bool> matcher, IList<Item> items, int amount)
+        public static void Leclair_Stardew_Common_InventoryHelper_ConsumeItem_Prefix(Func<Item, bool> matcher, IList<Item> items, ref int amount)
         {
             if (!Config.ModEnabled || items != Game1.player.Items)
                 return;

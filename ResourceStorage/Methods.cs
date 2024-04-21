@@ -5,6 +5,7 @@ using StardewValley;
 using StardewValley.GameData.Objects;
 using StardewValley.Inventories;
 using StardewValley.ItemTypeDefinitions;
+using StardewValley.Menus;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -224,6 +225,24 @@ namespace ResourceStorage
             }
 
             return totalConsumed;
+        }
+
+        public static void SetupResourceButton(IClickableMenu menu)
+        {
+            if(resourceButton is null)
+            {
+                resourceButton = new ClickableTextureComponent("Up", new Rectangle(menu.xPositionOnScreen + menu.width + 8 + Config.IconOffsetX, menu.yPositionOnScreen + 256 + Config.IconOffsetY, 44, 44), "", SHelper.Translation.Get("resources"), Game1.mouseCursors, new Rectangle(116, 442, 22, 22), 2)
+                {
+                    myID = 42999,
+                    upNeighborID = 106,
+                    downNeighborID = 105,
+                    leftNeighborID = 11
+                };
+            }
+            else
+            {
+                resourceButton.bounds = new Rectangle(menu.xPositionOnScreen + menu.width + 8 + Config.IconOffsetX, menu.yPositionOnScreen + 256 + Config.IconOffsetY, 44, 44);
+            }
         }
     }
 }

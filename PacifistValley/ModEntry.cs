@@ -54,6 +54,10 @@ namespace PacifistValley
                prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.setFarmerAnimating_prefix))
             );
             harmony.Patch(
+               original: AccessTools.Method(typeof(MeleeWeapon), nameof(MeleeWeapon.drawDuringUse), new Type[] {typeof(int), typeof(int), typeof(SpriteBatch), typeof(Vector2), typeof(Farmer), typeof(string), typeof(int), typeof(bool)}),
+               prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.MeleeWeapon_drawDuringUse_Prefix))
+            );
+            harmony.Patch(
                original: AccessTools.Method(typeof(MeleeWeapon), "beginSpecialMove"),
                prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.beginSpecialMove_prefix))
             );
@@ -769,6 +773,18 @@ namespace PacifistValley
             who.doEmote(20, true);
             return false;
         }
+
+        /// <summary>
+        /// Makes the position and rotation of the not weapons relative to the player look nice
+        /// </summary>
+        /// <param name="facingDirection"></param>
+        /// <param name="frameOfFarmerAnimation"></param>
+        private static void MeleeWeapon_drawDuringUse_Prefix(ref int facingDirection, ref int frameOfFarmerAnimation)
+        {
+            facingDirection = facingDirection == 0 || facingDirection == 3 ? 3 : 2;
+            frameOfFarmerAnimation = facingDirection == 3 ? 2 : 0;
+        }
+
         private static bool takeDamage_prefix(Farmer __instance, Monster damager)
         {
             if(damager != null && damager.Health <= 0)

@@ -151,6 +151,69 @@ namespace Swim
                     IAssetDataForImage image = asset.AsImage();
                     UpdateBathingSuits(image);
                 });
+            }else if(e.NameWithoutLocale.IsEquivalentTo("FlyingTNT.Swim/GirlSwimsuitArmless"))
+            {
+                if (e.DataType == typeof(Texture2D))
+                {
+                    e.LoadFromModFile<Texture2D>("assets/GirlSwimsuitArmless.png", AssetLoadPriority.Low);
+                }
+                else if (e.DataType == typeof(IRawTextureData))
+                {
+                    e.LoadFromModFile<IRawTextureData>("assets/GirlSwimsuitArmless.png", AssetLoadPriority.Low);
+                }
+                else
+                {
+                    SMonitor.Log($"Error loading file FlyingTNT.Swim/GirlSwimsuitArmless! Invalid type ({e.DataType})", LogLevel.Error);
+                    return;
+                }
+            }
+            else if (e.NameWithoutLocale.IsEquivalentTo("FlyingTNT.Swim/BoySwimsuitArmless"))
+            {
+                if (e.DataType == typeof(Texture2D))
+                {
+                    e.LoadFromModFile<Texture2D>("assets/BoySwimsuitArmless.png", AssetLoadPriority.Low);
+                }
+                else if (e.DataType == typeof(IRawTextureData))
+                {
+                    e.LoadFromModFile<IRawTextureData>("assets/BoySwimsuitArmless.png", AssetLoadPriority.Low);
+                }
+                else
+                {
+                    SMonitor.Log($"Error loading file FlyingTNT.Swim/BoySwimsuitArmless! Invalid type ({e.DataType})", LogLevel.Error);
+                    return;
+                }
+            }
+            else if (e.NameWithoutLocale.IsEquivalentTo("FlyingTNT.Swim/PlayerBaseBoyArmless"))
+            {
+                if (e.DataType == typeof(Texture2D))
+                {
+                    e.LoadFromModFile<Texture2D>("assets/PlayerBaseBoyArmless.png", AssetLoadPriority.Low);
+                }
+                else if (e.DataType == typeof(IRawTextureData))
+                {
+                    e.LoadFromModFile<IRawTextureData>("assets/PlayerBaseBoyArmless.png", AssetLoadPriority.Low);
+                }
+                else
+                {
+                    SMonitor.Log($"Error loading file FlyingTNT.Swim/PlayerBaseBoyArmless! Invalid type ({e.DataType})", LogLevel.Error);
+                    return;
+                }
+            }
+            else if (e.NameWithoutLocale.IsEquivalentTo("FlyingTNT.Swim/PlayerBaseGirlArmless"))
+            {
+                if (e.DataType == typeof(Texture2D))
+                {
+                    e.LoadFromModFile<Texture2D>("assets/PlayerBaseGirlArmless.png", AssetLoadPriority.Low);
+                }
+                else if (e.DataType == typeof(IRawTextureData))
+                {
+                    e.LoadFromModFile<IRawTextureData>("assets/PlayerBaseGirlArmless.png", AssetLoadPriority.Low);
+                }
+                else
+                {
+                    SMonitor.Log($"Error loading file FlyingTNT.Swim/PlayerBaseGirlArmless! Invalid type ({e.DataType})", LogLevel.Error);
+                    return;
+                }
             }
         }
 
@@ -986,7 +1049,7 @@ namespace Swim
         static readonly Rectangle replaceRectangle = new Rectangle(0, 14, 16, 32-14);
         public static void UnarmBathingModels(IAssetDataForImage image, bool girl)
         {
-            IRawTextureData textureData = SHelper.ModContent.Load<IRawTextureData>(girl ? "assets/PlayerBaseGirlArmless.png" : "assets/PlayerBaseBoyArmless.png");
+            IRawTextureData textureData = SHelper.GameContent.Load<IRawTextureData>(girl ? "FlyingTNT.Swim/PlayerBaseGirlArmless" : "FlyingTNT.Swim/PlayerBaseBoyArmless");
 
             Rectangle sourceRectangle = new Rectangle(replaceRectangle.Left, replaceRectangle.Top, replaceRectangle.Width, replaceRectangle.Height);
             Rectangle targetRectangle = new Rectangle(replaceRectangle.Left, replaceRectangle.Top + bathingSuitTextureStartY, replaceRectangle.Width, replaceRectangle.Height);
@@ -1005,8 +1068,8 @@ namespace Swim
         }
         public static void UpdateBathingSuits(IAssetDataForImage image)
         {
-            IRawTextureData girlTextureData = SHelper.ModContent.Load<IRawTextureData>("assets/GirlSwimsuitArmless.png");
-            IRawTextureData boyTextureData = SHelper.ModContent.Load<IRawTextureData>("assets/BoySwimsuitArmless.png");
+            IRawTextureData girlTextureData = Game1.content.Load<IRawTextureData>("FlyingTNT.Swim/GirlSwimsuitArmless");
+            IRawTextureData boyTextureData = Game1.content.Load<IRawTextureData>("FlyingTNT.Swim/BoySwimsuitArmless");
 
             Rectangle targetRectangle = new Rectangle(0, 0, 16*3, 32*3);
             // source is just the whole source image so we don't need a rectangle for it

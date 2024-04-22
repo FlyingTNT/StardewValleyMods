@@ -5,6 +5,9 @@ using Netcode;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.Characters;
+using StardewValley.GameData.Objects;
+using StardewValley.GameData.Weapons;
+using StardewValley.ItemTypeDefinitions;
 using StardewValley.Locations;
 using StardewValley.Monsters;
 using StardewValley.Network;
@@ -59,10 +62,21 @@ namespace PacifistValley
                transpiler: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.updateCharacters_Transpiler))
             );
             harmony.Patch(
-               original: AccessTools.Method(typeof(GameLocation), "damageMonster", new Type[] { typeof(Microsoft.Xna.Framework.Rectangle), typeof(int), typeof(int), typeof(bool), typeof(float), typeof(int), typeof(float), typeof(float), typeof(bool), typeof(Farmer) }),
-               transpiler: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.damageMonster_Transpiler)),
+               original: AccessTools.Method(typeof(GameLocation), "damageMonster", new Type[] { typeof(Rectangle), typeof(int), typeof(int), typeof(bool), typeof(float), typeof(int), typeof(float), typeof(float), typeof(bool), typeof(Farmer), typeof(bool)}),
                postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.damageMonster_Postfix))
                //prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.damageMonster_prefix))
+            );
+            harmony.Patch(
+                original: AccessTools.Method(typeof(GameLocation), "onMonsterKilled"),
+                transpiler: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.GameLocation_onMonsterKilled_Transpiler))
+            );
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Monster), nameof(Monster.ShouldMonsterBeRemoved)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Monster_ShouldMonsterBeRemoved_Postfix))
+            );
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Monster), nameof(Monster.deathAnimation)),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Monster_deathAnimation_Prefix))
             );
             harmony.Patch(
                original: AccessTools.Method(typeof(GameLocation), "drawCharacters"),
@@ -140,9 +154,9 @@ namespace PacifistValley
             {
                 e.LoadFromModFile<Texture2D>("assets/totally_not_weapons.png", StardewModdingAPI.Events.AssetLoadPriority.Exclusive);
             }
-            else if (e.NameWithoutLocale.IsEquivalentTo("Data/weapons"))
+            else if (e.NameWithoutLocale.IsEquivalentTo("Data/Weapons"))
             {
-                e.LoadFromModFile<Dictionary<int, string>>("assets/totally_not_weapons.json", StardewModdingAPI.Events.AssetLoadPriority.Exclusive);
+                e.LoadFromModFile<Dictionary<string, WeaponData>>("assets/totally_not_weapons.json", StardewModdingAPI.Events.AssetLoadPriority.Exclusive);
             }
             else if (e.NameWithoutLocale.IsEquivalentTo("Data/mail"))
             {
@@ -155,8 +169,8 @@ namespace PacifistValley
             else if (e.NameWithoutLocale.IsEquivalentTo("Data/Quests"))
             {
                 e.Edit(delegate (IAssetData data) {
-                    var editor = data.AsDictionary<int, string>();
-                    editor.Data[15] = Helper.Translation.Get("Quests-15");
+                    var editor = data.AsDictionary<string, string>();
+                    editor.Data["15"] = Helper.Translation.Get("Quests-15");
                 });
 
             }
@@ -190,18 +204,18 @@ namespace PacifistValley
                 editor.Data["Chat_MonsterSlayer3"] = Helper.Translation.Get("Chat_MonsterSlayer3");
                 });
             }
-            else if (e.NameWithoutLocale.IsEquivalentTo("Data/ObjectInformation"))
+            else if (e.NameWithoutLocale.IsEquivalentTo("Data/Objects"))
             {
                 e.Edit(delegate (IAssetData data) {
-                    var editor = data.AsDictionary<int, string>();
-                    editor.Data[527] = Helper.Translation.Get("ObjectInformation-527");
-                    editor.Data[531] = Helper.Translation.Get("ObjectInformation-531");
-                    editor.Data[532] = Helper.Translation.Get("ObjectInformation-532");
-                    editor.Data[533] = Helper.Translation.Get("ObjectInformation-533");
-                    editor.Data[534] = Helper.Translation.Get("ObjectInformation-534");
-                    editor.Data[521] = Helper.Translation.Get("ObjectInformation-521");
-                    editor.Data[522] = Helper.Translation.Get("ObjectInformation-522");
-                    editor.Data[523] = Helper.Translation.Get("ObjectInformation-523");
+                    var editor = data.AsDictionary<string, ObjectData>();
+                    editor.Data["527"] = convertObjectData(Helper.Translation.Get("ObjectInformation-527"), 527);
+                    editor.Data["531"] = convertObjectData(Helper.Translation.Get("ObjectInformation-531"), 531);
+                    editor.Data["532"] = convertObjectData(Helper.Translation.Get("ObjectInformation-532"), 532);
+                    editor.Data["533"] = convertObjectData(Helper.Translation.Get("ObjectInformation-533"), 533);
+                    editor.Data["534"] = convertObjectData(Helper.Translation.Get("ObjectInformation-534"), 534);
+                    editor.Data["521"] = convertObjectData(Helper.Translation.Get("ObjectInformation-521"), 521);
+                    editor.Data["522"] = convertObjectData(Helper.Translation.Get("ObjectInformation-522"), 522);
+                    editor.Data["523"] = convertObjectData(Helper.Translation.Get("ObjectInformation-523"), 523);
                 });
             }
             else if (e.NameWithoutLocale.IsEquivalentTo("Strings/StringsFromCSFiles"))
@@ -556,7 +570,7 @@ namespace PacifistValley
                 int monsters = 0;
                 foreach(Character c in __instance.characters)
                 {
-                    if(c is Monster && (c as Monster).Health > 0)
+                    if(c is Monster m && m.Health > 0)
                     {
                         monsters++;
                     }
@@ -597,54 +611,65 @@ namespace PacifistValley
                         {
                             Vector2 emotePosition = npc.getLocalPosition(Game1.viewport);
                             emotePosition.Y -= (float)(32 + npc.Sprite.SpriteHeight * 4);
-                            b.Draw(Game1.emoteSpriteSheet, emotePosition, new Rectangle?(new Rectangle(npc.CurrentEmoteIndex * 16 % Game1.emoteSpriteSheet.Width, npc.CurrentEmoteIndex * 16 / Game1.emoteSpriteSheet.Width * 16, 16, 16)), Color.White, 0f, Vector2.Zero, 4f, SpriteEffects.None, (float)npc.getStandingY() / 10000f);
+                            b.Draw(Game1.emoteSpriteSheet, emotePosition, new Rectangle?(new Rectangle(npc.CurrentEmoteIndex * 16 % Game1.emoteSpriteSheet.Width, npc.CurrentEmoteIndex * 16 / Game1.emoteSpriteSheet.Width * 16, 16, 16)), Color.White, 0f, Vector2.Zero, 4f, SpriteEffects.None, (float)npc.getStandingPosition().Y / 10000f);
                         }
                     }
                 }
             }
             return false;
         }
-        public static IEnumerable<CodeInstruction> damageMonster_Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
-            SMonitor.Log($"Transpiling GameLocation.damageMonster!");
 
-            var codes = new List<CodeInstruction>(instructions);
-            var newCodes = new List<CodeInstruction>();
-            bool startLooking = false;
-            bool startSkipping = false;
-            bool stopLooking = false;
-            for (int i = 0; i < codes.Count; i++)
+        public static void GameLocation_onMonsterKilled_Transpiler(IEnumerable<CodeInstruction> instructions)
+        {
+            SMonitor.Log("Transpliling GameLocation.onMonsterKilled");
+            try
             {
-                if (startLooking && !stopLooking)
+                var codes = new List<CodeInstruction>(instructions);
+                bool start = false;
+
+                for (int i = 1; i < codes.Count; i++)
                 {
-                    if (startSkipping && codes[i].opcode == OpCodes.Pop)
+                    if (codes[i].opcode == OpCodes.Ldarg_0 && codes[i-1].operand is MethodInfo info && info == AccessTools.Method(typeof(Stats), "set_MonstersKilled"))
                     {
-                        SMonitor.Log($"popped!");
-                        newCodes.Add(codes[i]);
-                        stopLooking = true;
+                        start = true;
+                        SMonitor.Log("Starting!");
                     }
-                    else if (!startSkipping && codes[i].opcode == OpCodes.Ldarg_0)
+
+                    if(start)
                     {
-                        SMonitor.Log($"start skipping!");
-                        startSkipping = true;
-                    }
-                    if (startSkipping)
-                    {
+                        if (codes[i].opcode == OpCodes.Call && codes[i].operand is MethodInfo info1 && info1 == AccessTools.Method(typeof(GameLocation), nameof(GameLocation.removeTemporarySpritesWithID)))
+                        {
+                            SMonitor.Log("Stopping!");
+                            codes[i].opcode = OpCodes.Nop;
+                            codes[i].operand = null;
+                            break;
+                        }
                         codes[i].opcode = OpCodes.Nop;
                         codes[i].operand = null;
-                        SMonitor.Log($"nullifying {codes[i].opcode}");
                     }
                 }
-                else if (!stopLooking && codes[i].opcode == OpCodes.Ldstr && (codes[i].operand as string) == "hardModeMonstersKilled")
-                {
-                    SMonitor.Log($"got hardModeMonstersKilled!");
-                    startLooking = true;
-                }
-                newCodes.Add(codes[i]);
             }
-
-            return newCodes.AsEnumerable();
+            catch(Exception e)
+            {
+                SMonitor.Log($"Failed in {nameof(GameLocation_onMonsterKilled_Transpiler)}: {e}", LogLevel.Error);
+            }
         }
+
+        public static bool Monster_deathAnimation_Prefix()
+        {
+            return false;
+        }
+
+        public static bool Monster_ShouldMonsterBeRemoved_Postfix(bool _)
+        {
+            return false;
+        }
+
+        public static bool OldShouldMonsterBeRemoved(Monster monster)
+        {
+            return monster.Health <= 0;
+        }
+
         private static void damageMonster_Postfix(GameLocation __instance)
         {
             for (int i = __instance.characters.Count - 1; i >= 0; i--)
@@ -657,7 +682,9 @@ namespace PacifistValley
 
         public static IEnumerable<CodeInstruction> updateCharacters_Transpiler(IEnumerable<CodeInstruction> instructions)
         {
-            SMonitor.Log($"Transpiling GameLocation.spawnObjects");
+            SMonitor.Log($"Transpiling GameLocation.updateCharacters");
+
+            int updatedCount = 0;
 
             var codes = new List<CodeInstruction>(instructions);
             for (int i = 0; i < codes.Count; i++)
@@ -669,6 +696,20 @@ namespace PacifistValley
                     codes[i - 2].operand = null;
                     codes[i].opcode = OpCodes.Call;
                     codes[i].operand = AccessTools.Method(typeof(ModEntry), nameof(ModEntry.EmoteMonster));
+                    updatedCount++;
+                }
+
+                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo info && info == AccessTools.Method(typeof(Monster), nameof(Monster.ShouldMonsterBeRemoved)))
+                {
+                    SMonitor.Log("Overriding should monster be removed");
+                    codes[i].opcode = OpCodes.Call;
+                    codes[i].operand = AccessTools.Method(typeof(ModEntry), nameof(ModEntry.OldShouldMonsterBeRemoved));
+
+                    updatedCount++;
+                }
+
+                if(updatedCount == 2)
+                {
                     break;
                 }
             }
@@ -681,9 +722,9 @@ namespace PacifistValley
                 monster.doEmote(20, true);
         }
 
-        private static bool setFarmerAnimating_prefix(MeleeWeapon __instance, Farmer who, ref bool ___hasBegunWeaponEndPause, ref bool ___anotherClick, Farmer ___lastUser)
+        private static bool setFarmerAnimating_prefix(MeleeWeapon __instance, Farmer who, ref bool ___anotherClick, Farmer ___lastUser)
         {
-            if (__instance.isScythe(-1))
+            if (__instance.isScythe())
             {
                 return true;
             }
@@ -692,17 +733,17 @@ namespace PacifistValley
             Vector2 tileLocation2 = Vector2.Zero;
             Rectangle areaOfEffect = __instance.getAreaOfEffect((int)actionTile.X, (int)actionTile.Y, who.FacingDirection, ref tileLocation, ref tileLocation2, who.GetBoundingBox(), 666);
             areaOfEffect.Inflate(Config.AreaOfKissEffectModifier, Config.AreaOfKissEffectModifier);
-            who.currentLocation.damageMonster(areaOfEffect, (int)((float)__instance.minDamage.Value * (1f + who.attackIncreaseModifier)), (int)((float)__instance.maxDamage.Value * (1f + who.attackIncreaseModifier)), false, __instance.knockback.Value * (1f + who.knockbackModifier), (int)((float)__instance.addedPrecision.Value * (1f + who.weaponPrecisionModifier)), __instance.critChance.Value * (1f + who.critChanceModifier), __instance.critMultiplier.Value * (1f + who.critPowerModifier), __instance.type.Value != 1 || !__instance.isOnSpecial, ___lastUser);
+            who.currentLocation.damageMonster(areaOfEffect, (int)((float)__instance.minDamage.Value * (1f + who.buffs.AttackMultiplier)), (int)((float)__instance.maxDamage.Value * (1f + who.buffs.AttackMultiplier)), false, __instance.knockback.Value * (1f + who.buffs.KnockbackMultiplier), (int)((float)__instance.addedPrecision.Value * (1f + who.buffs.WeaponPrecisionMultiplier)), __instance.critChance.Value * (1f + who.buffs.CriticalChanceMultiplier), __instance.critMultiplier.Value * (1f + who.buffs.CriticalPowerMultiplier), __instance.type.Value != 1 || !__instance.isOnSpecial, ___lastUser);
 
             GameLocation location = who.currentLocation;
 
             foreach (Vector2 v in Utility.removeDuplicates(Utility.getListOfTileLocationsForBordersOfNonTileRectangle(areaOfEffect)))
             {
-                if (location.terrainFeatures.ContainsKey(v) && location.terrainFeatures[v].performToolAction(__instance, 0, v, location))
+                if (location.terrainFeatures.ContainsKey(v) && location.terrainFeatures[v].performToolAction(__instance, 0, v))
                 {
                     location.terrainFeatures.Remove(v);
                 }
-                if (location.objects.ContainsKey(v) && location.objects[v].performToolAction(__instance, location))
+                if (location.objects.ContainsKey(v) && location.objects[v].performToolAction(__instance))
                 {
                     location.objects.Remove(v);
                 }
@@ -713,11 +754,11 @@ namespace PacifistValley
             }
 
             ___anotherClick = false;
-            location.playSound("dwop", NetAudio.SoundContext.Default);
+            location.playSound("dwop");
 
             int speed = (int)Math.Round((Config.MillisecondsPerLove - __instance.speed.Value * Config.DeviceSpeedFactor*10)/10f)*10;
 
-            who.faceDirection(who.facingDirection);
+            who.faceDirection(who.facingDirection.Value == 1 || who.facingDirection.Value == 3 ? who.facingDirection.Value : 3);
             who.FarmerSprite.PauseForSingleAnimation = false;
             who.FarmerSprite.animateOnce(new List<FarmerSprite.AnimationFrame>
             {
@@ -750,7 +791,7 @@ namespace PacifistValley
             var codes = new List<CodeInstruction>(instructions);
             for (int i = 0; i < codes.Count; i++)
             {
-                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo && (MethodInfo)codes[i].operand == AccessTools.Method(typeof(Farmer), nameof(Farmer.isMarried)))
+                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo && (MethodInfo)codes[i].operand == AccessTools.Method(typeof(Farmer), nameof(Farmer.isMarriedOrRoommates)))
                 {
                     SMonitor.Log($"Adding prevent method");
 
@@ -765,6 +806,25 @@ namespace PacifistValley
         private static bool PreventMonsterAttack(bool married)
         {
             return false;
+        }
+
+        /// <summary>
+        /// Temporary method until I move the object data out of the translation files
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        private ObjectData convertObjectData(string data, int spriteIndex)
+        {
+            string[] split = data.Split('/');
+            ObjectData output = new();
+            output.Name = split[0];
+            output.Price = int.Parse(split[1]);
+            output.Edibility = int.Parse(split[2]);
+            output.Type = split[3];
+            output.DisplayName = split[4];
+            output.Description = split[5];
+            output.SpriteIndex = spriteIndex;
+            return output;
         }
     }
 }

@@ -163,7 +163,7 @@ namespace PacifistValley
                 e.Edit(delegate (IAssetData data) {
                     var editor = data.AsDictionary<string, string>();
                     editor.Data["guildQuest"] = Helper.Translation.Get("guildQuest");
-                    editor.Data["Kent"] = editor.Data["Kent"].Replace("286 1 287 1 288 1 787 1", "787 1");
+                    editor.Data["Kent"] = editor.Data["Kent"].Replace("(O)286 1 (O)287 1 (O)288 1 (O)787 1", "(O)787 1");
                 });
             }
             else if (e.NameWithoutLocale.IsEquivalentTo("Data/Quests"))
@@ -174,7 +174,7 @@ namespace PacifistValley
                 });
 
             }
-            else if (e.NameWithoutLocale.IsEquivalentTo("String/Locations"))
+            else if (e.NameWithoutLocale.IsEquivalentTo("Strings/Locations"))
             {
                 e.Edit(delegate (IAssetData data) {
                     var editor = data.AsDictionary<string, string>();

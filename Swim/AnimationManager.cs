@@ -301,7 +301,7 @@ namespace Swim
             public FarmerRendererDrawState(){}
         }
 
-        public static void FarmerRenderer_draw_AllPatches_Prefix(FarmerRenderer __instance, Farmer who, ref int currentFrame, ref AnimationFrame animationFrame, ref Rectangle sourceRect, ref NetString ___textureName, ref bool ____spriteDirty, ref bool ____eyesDirty, ref bool ____skinDirty, ref bool ____shirtDirty, ref bool ____pantsDirty, ref bool ____shoesDirty, ref bool ____baseTextureDirty, ref FarmerRendererDrawState __state)
+        public static void FarmerRenderer_draw_AllPatches_Prefix(FarmerRenderer __instance, Farmer who, int currentFrame, ref AnimationFrame animationFrame, ref NetString ___textureName, ref bool ____spriteDirty, ref bool ____eyesDirty, ref bool ____skinDirty, ref bool ____shirtDirty, ref bool ____pantsDirty, ref bool ____shoesDirty, ref bool ____baseTextureDirty, ref FarmerRendererDrawState __state)
         {
             try
             {
@@ -313,12 +313,6 @@ namespace Swim
 
                 if (!who.bathingClothes.Value)
                     return;
-
-                if (MapAnimationFrameToBathingSuitAnimation(who, ref currentFrame))
-                {
-                    animationFrame.frame = currentFrame;
-                    sourceRect = new Rectangle(currentFrame * who.FarmerSprite.SpriteWidth % 96, currentFrame * who.FarmerSprite.SpriteWidth / 96 * who.FarmerSprite.SpriteHeight, who.FarmerSprite.SpriteWidth, who.FarmerSprite.SpriteHeight);
-                }
 
                 if (TryGetShouldUseArmless(currentFrame, out bool shouldUseArmless) && shouldUseArmless)
                 {

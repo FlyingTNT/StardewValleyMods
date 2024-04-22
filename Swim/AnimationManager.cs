@@ -11,6 +11,7 @@ using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI.Events;
 using StardewModdingAPI.Utilities;
+using static StardewValley.FarmerSprite;
 
 namespace Swim
 {
@@ -129,10 +130,6 @@ namespace Swim
                 {
                     e.LoadFrom(() => Game1.content.Load<Texture2D>("Characters/Farmer" + PathUtilities.PreferredAssetSeparator + path[2]), AssetLoadPriority.Medium);
                 }
-                else if (e.DataType == typeof(IRawTextureData))
-                {
-                    e.LoadFrom(() => Game1.content.Load<IRawTextureData>("Characters/Farmer" + PathUtilities.PreferredAssetSeparator + path[2]), AssetLoadPriority.Medium);
-                }
                 else
                 {
                     SMonitor.Log($"Error loading file {"FlyingTNT.Swim/DisarmedModels/" + path[2]}! Invalid type ({e.DataType})", LogLevel.Error);
@@ -240,6 +237,14 @@ namespace Swim
                    transpiler: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_Transpiler))
                 );
             }
+            else if(Config.AnimationPatches == MediumPatches)
+            {
+                harmony.Patch(
+                   original: AccessTools.Method(typeof(FarmerRenderer), nameof(FarmerRenderer.draw), new Type[] { typeof(SpriteBatch), typeof(FarmerSprite.AnimationFrame), typeof(int), typeof(Rectangle), typeof(Vector2), typeof(Vector2), typeof(float), typeof(int), typeof(Color), typeof(float), typeof(float), typeof(Farmer) }),
+                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_MediumPatches_Prefix)),
+                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(FarmerRenderer_draw_Postfix))
+                );
+            }
             else
             {
                 harmony.Patch(
@@ -249,88 +254,8 @@ namespace Swim
                 );
             }
 
-            if(Config.AnimationPatches == MediumPatches)
-            {
-                harmony.Patch(
-                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(FarmerSprite.endOfAnimationBehavior), typeof(int), typeof(bool) }),
-                    prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-
-                harmony.Patch(
-                   original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(int), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(FarmerSprite.endOfAnimationBehavior), typeof(int) }),
-                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
-                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-
-                harmony.Patch(
-                   original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(bool), typeof(int) }),
-                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
-                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-
-                harmony.Patch(
-                   original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(bool) }),
-                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
-                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-
-                harmony.Patch(
-                   original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(bool) }),
-                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
-                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-
-                harmony.Patch(
-                   original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool) }),
-                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
-                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-
-                harmony.Patch(
-                   original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int) }),
-                   prefix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Prefix)),
-                   postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-            }
-
             if (Config.AnimationPatches == AllPatches)
             {
-                harmony.Patch(
-                   original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(int), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(FarmerSprite.endOfAnimationBehavior), typeof(int) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-
-                harmony.Patch(
-                   original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(bool), typeof(int) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-
-                harmony.Patch(
-                    original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(FarmerSprite.endOfAnimationBehavior), typeof(int), typeof(bool) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-
-                harmony.Patch(
-                   original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(bool) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-
-                harmony.Patch(
-                   original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(int), typeof(bool) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-
-                harmony.Patch(
-                   original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-
-                harmony.Patch(
-                   original: AccessTools.Constructor(typeof(FarmerSprite.AnimationFrame), new Type[] { typeof(int), typeof(int), typeof(bool), typeof(bool), typeof(FarmerSprite.endOfAnimationBehavior), typeof(bool) }),
-                    postfix: new HarmonyMethod(typeof(AnimationManager), nameof(AnimationFrame_Constructor_Postfix))
-                );
-
                 harmony.Patch(
                     original: AccessTools.Method(typeof(Farmer), nameof(Farmer.GetDisplayPants)),
                     postfix: new HarmonyMethod(typeof(AnimationManager), nameof(Farmer_GetDisplayPants_Postfix))
@@ -376,7 +301,7 @@ namespace Swim
             public FarmerRendererDrawState(){}
         }
 
-        public static void FarmerRenderer_draw_AllPatches_Prefix(FarmerRenderer __instance, Farmer who, int currentFrame, ref NetString ___textureName, ref bool ____spriteDirty, ref bool ____eyesDirty, ref bool ____skinDirty, ref bool ____shirtDirty, ref bool ____pantsDirty, ref bool ____shoesDirty, ref bool ____baseTextureDirty, ref FarmerRendererDrawState __state)
+        public static void FarmerRenderer_draw_AllPatches_Prefix(FarmerRenderer __instance, Farmer who, ref int currentFrame, ref AnimationFrame animationFrame, ref Rectangle sourceRect, ref NetString ___textureName, ref bool ____spriteDirty, ref bool ____eyesDirty, ref bool ____skinDirty, ref bool ____shirtDirty, ref bool ____pantsDirty, ref bool ____shoesDirty, ref bool ____baseTextureDirty, ref FarmerRendererDrawState __state)
         {
             try
             {
@@ -386,7 +311,16 @@ namespace Swim
                     __state.wasSwimming = true;
                 }
 
-                if(who.bathingClothes.Value && Config.AnimationPatches == AllPatches && TryGetShouldUseArmless(currentFrame, out bool shouldUseArmless) && shouldUseArmless)
+                if (!who.bathingClothes.Value)
+                    return;
+
+                if (MapAnimationFrameToBathingSuitAnimation(who, ref currentFrame))
+                {
+                    animationFrame.frame = currentFrame;
+                    sourceRect = new Rectangle(currentFrame * who.FarmerSprite.SpriteWidth % 96, currentFrame * who.FarmerSprite.SpriteWidth / 96 * who.FarmerSprite.SpriteHeight, who.FarmerSprite.SpriteWidth, who.FarmerSprite.SpriteHeight);
+                }
+
+                if (TryGetShouldUseArmless(currentFrame, out bool shouldUseArmless) && shouldUseArmless)
                 {
                     string which = SplitPath(__instance.textureName.Value)[2];
 
@@ -452,6 +386,10 @@ namespace Swim
                     ____baseTextureDirty = false; // If it is true, it will undo our changes to the baseTexture.
 
                 }
+                else
+                {
+                    animationFrame.armOffset = 0;
+                }
             }
             catch (Exception ex)
             {
@@ -509,6 +447,36 @@ namespace Swim
             catch (Exception ex)
             {
                 SMonitor.Log($"Failed in {nameof(FarmerRenderer_draw_AllPatches_Postfix)}:\n{ex}", LogLevel.Error);
+            }
+        }
+
+        public static void FarmerRenderer_draw_MediumPatches_Prefix(Farmer who, ref FarmerSprite.AnimationFrame animationFrame, ref int currentFrame, ref Rectangle sourceRect, ref bool __state)
+        {
+            try
+            {
+                if (who.swimming.Value && Game1.player.currentLocation.Name.StartsWith("Custom_Underwater"))
+                {
+                    who.swimming.Value = false;
+                    __state = true;
+                }
+
+                if (!who.bathingClothes.Value)
+                    return;
+
+                if (!(TryGetShouldUseArmless(currentFrame, out bool shouldUseArmless) && shouldUseArmless))
+                {
+                    animationFrame.armOffset = 0;
+                }
+
+                if (MapAnimationFrameToBathingSuitAnimation(who, ref currentFrame))
+                {
+                    animationFrame.frame = currentFrame;
+                    sourceRect = new Rectangle(currentFrame * who.FarmerSprite.SpriteWidth % 96, currentFrame * who.FarmerSprite.SpriteWidth / 96 * who.FarmerSprite.SpriteHeight, who.FarmerSprite.SpriteWidth, who.FarmerSprite.SpriteHeight);
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(FarmerRenderer_draw_MediumPatches_Prefix)}:\n{ex}", LogLevel.Error);
             }
         }
 
@@ -588,29 +556,6 @@ namespace Swim
                 SMonitor.Log($"Failed in {nameof(FarmerSprite_checkForFootstep_Prefix)}:\n{ex}", LogLevel.Error);
             }
             return true;
-        }
-
-        public static void AnimationFrame_Constructor_Postfix(ref FarmerSprite.AnimationFrame __instance, int frame)
-        {
-            try
-            {
-                if (!Game1.player.bathingClothes.Value)
-                    return;
-
-                if (!(TryGetShouldUseArmless(frame, out bool shouldUseArmless) && shouldUseArmless))
-                {
-                    __instance.armOffset = 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                SMonitor.Log($"Failed in {nameof(AnimationFrame_Constructor_Postfix)}:\n{ex}", LogLevel.Error);
-            }
-        }
-
-        public static void AnimationFrame_Constructor_Prefix(ref int frame)
-        {
-            MapAnimationFrameToBathingSuitAnimation(Game1.player, ref frame);
         }
 
         public static void Farmer_GetDisplayPants_Postfix(Farmer __instance, ref int spriteIndex)
@@ -1049,7 +994,7 @@ namespace Swim
         static readonly Rectangle replaceRectangle = new Rectangle(0, 14, 16, 32-14);
         public static void UnarmBathingModels(IAssetDataForImage image, bool girl)
         {
-            IRawTextureData textureData = SHelper.GameContent.Load<IRawTextureData>(girl ? "FlyingTNT.Swim/PlayerBaseGirlArmless" : "FlyingTNT.Swim/PlayerBaseBoyArmless");
+            Texture2D textureData = SHelper.GameContent.Load<Texture2D>(girl ? "FlyingTNT.Swim/PlayerBaseGirlArmless" : "FlyingTNT.Swim/PlayerBaseBoyArmless");
 
             Rectangle sourceRectangle = new Rectangle(replaceRectangle.Left, replaceRectangle.Top, replaceRectangle.Width, replaceRectangle.Height);
             Rectangle targetRectangle = new Rectangle(replaceRectangle.Left, replaceRectangle.Top + bathingSuitTextureStartY, replaceRectangle.Width, replaceRectangle.Height);
@@ -1068,8 +1013,8 @@ namespace Swim
         }
         public static void UpdateBathingSuits(IAssetDataForImage image)
         {
-            IRawTextureData girlTextureData = Game1.content.Load<IRawTextureData>("FlyingTNT.Swim/GirlSwimsuitArmless");
-            IRawTextureData boyTextureData = Game1.content.Load<IRawTextureData>("FlyingTNT.Swim/BoySwimsuitArmless");
+            Texture2D girlTextureData = SHelper.GameContent.Load<Texture2D>("FlyingTNT.Swim/GirlSwimsuitArmless");
+            Texture2D boyTextureData = SHelper.GameContent.Load<Texture2D>("FlyingTNT.Swim/BoySwimsuitArmless");
 
             Rectangle targetRectangle = new Rectangle(0, 0, 16*3, 32*3);
             // source is just the whole source image so we don't need a rectangle for it

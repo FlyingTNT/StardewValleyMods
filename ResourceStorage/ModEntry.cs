@@ -56,6 +56,7 @@ namespace ResourceStorage
             {
                 if (resourceDict.TryGetValue(f.UniqueMultiplayerID, out var dict))
                 {
+                    SMonitor.Log($"Saving resource dictionary for {f.Name}");
                     f.modData[dictKey] = JsonConvert.SerializeObject(dict);
                 }
             }

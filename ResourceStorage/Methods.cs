@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
+using StardewModdingAPI;
 using StardewValley;
 using StardewValley.GameData.Objects;
 using StardewValley.Inventories;
@@ -27,6 +28,7 @@ namespace ResourceStorage
 
             if (!dict.TryGetValue(id, out long oldAmount))
             {
+                SMonitor.Log($"{instance.Name} does not have {id}");
                 if (auto && !CanAutoStore(id))
                     return 0;
                 oldAmount = 0;
@@ -34,10 +36,10 @@ namespace ResourceStorage
             var newAmount = Math.Max(oldAmount + amountToAdd, 0);
             if(newAmount != oldAmount)
             {
-                SMonitor.Log($"Modified resource {id} from {oldAmount} to {newAmount}");
+                SMonitor.Log($"Modified {instance.Name}'s resource {id} from {oldAmount} to {newAmount}");
                 if (Config.ShowMessage)
                 {
-                    Object item =  ItemRegistry.Create<Object>(id, (int)(newAmount - oldAmount));
+                    Object item = ItemRegistry.Create<Object>(id, (int)(newAmount - oldAmount));
                     try
                     {
                         var hm = new HUDMessage(string.Format(newAmount > oldAmount ? SHelper.Translation.Get("added-x-y") : SHelper.Translation.Get("removed-x-y"), (int)Math.Abs(newAmount - oldAmount), item.DisplayName), 1000) { whatType = newAmount > oldAmount ? 4 : 3 };
@@ -55,9 +57,20 @@ namespace ResourceStorage
 
         public static Dictionary<string, long> GetFarmerResources(Farmer instance)
         {
+            SMonitor.Log($"Getting resource dictionary for {instance.Name}");
             if (!resourceDict.TryGetValue(instance.UniqueMultiplayerID, out var dict))
             {
-                dict = instance.modData.TryGetValue(dictKey, out var str) ? DeserializeDictionary(str) : new();
+                SMonitor.Log($"Checking mod data for {instance.Name}");
+                if(instance.modData.TryGetValue(dictKey, out var str))
+                {
+                    SMonitor.Log("Deserializing dictionary!");
+                    dict = DeserializeDictionary(str);
+                }
+                else
+                {
+                    SMonitor.Log("No mod data found; making a new dictionary.");
+                    dict = new();
+                }
                 resourceDict[instance.UniqueMultiplayerID] = dict;
             }
             return dict;
@@ -121,7 +134,11 @@ namespace ResourceStorage
 
             Dictionary<string, long> dict = GetFarmerResources(instance);
 
-            return dict.TryGetValue(id, out long amount) ? amount : 0;
+            long count = dict.TryGetValue(id, out long amount) ? amount : 0;
+
+            SMonitor.Log($"Getting {instance.Name}'s {id} ({count})");
+
+            return count;
         }
         public static bool CanStore(Object obj)
         {
@@ -164,6 +181,8 @@ namespace ResourceStorage
             if (!Config.ModEnabled || !Config.AutoUse)
                 return ingredient_count;
 
+            SMonitor.Log("Adding ingredient amount");
+
             return (int)(ingredient_count + GetResourceAmount(Game1.player, ItemRegistry.QualifyItemId(pair.Key)));
         }
 
@@ -171,8 +190,9 @@ namespace ResourceStorage
         {
             foreach(Farmer f in Game1.getAllFarmers())
             {
-                if(f.Items == inventory)
+                if(ReferenceEquals(f.Items, inventory))
                 {
+                    SMonitor.Log($"{f.Name} is the inventory owner");
                     farmer = f;
                     return true;
                 }
@@ -187,11 +207,14 @@ namespace ResourceStorage
             if (!Config.ModEnabled || !Config.AutoUse)
                 return 0;
 
+            SMonitor.Log($"Getting {farmer.Name}'s crafting matches for {itemId}");
+
             int output = 0;
             foreach (var kvp in GetFarmerResources(farmer))
             {
                 if (CraftingRecipe.ItemMatchesForCrafting(ItemRegistry.Create(kvp.Key), itemId))
                 {
+                    SMonitor.Log($"{kvp.Key} mathces. Adding {kvp.Value}");
                     output += (int)kvp.Value;
                 }
             }
@@ -210,14 +233,18 @@ namespace ResourceStorage
             if (!Config.ModEnabled || !Config.AutoUse)
                 return 0;
 
+            SMonitor.Log($"Consuming {maxAmount} {itemId} from {farmer.Name} for crafting.");
+
             int totalConsumed = 0;
 
             foreach(var kvp in GetFarmerResources(farmer))
             {
                 if (CraftingRecipe.ItemMatchesForCrafting(ItemRegistry.Create(kvp.Key), itemId))
                 {
+                    SMonitor.Log($"Consuming {kvp.Key}");
                     totalConsumed -= (int)ModifyResourceLevel(farmer, kvp.Key, -(maxAmount - totalConsumed));
-                    if (totalConsumed == maxAmount)
+                    SMonitor.Log($"Total consumed thus far: {totalConsumed}");
+                    if (totalConsumed >= maxAmount)
                     {
                         return totalConsumed;
                     }

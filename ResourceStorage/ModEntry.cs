@@ -26,6 +26,7 @@ namespace ResourceStorage
         public static GameMenu gameMenu;
         public static ClickableTextureComponent resourceButton;
         private Harmony harmony;
+        private static bool ShouldReloadDictionary = true;
 
 
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
@@ -42,6 +43,7 @@ namespace ResourceStorage
             Helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
             Helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
             Helper.Events.GameLoop.Saving += GameLoop_Saving;
+            Helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
 
             harmony = new Harmony(ModManifest.UniqueID);
             harmony.PatchAll();
@@ -64,7 +66,17 @@ namespace ResourceStorage
 
         public void GameLoop_SaveLoaded(object sender, StardewModdingAPI.Events.SaveLoadedEventArgs e)
         {
-            resourceDict.Clear();
+            if(ShouldReloadDictionary)
+            {
+                SMonitor.Log("Clearing the resource dictionary!");
+                resourceDict.Clear();
+                ShouldReloadDictionary = false;
+            }
+        }
+
+        public static void GameLoop_ReturnedToTitle(object sender, StardewModdingAPI.Events.ReturnedToTitleEventArgs e)
+        {
+            ShouldReloadDictionary = true;
         }
 
         public void GameLoop_GameLaunched(object sender, StardewModdingAPI.Events.GameLaunchedEventArgs e)

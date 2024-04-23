@@ -1,15 +1,15 @@
 ﻿{
   "Name": "Pacifist Valley",
-  "Author": "Aedenthorn",
-  "Version": "1.0.1",
+  "Author": "aedenthorn, FlyingTNT",
+  "Version": "1.0.0",
   "Description": "Changes killing into kissing.",
-  "UniqueID": "Aedenthorn.PacifistValley",
+  "UniqueID": "FlyingTNT.PacifistValley",
   "EntryDll": "PacifistValley.dll",
   "MinimumApiVersion": "4.0.0",
-  "UpdateKeys": ["Nexus:5464"],
+  "UpdateKeys": [ "Nexus:23109" ],
   "ModUpdater": {
     "Repository": "StardewValleyMods",
-    "User": "aedenthorn",
+    "User": "FlyingTNT",
     "Directory": "_releases",
     "ModFolder": "PacifistValley"
   },

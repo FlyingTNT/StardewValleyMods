@@ -301,10 +301,18 @@ namespace Swim
         {
             try
             {
-                if (who.swimming.Value && Game1.player.currentLocation.Name.StartsWith("Custom_Underwater"))
+                if (who.swimming.Value)
                 {
-                    who.swimming.Value = false;
-                    __state.wasSwimming = true;
+
+                    if(Game1.player.currentLocation.Name.StartsWith("Custom_Underwater"))
+                    {
+                        who.swimming.Value = false;
+                        __state.wasSwimming = true;
+                    }
+                    else
+                    {
+                        animationFrame.positionOffset = 0;
+                    }
                 }
 
                 currentlyDrawingFarmer.Value = who;
@@ -451,23 +459,26 @@ namespace Swim
         {
             try
             {
-                if (who.swimming.Value && Game1.player.currentLocation.Name.StartsWith("Custom_Underwater"))
+                if (who.swimming.Value)
                 {
-                    who.swimming.Value = false;
-                    __state = true;
+                    if (Game1.player.currentLocation.Name.StartsWith("Custom_Underwater"))
+                    {
+                        who.swimming.Value = false;
+                        __state = true;
+                    }
+                    else
+                    {
+                        animationFrame.positionOffset = 0;
+                    }
                 }
 
                 if (!who.bathingClothes.Value)
                     return;
 
-                if (!(TryGetShouldUseArmless(currentFrame, out bool shouldUseArmless) && shouldUseArmless))
-                {
-                    animationFrame.armOffset = 0;
-                }
-
                 if (MapAnimationFrameToBathingSuitAnimation(who, ref currentFrame))
                 {
                     animationFrame.frame = currentFrame;
+                    animationFrame.armOffset = 0;
                     sourceRect = new Rectangle(currentFrame * who.FarmerSprite.SpriteWidth % 96, currentFrame * who.FarmerSprite.SpriteWidth / 96 * who.FarmerSprite.SpriteHeight, who.FarmerSprite.SpriteWidth, who.FarmerSprite.SpriteHeight);
                 }
             }
@@ -708,6 +719,25 @@ namespace Swim
                     {
                         SMonitor.Log($"Editing the pants sprite.");
 
+                        codes[i - 1].opcode = OpCodes.Nop;
+                        codes[i - 1].operand = null;
+
+                        codes[i].operand = (byte)12;
+                        codes[i + 1].opcode = OpCodes.Ldarg_S;
+                        codes[i + 1].operand = (byte)4;
+                        codes[i + 2].opcode = OpCodes.Call;
+                        codes[i + 2].operand = AccessTools.Method(typeof(AnimationManager), nameof(getSwimSourceRectanglePant));
+
+                        for(int j = 3; j < 8; j++)
+                        {
+                            codes[i + j].opcode = OpCodes.Nop;
+                            codes[i + j].operand = null;
+                        }
+
+                        codes[i + 8].opcode = OpCodes.Stloc_S;
+                        codes[i + 8].operand = (byte)3;
+
+                        /*
                         codes[i + 1].opcode = OpCodes.Call;
                         codes[i + 1].operand = AccessTools.Method(typeof(AnimationManager), nameof(GetPantsRectX));
 
@@ -718,7 +748,7 @@ namespace Swim
                         codes[i + 5].operand = AccessTools.Method(typeof(AnimationManager), nameof(GetPantsRectWidth));
 
                         codes[i + 7].opcode = OpCodes.Call;
-                        codes[i + 7].operand = AccessTools.Method(typeof(AnimationManager), nameof(GetPantsRectHeight));
+                        codes[i + 7].operand = AccessTools.Method(typeof(AnimationManager), nameof(GetPantsRectHeight));*/
 
                         pants = false;
                     }
@@ -967,11 +997,20 @@ namespace Swim
 
         public static Rectangle getSwimSourceRectangle(Farmer farmer, Rectangle ogRect)
         {
-            if (!farmer.bathingClothes.Value || farmer.swimming.Value || FarmerRenderer.isDrawingForUI)
+            if (!farmer.bathingClothes.Value || FarmerRenderer.isDrawingForUI)
                 return ogRect;
 
             TryMapAnimationFrame(farmer.FarmerSprite.CurrentFrame, out int frame);
-            return new Rectangle(frame * farmer.FarmerSprite.SpriteWidth % 96, frame * farmer.FarmerSprite.SpriteWidth / 96 * farmer.FarmerSprite.SpriteHeight, farmer.FarmerSprite.SpriteWidth, farmer.FarmerSprite.SpriteHeight);
+            return new Rectangle(frame * farmer.FarmerSprite.SpriteWidth % 96, frame * farmer.FarmerSprite.SpriteWidth / 96 * farmer.FarmerSprite.SpriteHeight, farmer.FarmerSprite.SpriteWidth, farmer.swimming.Value ? farmer.FarmerSprite.SpriteHeight/2 - (int)farmer.yOffset/4 : farmer.FarmerSprite.SpriteHeight);
+        }
+
+        public static Rectangle getSwimSourceRectanglePant(Farmer farmer, Rectangle ogRect)
+        {
+            if (!farmer.bathingClothes.Value || FarmerRenderer.isDrawingForUI)
+                return new Rectangle(ogRect.X, ogRect.Y, ogRect.Width, ogRect.Height);
+
+            TryMapAnimationFrame(farmer.FarmerSprite.CurrentFrame, out int frame);
+            return new Rectangle(frame * farmer.FarmerSprite.SpriteWidth % 96, frame * farmer.FarmerSprite.SpriteWidth / 96 * farmer.FarmerSprite.SpriteHeight, farmer.FarmerSprite.SpriteWidth, farmer.swimming.Value ? farmer.FarmerSprite.SpriteHeight / 2 - (int)farmer.yOffset / 4 : farmer.FarmerSprite.SpriteHeight);
         }
 
         public static int GetPantsRectX(Rectangle sourceRect)

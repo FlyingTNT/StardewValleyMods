@@ -779,8 +779,10 @@ namespace PacifistValley
         /// </summary>
         /// <param name="facingDirection"></param>
         /// <param name="frameOfFarmerAnimation"></param>
-        private static void MeleeWeapon_drawDuringUse_Prefix(ref int facingDirection, ref int frameOfFarmerAnimation)
+        private static void MeleeWeapon_drawDuringUse_Prefix(MeleeWeapon __instance, ref int facingDirection, ref int frameOfFarmerAnimation)
         {
+            if (__instance.isScythe())
+                return;
             facingDirection = facingDirection == 0 || facingDirection == 3 ? 3 : 2;
             frameOfFarmerAnimation = facingDirection == 3 ? 2 : 0;
         }

@@ -160,17 +160,30 @@ namespace ResourceStorage
         [HarmonyPatch(typeof(CraftingRecipe), nameof(CraftingRecipe.getCraftableCount), new Type[] { typeof(IList<Item>) })]
         public class CraftingRecipe_getCraftableCount_Patch
         {
+            /*public static void Prefix(ref IList<Item> additional_materials)
+            {
+                if(additional_materials is null)
+                {
+                    additional_materials = new List<Item>();
+                }
+
+                foreach(var kvp in GetFarmerResources(Game1.player))
+                {
+                    additional_materials.Add(ItemRegistry.Create(kvp.Key, (int)kvp.Value));
+                }
+            }*/
+
             public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
             {
                 SMonitor.Log($"Transpiling CraftingRecipe.getCraftableCount");
                 var codes = new List<CodeInstruction>(instructions);
-                for (int i = 0; i < codes.Count; i++)//Broken
+                for (int i = 0; i < codes.Count; i++)
                 {
                     if (codes[i].opcode == OpCodes.Ldloc_3 && codes[i + 1].opcode == OpCodes.Ldloc_S && codes[i + 2].opcode == OpCodes.Div)
                     {
                         SMonitor.Log($"adding method to increase ingredient count");
                         codes.Insert(i + 1, new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(ModEntry), nameof(AddIngredientAmount))));
-                        codes.Insert(i + 1, new CodeInstruction(OpCodes.Ldloc_2));
+                        codes.Insert(i + 1, new CodeInstruction(OpCodes.Ldloc, (byte)4));
                     }
                 }
 

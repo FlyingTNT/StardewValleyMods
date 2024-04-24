@@ -176,14 +176,16 @@ namespace ResourceStorage
             return ItemRegistry.GetMetadata(id).LocalItemId;
         }
 
-        private static int AddIngredientAmount(int ingredient_count, KeyValuePair<string, int> pair)
+        private static int AddIngredientAmount(int ingredient_count, string itemId)
         {
             if (!Config.ModEnabled || !Config.AutoUse)
                 return ingredient_count;
 
-            SMonitor.Log("Adding ingredient amount");
+            int newAmount = ingredient_count + GetMatchesForCrafting(Game1.player, itemId);
 
-            return (int)(ingredient_count + GetResourceAmount(Game1.player, ItemRegistry.QualifyItemId(pair.Key)));
+            SMonitor.Log($"Updated ingredient amount {ingredient_count} -> {newAmount}");
+
+            return newAmount;
         }
 
         public static bool TryGetInventoryOwner(Inventory inventory, out Farmer farmer)

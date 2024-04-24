@@ -94,6 +94,13 @@ namespace Swim
                 //SwimMaps.SwitchToWaterTiles(e.NewLocation);
             }
 
+            // We don't allow swimming in the night market, so we need to make sure the bridge is fixed so that they can't get softlocked on the right island.
+            // This would happen if they swam in thru the river and then jumped out on that island
+            if(e.NewLocation is BeachNightMarket market)
+            {
+                Beach.fixBridge(market);
+            }
+
             ModEntry.locationIsPool.Value = false;
         }
 

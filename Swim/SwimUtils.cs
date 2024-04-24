@@ -151,6 +151,12 @@ namespace Swim
                 return false;
             }
 
+            // Don't let them jump into water in the night market (still let them leave the water tho)
+            if(Game1.player.currentLocation is BeachNightMarket && !Game1.player.swimming.Value)
+            {
+                return false;
+            }
+
             return true;
         }
 

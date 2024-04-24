@@ -23,9 +23,9 @@ namespace Swim
 {
     internal class SwimUtils
     {
-        private static IMonitor Monitor;
+        private static IMonitor SMonitor;
         private static ModConfig Config;
-        private static IModHelper Helper;
+        private static IModHelper SHelper;
         public static Dictionary<string, string> seaMonsterSounds = new Dictionary<string, string>() {
             {"A","dialogueCharacter"},
             {"B","grunt"},
@@ -57,9 +57,9 @@ namespace Swim
 
         public static void Initialize(IMonitor monitor, IModHelper helper, ModConfig config)
         {
-            Monitor = monitor;
+            SMonitor = monitor;
             Config = config;
-            Helper = helper;
+            SHelper = helper;
         }
 
         public static Point GetEdgeWarpDestination(int idxPos, EdgeWarp edge)
@@ -73,12 +73,12 @@ namespace Swim
                 int tileIdx = edge.OtherMapFirstTile - 1 + otherIdx;
                 if (edge.DestinationHorizontal == true)
                 {
-                    Monitor.Log($"idx {idx} length {length} otherIdx {otherIdx} tileIdx {tileIdx} warp point: {tileIdx},{edge.OtherMapIndex}");
+                    SMonitor.Log($"idx {idx} length {length} otherIdx {otherIdx} tileIdx {tileIdx} warp point: {tileIdx},{edge.OtherMapIndex}");
                     return new Point(tileIdx, edge.OtherMapIndex);
                 }
                 else
                 {
-                    Monitor.Log($"warp point: {edge.OtherMapIndex},{tileIdx}");
+                    SMonitor.Log($"warp point: {edge.OtherMapIndex},{tileIdx}");
                     return new Point(edge.OtherMapIndex, tileIdx);
                 }
             }
@@ -94,7 +94,7 @@ namespace Swim
             DivePosition dp = diveLocation.OtherMapPos;
             if (dp == null)
             {
-                Monitor.Log($"Diving to existing tile position");
+                SMonitor.Log($"Diving to existing tile position");
                 Point pos = Game1.player.TilePoint;
                 dp = new DivePosition()
                 {
@@ -146,7 +146,7 @@ namespace Swim
             }
 
             // Player input checks
-            if (!((Game1.player.isMoving() && Config.ReadyToSwim) || (Helper.Input.IsDown(Config.ManualJumpButton) && Config.EnableClickToSwim)) || Helper.Input.IsDown(SButton.LeftShift))
+            if (!((Game1.player.isMoving() && Config.ReadyToSwim) || (SHelper.Input.IsDown(Config.ManualJumpButton) && Config.EnableClickToSwim)) || SHelper.Input.IsDown(SButton.LeftShift))
             {
                 return false;
             }
@@ -451,11 +451,11 @@ namespace Swim
                 if (!ModEntry.diveMaps.ContainsKey(map.Name))
                 {
                     ModEntry.diveMaps.Add(map.Name, map);
-                    Monitor.Log($"added dive map info for {map.Name}", LogLevel.Debug);
+                    SMonitor.Log($"added dive map info for {map.Name}", LogLevel.Debug);
                 }
                 else
                 {
-                    Monitor.Log($"dive map info already exists for {map.Name}", LogLevel.Warn);
+                    SMonitor.Log($"dive map info already exists for {map.Name}", LogLevel.Trace);
                 }
             }
         }
@@ -535,7 +535,7 @@ namespace Swim
 
             if (property == "PoolEntrance" || property == "ChangeIntoSwimsuit")
             {
-                Monitor.Log("The current tile is a pool entrance! Disabling swimming in this location.");
+                SMonitor.Log("The current tile is a pool entrance! Disabling swimming in this location.");
                 ModEntry.locationIsPool.Value = true;
                 return false;
             }

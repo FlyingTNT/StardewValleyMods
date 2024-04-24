@@ -317,7 +317,7 @@ namespace Swim
 
                 currentlyDrawingFarmer.Value = who;
 
-                if (!who.bathingClothes.Value)
+                if (!who.bathingClothes.Value || FarmerRenderer.isDrawingForUI)
                     return;
 
                 if (GetTextureState(who) is not FarmerTextureState textureState)
@@ -411,6 +411,11 @@ namespace Swim
                     who.swimming.Value = true;
                 }
 
+                if (FarmerRenderer.isDrawingForUI)
+                {
+                    return;
+                }
+
                 if (__state.oldTexture is not null)
                 {
                     SHelper.Reflection.GetField<Texture2D>(__instance, "baseTexture").SetValue(__state.oldTexture);
@@ -472,7 +477,7 @@ namespace Swim
                     }
                 }
 
-                if (!who.bathingClothes.Value)
+                if (!who.bathingClothes.Value || FarmerRenderer.isDrawingForUI)
                     return;
 
                 if (MapAnimationFrameToBathingSuitAnimation(who, ref currentFrame))
@@ -522,52 +527,59 @@ namespace Swim
 
         static void FramerRenderer_Constructor_Postfix(NetColor ___eyes, NetInt ___skin, NetString ___shoes, NetString ___shirt, NetString ___pants)
         {
-            ___eyes.fieldChangeVisibleEvent += delegate
+            try
             {
-                if (GetTextureState(Game1.player) is not FarmerTextureState state)
+                ___eyes.fieldChangeVisibleEvent += delegate
                 {
-                    return;
-                }
-                state.spriteDirty = true;
-                state.eyesDirty = true;
-            };
-            ___skin.fieldChangeVisibleEvent += delegate
+                    if (GetTextureState(Game1.player) is not FarmerTextureState state)
+                    {
+                        return;
+                    }
+                    state.spriteDirty = true;
+                    state.eyesDirty = true;
+                };
+                ___skin.fieldChangeVisibleEvent += delegate
+                {
+                    if (GetTextureState(Game1.player) is not FarmerTextureState state)
+                    {
+                        return;
+                    }
+                    state.spriteDirty = true;
+                    state.skinDirty = true;
+                    state.shirtDirty = true;
+                };
+                ___shoes.fieldChangeVisibleEvent += delegate
+                {
+                    if (GetTextureState(Game1.player) is not FarmerTextureState state)
+                    {
+                        return;
+                    }
+                    state.spriteDirty = true;
+                    state.shoesDirty = true;
+                };
+                ___shirt.fieldChangeVisibleEvent += delegate
+                {
+                    if (GetTextureState(Game1.player) is not FarmerTextureState state)
+                    {
+                        return;
+                    }
+                    state.spriteDirty = true;
+                    state.shirtDirty = true;
+                };
+                ___pants.fieldChangeVisibleEvent += delegate
+                {
+                    if (GetTextureState(Game1.player) is not FarmerTextureState state)
+                    {
+                        return;
+                    }
+                    state.spriteDirty = true;
+                    state.pantsDirty = true;
+                };
+            }
+            catch (Exception ex)
             {
-                if (GetTextureState(Game1.player) is not FarmerTextureState state)
-                {
-                    return;
-                }
-                state.spriteDirty = true;
-                state.skinDirty = true;
-                state.shirtDirty = true;
-            };
-            ___shoes.fieldChangeVisibleEvent += delegate
-            {
-                if (GetTextureState(Game1.player) is not FarmerTextureState state)
-                {
-                    return;
-                }
-                state.spriteDirty = true;
-                state.shoesDirty = true;
-            };
-            ___shirt.fieldChangeVisibleEvent += delegate
-            {
-                if (GetTextureState(Game1.player) is not FarmerTextureState state)
-                {
-                    return;
-                }
-                state.spriteDirty = true;
-                state.shirtDirty = true;
-            };
-            ___pants.fieldChangeVisibleEvent += delegate
-            {
-                if (GetTextureState(Game1.player) is not FarmerTextureState state)
-                {
-                    return;
-                }
-                state.spriteDirty = true;
-                state.pantsDirty = true;
-            };
+                SMonitor.Log($"Failed in {nameof(FramerRenderer_Constructor_Postfix)}:\n{ex}", LogLevel.Error);
+            }
         }
 
         public static bool FarmerSprite_checkForFootstep_Prefix()
@@ -588,10 +600,17 @@ namespace Swim
 
         public static void Farmer_GetDisplayPants_Postfix(Farmer __instance, ref int spriteIndex)
         {
-            if (!__instance.bathingClothes.Value || FarmerRenderer.isDrawingForUI)
-                return;
+            try
+            {
+                if (!__instance.bathingClothes.Value || FarmerRenderer.isDrawingForUI)
+                    return;
 
-            spriteIndex = TryGetShouldUseArmless(__instance.FarmerSprite.CurrentFrame, out bool shouldUseArmless) && shouldUseArmless ? 0 : 1;
+                spriteIndex = TryGetShouldUseArmless(__instance.FarmerSprite.CurrentFrame, out bool shouldUseArmless) && shouldUseArmless ? 0 : 1;
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(Farmer_GetDisplayPants_Postfix)}:\n{ex}", LogLevel.Error);
+            }
         }
 
 
@@ -624,13 +643,12 @@ namespace Swim
 	         * 11 IL_0eb8: ldfld bool StardewValley.FarmerSprite/AnimationFrame::flip
              */
 
-            int hatCount = 0;
-
             try
             {
                 SMonitor.Log($"Transpiling FarmerRenderer.drawHairAndAccessories");
 
                 bool hat = true;
+                int hatCount = 0;
 
                 // We want codes[i] to be that first ldarg. We are going to check every instruction shown above because for this method, this code is kind of generic (similar checks happen multiple times)
                 for (int i = 0; i < codes.Count; i++)
@@ -689,14 +707,14 @@ namespace Swim
         {
             var codes = new List<CodeInstruction>(instructions);
 
-            bool pants = true;
-            bool body = true;
-            int hatCount = 0;
-
-            SMonitor.Log($"Transpiling FarmerRenderer.draw");
-
             try
             {
+                bool pants = true;
+                bool body = true;
+                int hatCount = 0;
+
+                SMonitor.Log($"Transpiling FarmerRenderer.draw");
+
                 for (int i = 0; i < codes.Count; i++)
                 {
                     if (body && codes[i].opcode == OpCodes.Ldarg_S && codes[i + 1].opcode == OpCodes.Newobj && codes[i + 2].opcode == OpCodes.Ldarg_S && codes[i + 3].opcode == OpCodes.Ldarg_S &&
@@ -950,6 +968,9 @@ namespace Swim
                false, false, false,  true,  true,  true                             // 120
             };
 
+        public static readonly int[] FarmerRendererFeatureXOffsetPerFrameMapped = AnimationFrameToBathingSuitFrameMap.Select(value => FarmerRenderer.featureXOffsetPerFrame[value]).ToArray();
+        public static readonly int[] FarmerRendererFeatureYOffsetPerFrameMapped = AnimationFrameToBathingSuitFrameMap.Select(value => FarmerRenderer.featureYOffsetPerFrame[value]).ToArray();
+
         public static bool TryMapAnimationFrame(int frame, out int mappedFrame)
         {
             if(frame >= 0 && frame < AnimationFrameToBathingSuitFrameMap.Length)
@@ -1032,9 +1053,6 @@ namespace Swim
         {
             return getSwimSourceRectangle(GetCurrentlyDrawingFarmer(), sourceRect).Height;
         }
-
-        public static readonly int[] FarmerRendererFeatureXOffsetPerFrameMapped = AnimationFrameToBathingSuitFrameMap.Select(value => FarmerRenderer.featureXOffsetPerFrame[value]).ToArray();
-        public static readonly int[] FarmerRendererFeatureYOffsetPerFrameMapped = AnimationFrameToBathingSuitFrameMap.Select(value => FarmerRenderer.featureYOffsetPerFrame[value]).ToArray();
 
         public static int[] MapFarmerRendererFeatureXOffset()
         {

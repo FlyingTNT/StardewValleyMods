@@ -26,7 +26,6 @@ namespace Swim
         public static ModConfig Config;
         public static IMonitor SMonitor;
         public static IModHelper SHelper;
-        //public static IJsonAssetsApi JsonAssets;
         public static ModEntry context;
 
         public static PerScreen<Texture2D> OxygenBarTexture = new PerScreen<Texture2D>();
@@ -42,7 +41,6 @@ namespace Swim
         public static readonly PerScreen<Random> myRand = new PerScreen<Random>(() => new Random());
         public static PerScreen<bool> locationIsPool = new PerScreen<bool>(() => false);
 
-        //public static readonly PerScreen<Dictionary<string, DiveMap>> diveMaps = new PerScreen<Dictionary<string, DiveMap>>(() => new Dictionary<string, DiveMap>());
         public static Dictionary<string, DiveMap> diveMaps = new Dictionary<string, DiveMap>();
 
         public static Dictionary<string,bool> changeLocations = new Dictionary<string, bool> {

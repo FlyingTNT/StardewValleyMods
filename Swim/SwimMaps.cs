@@ -17,21 +17,21 @@ namespace Swim
 {
     public class SwimMaps
     {
-        private static IMonitor Monitor;
+        private static IMonitor SMonitor;
         private static ModConfig Config;
-        private static IModHelper Helper;
+        private static IModHelper SHelper;
 
         public static void Initialize(IMonitor monitor, IModHelper helper, ModConfig config)
         {
-            Monitor = monitor;
+            SMonitor = monitor;
             Config = config;
-            Helper = helper;
+            SHelper = helper;
         }
 
         public static Object SpawnForageItem(GameLocation location, Vector2 position, string itemID)
         {
             Object item = ItemRegistry.Create<Object>(itemID.StartsWith("(") ? itemID : "(O)" + itemID);
-            Monitor.Log($"Spawning forage {item.Name} at ({position.X}, {position.Y})");
+            SMonitor.Log($"Spawning forage {item.Name} at ({position.X}, {position.Y})");
             location.numberOfSpawnedObjectsOnMap++;
             location.overlayObjects[position] = item;
             item.IsSpawnedObject = true;
@@ -42,7 +42,7 @@ namespace Swim
         public static Object SpawnWorldItem(GameLocation location, Vector2 position, string itemID)
         {
             Object item = ItemRegistry.Create<Object>(itemID.StartsWith("(") ? itemID : "(O)" + itemID);
-            Monitor.Log($"Spawning world item {item.Name} at ({position.X}, {position.Y})");
+            SMonitor.Log($"Spawning world item {item.Name} at ({position.X}, {position.Y})");
             location.overlayObjects[position] = item;
             return item;
         }
@@ -79,12 +79,12 @@ namespace Swim
             }
             if (!foundAnyWater)
             {
-                Monitor.Log($"{Game1.player.currentLocation.Name} has no water tiles");
+                SMonitor.Log($"{Game1.player.currentLocation.Name} has no water tiles");
                 gameLocation.waterTiles = null;
             }
             else
             {
-                Monitor.Log($"Gave {Game1.player.currentLocation.Name} water tiles");
+                SMonitor.Log($"Gave {Game1.player.currentLocation.Name} water tiles");
             }
         }
 
@@ -218,7 +218,7 @@ namespace Swim
                 }
                 if(spots.Count == 0)
                 {
-                    Monitor.Log($"No spots for fishies in map {l.Name}", LogLevel.Warn);
+                    SMonitor.Log($"No spots for fishies in map {l.Name}", LogLevel.Warn);
                     return;
                 }
                 int n = spots.Count;
@@ -567,7 +567,7 @@ namespace Swim
                 }
                 foreach (var obj in treasures)
                 {
-                    Monitor.Log($"Treasures: {obj.QualifiedItemId} {obj.DisplayName}");
+                    SMonitor.Log($"Treasures: {obj.QualifiedItemId} {obj.DisplayName}");
                 }
             }
         }

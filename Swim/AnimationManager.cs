@@ -98,13 +98,8 @@ namespace Swim
         private static ModConfig Config;
         private static IModHelper SHelper;
 
-        private static readonly PerScreen<bool> spriteDirty = new PerScreen<bool>(()=>true);
-        private static readonly PerScreen<bool> eyesDirty = new PerScreen<bool>(()=>true);
-        private static readonly PerScreen<bool> skinDirty = new PerScreen<bool>(()=>true);
-        private static readonly PerScreen<bool> shoesDirty = new PerScreen<bool>(()=>true);
-        private static readonly PerScreen<bool> shirtDirty = new PerScreen<bool>(()=>true);
-        private static readonly PerScreen<bool> pantsDirty = new PerScreen<bool>(()=>true);
-        private static readonly PerScreen<Texture2D> texture = new PerScreen<Texture2D>(()=>null);
+        private static readonly PerScreen<Farmer> currentlyDrawingFarmer = new PerScreen<Farmer>();
+        private static Dictionary<long, FarmerTextureState> TextureStateDictionary = new();
 
         const int LegacyPatches = 0;
         const int MediumPatches = 1;
@@ -282,10 +277,11 @@ namespace Swim
 
         public static void GameLoop_SaveLoaded(object sender, SaveLoadedEventArgs e)
         {
-            MarkAllDirty();
+            if (Context.IsMainPlayer)
+                TextureStateDictionary.Clear();
         }
 
-        public struct FarmerRendererDrawState
+        public ref struct FarmerRendererDrawState
         {
             public bool wasSwimming = false;
             public Texture2D oldTexture = null;
@@ -311,8 +307,15 @@ namespace Swim
                     __state.wasSwimming = true;
                 }
 
+                currentlyDrawingFarmer.Value = who;
+
                 if (!who.bathingClothes.Value)
                     return;
+
+                if (GetTextureState(who) is not FarmerTextureState textureState)
+                {
+                    return;
+                }
 
                 if (TryGetShouldUseArmless(currentFrame, out bool shouldUseArmless) && shouldUseArmless)
                 {
@@ -320,17 +323,17 @@ namespace Swim
 
                     string textureName = "FlyingTNT.Swim/DisarmedModels/" + which;
 
-                    if(texture.Value is null || texture.Value.IsDisposed)
+                    if(textureState.texture is null || textureState.texture.IsDisposed)
                     {
                         SMonitor.Log($"Reloading Screen {Context.ScreenId} Texture!");
-                        texture.Value = GetUniqueScreenTexture(textureName);
+                        textureState.texture = GetUniqueScreenTexture(textureName);
                     }
 
                     IReflectedField<Texture2D> baseTexture = SHelper.Reflection.GetField<Texture2D>(__instance, "baseTexture");
                     __state.oldTexture = baseTexture.GetValue();
-                    baseTexture.SetValue(texture.Value);
+                    baseTexture.SetValue(textureState.texture);
 
-                    if(spriteDirty.Value)
+                    if(textureState.spriteDirty)
                     {
                         __state.wasSpriteDirty = ____spriteDirty;
                         __state.wasSkinDirty = ____skinDirty;
@@ -344,38 +347,38 @@ namespace Swim
                         ___textureName.Set(textureName);
 
                         SMonitor.Log("Sprite Dirty");
-                        if (skinDirty.Value)
+                        if (textureState.skinDirty)
                         {
                             SMonitor.Log("Skin Dirty");
                             ____skinDirty = true;
-                            skinDirty.Value = false;
+                            textureState.skinDirty = false;
                         }
-                        if (eyesDirty.Value)
+                        if (textureState.eyesDirty)
                         {
                             SMonitor.Log("Eyes Dirty");
                             ____eyesDirty = true;
-                            eyesDirty.Value = false;
+                            textureState.eyesDirty = false;
                         }
-                        if (shirtDirty.Value)
+                        if (textureState.shirtDirty)
                         {
                             SMonitor.Log("Shirt Dirty");
                             ____shirtDirty = true;
-                            shirtDirty.Value = false;
+                            textureState.shirtDirty = false;
                         }
-                        if (pantsDirty.Value)
+                        if (textureState.pantsDirty)
                         {
                             SMonitor.Log("Pants Dirty");
                             ____pantsDirty = true;
-                            pantsDirty.Value = false;
+                            textureState.pantsDirty = false;
                         }
-                        if (shoesDirty.Value)
+                        if (textureState.shoesDirty)
                         {
                             SMonitor.Log("Shoes Dirty");
                             ____shoesDirty = true;
-                            shoesDirty.Value = false;
+                            textureState.shoesDirty = false;
                         }
                         ____spriteDirty = true;
-                        spriteDirty.Value = false;
+                        textureState.spriteDirty = false;
                     }
                     ____baseTextureDirty = false; // If it is true, it will undo our changes to the baseTexture.
 
@@ -510,29 +513,49 @@ namespace Swim
         {
             ___eyes.fieldChangeVisibleEvent += delegate
             {
-                spriteDirty.Value = true;
-                eyesDirty.Value = true;
+                if (GetTextureState(Game1.player) is not FarmerTextureState state)
+                {
+                    return;
+                }
+                state.spriteDirty = true;
+                state.eyesDirty = true;
             };
             ___skin.fieldChangeVisibleEvent += delegate
             {
-                spriteDirty.Value = true;
-                skinDirty.Value = true;
-                shirtDirty.Value = true;
+                if (GetTextureState(Game1.player) is not FarmerTextureState state)
+                {
+                    return;
+                }
+                state.spriteDirty = true;
+                state.skinDirty = true;
+                state.shirtDirty = true;
             };
             ___shoes.fieldChangeVisibleEvent += delegate
             {
-                spriteDirty.Value = true;
-                shoesDirty.Value = true;
+                if (GetTextureState(Game1.player) is not FarmerTextureState state)
+                {
+                    return;
+                }
+                state.spriteDirty = true;
+                state.shoesDirty = true;
             };
             ___shirt.fieldChangeVisibleEvent += delegate
             {
-                spriteDirty.Value = true;
-                shirtDirty.Value = true;
+                if (GetTextureState(Game1.player) is not FarmerTextureState state)
+                {
+                    return;
+                }
+                state.spriteDirty = true;
+                state.shirtDirty = true;
             };
             ___pants.fieldChangeVisibleEvent += delegate
             {
-                spriteDirty.Value = true;
-                pantsDirty.Value = true;
+                if (GetTextureState(Game1.player) is not FarmerTextureState state)
+                {
+                    return;
+                }
+                state.spriteDirty = true;
+                state.pantsDirty = true;
             };
         }
 
@@ -953,22 +976,22 @@ namespace Swim
 
         public static int GetPantsRectX(Rectangle sourceRect)
         {
-            return getSwimSourceRectangle(Game1.player, sourceRect).X;
+            return getSwimSourceRectangle(GetCurrentlyDrawingFarmer(), sourceRect).X;
         }
 
         public static int GetPantsRectY(Rectangle sourceRect)
         {
-            return getSwimSourceRectangle(Game1.player, sourceRect).Y;
+            return getSwimSourceRectangle(GetCurrentlyDrawingFarmer(), sourceRect).Y;
         }
 
         public static int GetPantsRectWidth(Rectangle sourceRect)
         {
-            return getSwimSourceRectangle(Game1.player, sourceRect).Width;
+            return getSwimSourceRectangle(GetCurrentlyDrawingFarmer(), sourceRect).Width;
         }
 
         public static int GetPantsRectHeight(Rectangle sourceRect)
         {
-            return getSwimSourceRectangle(Game1.player, sourceRect).Height;
+            return getSwimSourceRectangle(GetCurrentlyDrawingFarmer(), sourceRect).Height;
         }
 
         public static readonly int[] FarmerRendererFeatureXOffsetPerFrameMapped = AnimationFrameToBathingSuitFrameMap.Select(value => FarmerRenderer.featureXOffsetPerFrame[value]).ToArray();
@@ -976,12 +999,12 @@ namespace Swim
 
         public static int[] MapFarmerRendererFeatureXOffset()
         {
-            return Game1.player.bathingClothes.Value ? FarmerRendererFeatureXOffsetPerFrameMapped : FarmerRenderer.featureXOffsetPerFrame;
+            return GetCurrentlyDrawingFarmer().bathingClothes.Value ? FarmerRendererFeatureXOffsetPerFrameMapped : FarmerRenderer.featureXOffsetPerFrame;
         }
 
         public static int[] MapFarmerRendererFeatureYOffset()
         {
-            return Game1.player.bathingClothes.Value ? FarmerRendererFeatureYOffsetPerFrameMapped : FarmerRenderer.featureYOffsetPerFrame;
+            return GetCurrentlyDrawingFarmer().bathingClothes.Value ? FarmerRendererFeatureYOffsetPerFrameMapped : FarmerRenderer.featureYOffsetPerFrame;
         }
 
         const int bathingSuitTextureStartY = 576; // X is just 0
@@ -1031,20 +1054,65 @@ namespace Swim
             return path.Split(new string[] { "/", "\\"}, StringSplitOptions.None);
         }
 
-        public static void MarkAllDirty()
+        public static void MarkAllDirty(Farmer farmer)
         {
-            spriteDirty.Value = true;
-            eyesDirty.Value = true;
-            skinDirty.Value = true;
-            shirtDirty.Value = true;
-            pantsDirty.Value = true;
-            shoesDirty.Value = true;
+            if(GetTextureState(farmer) is not FarmerTextureState state)
+            {
+                return;
+            }
+            state.spriteDirty = true;
+            state.eyesDirty = true;
+            state.skinDirty = true;
+            state.shirtDirty = true;
+            state.pantsDirty = true;
+            state.shoesDirty = true;
         }
 
         public static Texture2D GetUniqueScreenTexture(string textureName)
         {
             Texture2D texture = Game1.temporaryContent.CreateTemporary().Load<Texture2D>(textureName);
             return texture;
+        }
+
+        public class FarmerTextureState
+        {
+            public bool spriteDirty = true;
+            public bool eyesDirty = true;
+            public bool skinDirty = true;
+            public bool shoesDirty = true;
+            public bool shirtDirty = true;
+            public bool pantsDirty = true;
+            public Texture2D texture = null;
+        }
+
+        public static FarmerTextureState GetTextureState(Farmer farmer)
+        {
+            if(farmer is null)
+            {
+                SMonitor.Log("Farmer is null; using Game1.player");
+                farmer = Game1.player;
+                if(farmer is null)
+                {
+                    return null;
+                }
+            }
+
+            if(!TextureStateDictionary.TryGetValue(farmer.UniqueMultiplayerID, out FarmerTextureState state))
+            {
+                state = new FarmerTextureState();
+                TextureStateDictionary.Add(farmer.UniqueMultiplayerID, state);
+            }
+
+            return state;
+        }
+
+        public static Farmer GetCurrentlyDrawingFarmer()
+        {
+            if(currentlyDrawingFarmer.Value is null)
+            {
+                currentlyDrawingFarmer.Value = Game1.player;
+            }
+            return currentlyDrawingFarmer.Value;
         }
 
         #endregion

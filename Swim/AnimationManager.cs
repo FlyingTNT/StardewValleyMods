@@ -62,10 +62,9 @@ namespace Swim
     /// else the skirt is displayed instead of the bathing suit. Additionally, because I am still technically wearing a bathing suit, my shirt is not displayed. As such, it looks like I am wearing
     /// a skirt and no shirt, while it should ideally still display the bathing suit.
     /// 
-    /// To solve this, I added a prefix to the AnimationFrame constructors - AnimationFrame has seven constructors, but they all take in the frame's frame index as an argument; the prefix
-    /// takes that frame index and maps it through AnimationFrameToBathingSuitFrameMap. AnimationFrameToBathingSuitFrameMap is an array whose indicies are the 126 animation frames and whose values
-    /// are the indicies of the bathing suit animation frame I thought best represented the frame. Some frames are unmapped, either because I didn't think a bathing suit frame
-    /// would do them justice, or because I simply haven't encountered them yet in my testing.
+    /// To solve this, I added a prefix to FarmerRenderer.draw that takes the frame index it's drawing and maps it through AnimationFrameToBathingSuitFrameMap.
+    /// AnimationFrameToBathingSuitFrameMap is an array whose indicies are the 126 animation frames and whose values are the indicies of the bathing suit animation frame I thought best represented the frame. 
+    /// Some frames are unmapped, either because I didn't think a bathing suit frame would do them justice, or because I simply haven't encountered them yet in my testing.
     /// This solution is pretty good - the player's bathing suit doesn't 'fall off' (except in the unmapped frames), and the animations are generally pretty reasonable. However there is one flaw:
     /// as I mentioned earlier, the animation frame index dictates three things: which player body sprite is drawn, which pant sprite is drawn, and which arm sprite is drawn. The map does fix the first
     /// two - we want the bathing suit pants and body to be drawn. However, normally no arms are drawn when drawing the bathing suit, so when say using a tool, it looks like the tool is being controlled
@@ -75,10 +74,8 @@ namespace Swim
     /// need arm frames by storing the pan arm frames in the bathing suit arm slots. (this is necessary because there needs to be a frame for each quality of pan, and that is too many frames to fit in the 
     /// normal allotted space. Normally this isn't a problem because the bathing suit frames' arm offsets are usually set to -1 (less than zero offsets are not drawn). However, because these frames we
     /// are mapping were not originally meant to be bathing suit frames, their arm offsets are usually not -1. This has the effect of causing the player to look like they are holding a pan behind their
-    /// back when they are walking upward. We fix this by adding a postfix to the constructor to set the arm offset to -1 if the frame is a bathing suit frame. The reason we don't do this in the prefix is that
-    /// not all of the constructors take in an armOffset as a parameter - many of them decide it based on other factors - and I don't want to write seven different prefixes.
-    /// This prefix and postfix combined makes it so that the player's bathing suit doesn't fall off, although their arms are always at their sides no matter the frame, so frames in which they are using
-    /// tools look kind of wonky.
+    /// back when they are walking upward. We fix this by also setting the set the arm offset to -1 if the frame is a bathing suit frame in the draw prefix.
+    /// In all, this makes it so that the player's bathing suit doesn't fall off, although their arms are always at their sides no matter the frame, so frames in which they are using tools look kind of wonky.
     /// 
     /// At this point, I will mention that these patches are divided into three levels, which are configuralble with a config option. Level 0 is just the old patches that predate this file - the patch to prevent
     /// footsteps while swimming and the pach to allow hats while in the bathing suit. Level 1 includes those patches, plus the AnimationFrame constructor prefix and postfix I just mentioned. Level 2 includes the
@@ -90,7 +87,17 @@ namespace Swim
     /// display.
     /// 
     /// So without further ado, the level 2 patches:
-    /// 
+    /// First of all, we are not still mapping the animation frames directly because we need to preserve what arms we should draw. As such, we need a different way of making sure the game draws
+    /// the bathing suit pants and body. We do this by adding a transpiler to FarmerRender.draw. The game decides which pants/body to draw using a Rectangle which defines the location of the sprite
+    /// in the spriteSheet. Normally, this is based on the frame index, but our transpiler changes that Rectangle to be the correct bathing suit rectangle. We ues getSwimSourceRectangle for the body
+    /// and getSwimSourceRectanglePant for the pants. This perserves the arm index while also drawing the correct body, so when the player uses a tool etc. their arms are actually visible. However,
+    /// this introcudes a problem: the player's feature offset (the position of their hair and earrings relative to their body) is also based on the frame index, so now the player's hair moves
+    /// independently of their body, which looks odd to say the least. All of these offsets are stored in FarmerRenderer.featureXOffsetPerFrame (and one for the Y offset), which are arrays that map 
+    /// each animation frame to its offset. We replace all references to this with calls to our own MapFarmerRendererFeatureXOffset() and Y. If the player is not wearing bathing clothes, this just
+    /// returns FarmerRenderer.featureXOffsetPerFrame, but if they are, it returns FarmerRendererFeatureXOffsetPerFrameMapped, which is just FarmerRenderer.featureXOffsetPerFrame but mapped through
+    /// AnimationFrameToBathingSuitFrameMap. We replace all instances of these in FarmerRenderer.draw and FarmerRenderer.drawHairAndAccesories (there are like 40!) in our transpilers. Now the player's
+    /// bathing suit, body, hair, and arms are all in the correct position. However, there is one last problem: as I mentioned earlier, the player's arms for the bathing suit animation are included 
+    /// in the bathing suit sprite itself. As such, when the player is using a tool and whatnot, their arms are not only shown swimging the tool, but also hanging at their sides.
     /// </summary>
     internal class AnimationManager
     {
@@ -1025,6 +1032,7 @@ namespace Swim
             return new Rectangle(frame * farmer.FarmerSprite.SpriteWidth % 96, frame * farmer.FarmerSprite.SpriteWidth / 96 * farmer.FarmerSprite.SpriteHeight, farmer.FarmerSprite.SpriteWidth, farmer.swimming.Value ? farmer.FarmerSprite.SpriteHeight/2 - (int)farmer.yOffset/4 : farmer.FarmerSprite.SpriteHeight);
         }
 
+        // The only difference between this and the above is that this always creates a new rectangle instance (the pants rectangle *needs* to be different from the input).
         public static Rectangle getSwimSourceRectanglePant(Farmer farmer, Rectangle ogRect)
         {
             if (!farmer.bathingClothes.Value || FarmerRenderer.isDrawingForUI)

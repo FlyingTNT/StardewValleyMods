@@ -120,17 +120,17 @@ namespace Swim
             if (e.Player != Game1.player)
                 return;
 
-            if (!Game1.player.mailReceived.Contains("ScubaTank") && ModEntry.scubaTankID.Value != "" && e.Added != null && e.Added.Count() > 0 && e.Added.FirstOrDefault() != null && e.Added.FirstOrDefault().GetType() == typeof(Clothing) && e.Added.FirstOrDefault().ItemId == ModEntry.scubaTankID.Value)
+            if (!Game1.player.mailReceived.Contains("ScubaTank") && e.Added != null && e.Added.Count() > 0 && e.Added.FirstOrDefault() != null && e.Added.FirstOrDefault().GetType() == typeof(Clothing) && e.Added.FirstOrDefault().ItemId == ModEntry.scubaTankID.Value)
             {
                 SMonitor.Log("Player found scuba tank");
                 Game1.player.mailReceived.Add("ScubaTank");
             }
-            if (!Game1.player.mailReceived.Contains("ScubaMask") && ModEntry.scubaMaskID.Value != "" && e.Added != null && e.Added.Count() > 0 && e.Added.FirstOrDefault() != null && e.Added.FirstOrDefault().GetType() == typeof(Hat) && (e.Added.FirstOrDefault() as Hat).ItemId == ModEntry.scubaMaskID.Value + "")
+            if (!Game1.player.mailReceived.Contains("ScubaMask") && e.Added != null && e.Added.Count() > 0 && e.Added.FirstOrDefault() != null && e.Added.FirstOrDefault().GetType() == typeof(Hat) && (e.Added.FirstOrDefault() as Hat).ItemId == ModEntry.scubaMaskID.Value)
             {
                 SMonitor.Log("Player found scuba mask");
                 Game1.player.mailReceived.Add("ScubaMask");
             }
-            if (!Game1.player.mailReceived.Contains("ScubaFins") && ModEntry.scubaTankID.Value != "" && e.Added != null && e.Added.Count() > 0 && e.Added.FirstOrDefault() != null && e.Added.FirstOrDefault().GetType() == typeof(Boots) && e.Added.FirstOrDefault().ItemId == ModEntry.scubaFinsID.Value)
+            if (!Game1.player.mailReceived.Contains("ScubaFins") && e.Added != null && e.Added.Count() > 0 && e.Added.FirstOrDefault() != null && e.Added.FirstOrDefault().GetType() == typeof(Boots) && e.Added.FirstOrDefault().ItemId == ModEntry.scubaFinsID.Value)
             {
                 SMonitor.Log("Player found scuba fins");
                 Game1.player.mailReceived.Add("ScubaFins");
@@ -596,8 +596,6 @@ namespace Swim
                     Game1.player.changeIntoSwimsuit();
             }
 
-
-            // !IMP: Conditions, with locations (i.e. locations with restricted swimming), must be checked here
             if (!Context.IsPlayerFree)
             {
                 return;
@@ -619,7 +617,7 @@ namespace Swim
                     Game1.player.changeIntoSwimsuit();
 
 
-                if (Game1.player.boots.Value != null && ModEntry.scubaFinsID.Value != "" && Game1.player.boots.Value.ItemId == ModEntry.scubaFinsID.Value)
+                if (Game1.player.boots.Value != null && Game1.player.boots.Value.ItemId == ModEntry.scubaFinsID.Value)
                 {
                     string buffId = "Swim_ScubaFinsSpeed";
                     Buff buff = Game1.player.buffs.AppliedBuffs.Values.FirstOrDefault((Buff p) => p.Equals(buffId));
@@ -755,7 +753,7 @@ namespace Swim
                     }
                     catch (Exception ex)
                     {
-                        SMonitor.Log("" + ex);
+                        SMonitor.Log($"Exception in tryToJumpInDirection: {ex}");
                     }
                     if (nextToLand && !isWater && isPassable)
                     {
@@ -774,8 +772,6 @@ namespace Swim
 
                 }
             }
-
-            // Monitor.Log($"Current \"JumpLocation\" state: {jumpLocation}. Equals state: {jumpLocation == Vector2.Zero}.");
 
             if (jumpLocation != Vector2.Zero)
             {

@@ -554,15 +554,18 @@ namespace PacifistValley
 
         private static void Grub_behaviorAtGameTick_postfix(Grub __instance, GameTime time, ref int ___metamorphCounter, ref NetBool ___pupating)
         {
-            if (___pupating && ___metamorphCounter <= time.ElapsedGameTime.Milliseconds)
+            if (__instance.Health <= 0 && ___pupating.Value && ___metamorphCounter <= time.ElapsedGameTime.Milliseconds)
             {
-                    __instance.Health = -500;
-                    __instance.currentLocation.characters.Add(new Fly(__instance.Position, __instance.hard.Value)
-                    {
-                        currentLocation = __instance.currentLocation
-                    });
-                    __instance.currentLocation.characters.Remove(__instance);
-                    ___metamorphCounter = 200000;
+                __instance.Health = -500;
+
+                Fly newFly = new Fly(__instance.Position, __instance.hard.Value);
+                newFly.Health = 0;
+                newFly.currentLocation = __instance.currentLocation;
+
+                __instance.currentLocation.characters.Add(newFly);
+
+                __instance.currentLocation.characters.Remove(__instance);
+                ___metamorphCounter = 200000;
                 
             }
         }
@@ -781,7 +784,7 @@ namespace PacifistValley
         /// <param name="frameOfFarmerAnimation"></param>
         private static void MeleeWeapon_drawDuringUse_Prefix(MeleeWeapon __instance, ref int facingDirection, ref int frameOfFarmerAnimation)
         {
-            if (__instance.isScythe())
+            if (__instance is not null && __instance.isScythe())
                 return;
             facingDirection = facingDirection == 0 || facingDirection == 3 ? 3 : 2;
             frameOfFarmerAnimation = facingDirection == 3 ? 2 : 0;

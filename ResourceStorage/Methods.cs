@@ -273,5 +273,18 @@ namespace ResourceStorage
                 resourceButton.bounds = new Rectangle(menu.xPositionOnScreen + menu.width + 8 + Config.IconOffsetX, menu.yPositionOnScreen + 256 + Config.IconOffsetY, 44, 44);
             }
         }
+
+        public static int Farmer_GetItemCountTranspilerMethod(Farmer farmer, IList<Item> items, string itemId)
+        {
+            // Ignore deprecation warning because this is the method that GetItemCount uses by default
+            #pragma warning disable CS0618 // Type or member is obsolete
+            int count = farmer.getItemCountInList(items, itemId);
+            #pragma warning restore CS0618 // Type or member is obsolete
+
+            if (Config.ModEnabled && Config.AutoUse)
+                count += GetMatchesForCrafting(farmer, itemId);
+
+            return count;
+        }
     }
 }

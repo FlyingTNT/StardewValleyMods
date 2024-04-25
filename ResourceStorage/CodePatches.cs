@@ -9,6 +9,7 @@ using StardewValley.Menus;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.Emit;
 using Object = StardewValley.Object;
 using Rectangle = Microsoft.Xna.Framework.Rectangle;
@@ -61,6 +62,25 @@ namespace ResourceStorage
         [HarmonyPatch(typeof(Farmer), nameof(Farmer.getItemCount))]
         public class Farmer_getItemCount_Patch
         {
+            public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+            {
+                SMonitor.Log($"Transpiling Farmer.getItemCount");
+                var codes = new List<CodeInstruction>(instructions);
+                for (int i = 0; i < codes.Count-2; i++)
+                {
+                    if (codes[i].opcode == OpCodes.Call && codes[i + 2].opcode == OpCodes.Call && codes[i + 2].operand is MethodInfo info && info == AccessTools.Method(typeof(Farmer), nameof(Farmer.getItemCountInList)))
+                    {
+                        SMonitor.Log("Replacing default method");
+                        codes[i + 2].opcode = OpCodes.Call;
+                        codes[i + 2].operand = AccessTools.Method(typeof(ModEntry), nameof(Farmer_GetItemCountTranspilerMethod));
+                        break;
+                    }
+                }
+
+                return codes.AsEnumerable();
+            }
+
+            /*
             public static void Postfix(Farmer __instance, string itemId, ref int __result)
             {
                 if (!Config.ModEnabled || !Config.AutoUse)
@@ -68,6 +88,7 @@ namespace ResourceStorage
 
                 __result += GetMatchesForCrafting(__instance, itemId);
             }
+            */
         }
 
         [HarmonyPatch(typeof(Inventory), nameof(Inventory.ContainsId), new Type[] {typeof(string)})]

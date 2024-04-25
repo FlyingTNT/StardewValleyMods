@@ -54,7 +54,7 @@ namespace Swim
             ManualJumpButton = SButton.MouseRight;
 
             EnableMod = true;
-            ReadyToSwim = true;
+            ReadyToSwim = false;
             SwimIndoors = false;
             ShowOxygenBar = true;
             SwimSuitAlways = false;

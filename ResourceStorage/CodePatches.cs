@@ -152,6 +152,7 @@ namespace ResourceStorage
             }
         }
 
+        // Watch for inlining
         [HarmonyPatch(typeof(Object), nameof(Object.ConsumeInventoryItem), new Type[] { typeof(Farmer), typeof(Item), typeof(int) })]
         public class Object_ConsumeInventoryItem_Patch
         {
@@ -327,6 +328,7 @@ namespace ResourceStorage
             }
         }
 
+        // Watch for inlining
         [HarmonyPatch(typeof(InventoryPage), nameof(InventoryPage.receiveGamePadButton))]
         public class InventoryPage_receiveGamePadButton_Patch
         {
@@ -345,7 +347,6 @@ namespace ResourceStorage
                 return true;
             }
         }
-
 
         [HarmonyPatch(typeof(InventoryPage), nameof(InventoryPage.receiveLeftClick))]
         public class InventoryPage_receiveLeftClick_Patch

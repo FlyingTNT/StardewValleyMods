@@ -634,7 +634,7 @@ namespace Swim
                 }
 
                 Game1.player.canOnlyWalk = !Config.AllowActionsWhileInSwimsuit;
-                if(Game1.player.running && !Config.AllowRunningWhileInSwimsuit)
+                if(Game1.player.running && !Config.AllowRunningWhileInSwimsuit && !SwimUtils.IsWearingScubaGear())
                 {
                     Game1.player.setRunning(false);
                 }

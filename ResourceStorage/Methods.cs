@@ -281,8 +281,16 @@ namespace ResourceStorage
             int count = farmer.getItemCountInList(items, itemId);
             #pragma warning restore CS0618 // Type or member is obsolete
 
-            if (Config.ModEnabled && Config.AutoUse)
-                count += GetMatchesForCrafting(farmer, itemId);
+            // The above is not in the try b/c it is literally what the method would do if we didn't transpile it
+            try
+            {
+                if (Config.ModEnabled && Config.AutoUse)
+                    count += GetMatchesForCrafting(farmer, itemId);
+            }
+            catch (Exception e)
+            {
+                SMonitor.Log($"Failed in {Farmer_GetItemCountTranspilerMethod}: {e}");
+            }
 
             return count;
         }

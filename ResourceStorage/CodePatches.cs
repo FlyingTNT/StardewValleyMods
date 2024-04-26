@@ -69,7 +69,12 @@ namespace ResourceStorage
         {
             if (!Config.ModEnabled || Game1.activeClickableMenu is ResourceMenu || item is not Object || !CanStore(item as Object))
                 return true;
-            return ModifyResourceLevel(__instance, item.QualifiedItemId, item.Stack) <= 0;
+
+            long countAdded = ModifyResourceLevel(__instance, item.QualifiedItemId, item.Stack);
+
+            __instance.OnItemReceived(item, (int)countAdded, null, !Config.ShowMessage);
+
+            return countAdded <= 0;
         }
 
         // Transpiled becaues it was getting inlined

@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using Newtonsoft.Json;
 using StardewModdingAPI;
+using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.Inventories;
 using StardewValley.Menus;
@@ -23,8 +24,8 @@ namespace ResourceStorage
         public static string dictKey = "aedenthorn.ResourceStorage/dictionary"; // Not updating to FlyingTNT.ResourceStorage for backwards compatibility
         public static Dictionary<long, Dictionary<string, long>> resourceDict = new();
 
-        public static GameMenu gameMenu;
-        public static ClickableTextureComponent resourceButton;
+        public static PerScreen<GameMenu> gameMenu = new PerScreen<GameMenu>();
+        public static PerScreen<ClickableTextureComponent> resourceButton = new PerScreen<ClickableTextureComponent>();
         private Harmony harmony;
 
 

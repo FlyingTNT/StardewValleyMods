@@ -185,7 +185,7 @@ namespace ResourceStorage
         {
             if (!Config.ModEnabled)
                 return;
-            gameMenu = null;
+            gameMenu.Value = null;
             SetupResourceButton(__instance);
         }
 
@@ -206,16 +206,17 @@ namespace ResourceStorage
             if (!Config.ModEnabled || Game1.activeClickableMenu is not GameMenu menu)
                 return;
             SetupResourceButton(menu); // Update the button's bounds
-            resourceButton.draw(b);
+            resourceButton.Value.draw(b);
         }
 
         public static bool InventoryPage_performHoverAction_Prefix(ref string ___hoverText, int x, int y)
         {
             if (!Config.ModEnabled || Game1.activeClickableMenu is not GameMenu)
                 return true;
-            if (resourceButton.containsPoint(x, y))
+
+            if (resourceButton.Value.containsPoint(x, y))
             {
-                ___hoverText = resourceButton.hoverText;
+                ___hoverText = resourceButton.Value.hoverText;
                 return false;
             }
             return true;
@@ -229,7 +230,7 @@ namespace ResourceStorage
             {
                 ___hoverText = "";
                 Game1.playSound("bigSelect");
-                gameMenu = Game1.activeClickableMenu as GameMenu;
+                gameMenu.Value = Game1.activeClickableMenu as GameMenu;
                 Game1.activeClickableMenu = new ResourceMenu();
                 return false;
             }
@@ -244,7 +245,7 @@ namespace ResourceStorage
             {
                 ___hoverText = "";
                 Game1.playSound("bigSelect");
-                gameMenu = Game1.activeClickableMenu as GameMenu;
+                gameMenu.Value = Game1.activeClickableMenu as GameMenu;
                 Game1.activeClickableMenu = new ResourceMenu();
                 return false;
             }
@@ -255,7 +256,7 @@ namespace ResourceStorage
         {
             if (!Config.ModEnabled || Game1.activeClickableMenu is not GameMenu)
                 return true;
-            if (resourceButton.containsPoint(x, y))
+            if (resourceButton.Value.containsPoint(x, y))
             {
                 if (Game1.player.CursorSlotItem is Object obj)
                 {
@@ -270,7 +271,7 @@ namespace ResourceStorage
                 {
                     ___hoverText = "";
                     Game1.playSound("bigSelect");
-                    gameMenu = Game1.activeClickableMenu as GameMenu;
+                    gameMenu.Value = Game1.activeClickableMenu as GameMenu;
                     Game1.activeClickableMenu = new ResourceMenu();
 
                 }
@@ -284,10 +285,10 @@ namespace ResourceStorage
             if (!Config.ModEnabled || __instance is not InventoryPage)
                 return;
 
-            if (resourceButton is null)
+            if (resourceButton.Value is null)
                 SetupResourceButton(__instance);
 
-            __instance.allClickableComponents.Add(resourceButton);
+            __instance.allClickableComponents.Add(resourceButton.Value);
         }
 
         public static void Leclair_Stardew_Common_InventoryHelper_CountItem_Postfix(Farmer who, Func<Item, bool> matcher, ref int __result)

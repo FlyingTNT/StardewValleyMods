@@ -136,7 +136,8 @@ namespace ResourceStorage
 
         public override void draw(SpriteBatch b)
         {
-            ModEntry.gameMenu.draw(b);
+            if(ModEntry.gameMenu.Value is not null)
+                ModEntry.gameMenu.Value.draw(b);
             Game1.drawDialogueBox(xPositionOnScreen, yPositionOnScreen, width, height, false, true, null, false, true);
             SpriteText.drawStringHorizontallyCenteredAt(b, ModEntry.SHelper.Translation.Get("resources"), Game1.uiViewport.Width / 2, yPositionOnScreen + spaceToClearTopBorder + borderWidth / 2);
             b.Draw(Game1.menuTexture, new Rectangle(xPositionOnScreen + 32, yPositionOnScreen + borderWidth + spaceToClearTopBorder + 48, width - 64, 16), new Rectangle(40, 16, 1, 16), Color.White);
@@ -291,7 +292,7 @@ namespace ResourceStorage
             if((Game1.options.doesInputListContain(Game1.options.menuButton, key) || SButtonExtensions.ToSButton(key) == ModEntry.Config.ResourcesKey) && readyToClose())
             {
                 exitThisMenu();
-                Game1.activeClickableMenu = ModEntry.gameMenu;
+                Game1.activeClickableMenu = ModEntry.gameMenu.Value;
                 return;
             }
             base.receiveKeyPress(key);
@@ -302,7 +303,7 @@ namespace ResourceStorage
             if (SButtonExtensions.ToSButton(button) == ModEntry.Config.ResourcesKey && readyToClose())
             {
                 exitThisMenu();
-                Game1.activeClickableMenu = ModEntry.gameMenu;
+                Game1.activeClickableMenu = ModEntry.gameMenu.Value;
                 return;
             }
             base.receiveGamePadButton(button);

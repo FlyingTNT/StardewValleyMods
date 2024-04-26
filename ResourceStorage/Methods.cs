@@ -258,9 +258,9 @@ namespace ResourceStorage
 
         public static void SetupResourceButton(IClickableMenu menu)
         {
-            if(resourceButton is null)
+            if(resourceButton.Value is null)
             {
-                resourceButton = new ClickableTextureComponent("Up", new Rectangle(menu.xPositionOnScreen + menu.width + 8 + Config.IconOffsetX, menu.yPositionOnScreen + 256 + Config.IconOffsetY, 44, 44), "", SHelper.Translation.Get("resources"), Game1.mouseCursors, new Rectangle(116, 442, 22, 22), 2)
+                resourceButton.Value = new ClickableTextureComponent("Up", new Rectangle(menu.xPositionOnScreen + menu.width + 8 + Config.IconOffsetX, menu.yPositionOnScreen + 256 + Config.IconOffsetY, 44, 44), "", SHelper.Translation.Get("resources"), Game1.mouseCursors, new Rectangle(116, 442, 22, 22), 2)
                 {
                     myID = 42999,
                     upNeighborID = 106,
@@ -270,7 +270,7 @@ namespace ResourceStorage
             }
             else
             {
-                resourceButton.bounds = new Rectangle(menu.xPositionOnScreen + menu.width + 8 + Config.IconOffsetX, menu.yPositionOnScreen + 256 + Config.IconOffsetY, 44, 44);
+                resourceButton.Value.bounds = new Rectangle(menu.xPositionOnScreen + menu.width + 8 + Config.IconOffsetX, menu.yPositionOnScreen + 256 + Config.IconOffsetY, 44, 44);
             }
         }
 

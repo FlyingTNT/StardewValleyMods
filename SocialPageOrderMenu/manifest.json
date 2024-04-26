@@ -5,7 +5,7 @@
   "Description": "Lets you reorder the social page.",
   "UniqueID": "aedenthorn.SocialPageOrderMenu",
   "EntryDll": "SocialPageOrderMenu.dll",
-  "MinimumApiVersion": "3.13.0",
+  "MinimumApiVersion": "4.0.4",
   "UpdateKeys": [ "Nexus:13698" ],
   "ModUpdater": {
     "Repository": "StardewValleyMods",

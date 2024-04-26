@@ -10,8 +10,7 @@ namespace SocialPageOrderMenu
 		public override void leftClickReleased(int x, int y)
 		{
 			base.leftClickReleased(x, y);
-            ModEntry.Config.CurrentSort = selectedOption;
-            ModEntry.SHelper.WriteConfig(ModEntry.Config);
+            ModEntry.currentSort.Value = selectedOption;
             ModEntry.ResortSocialList();
         }
 	}

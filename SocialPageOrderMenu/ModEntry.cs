@@ -3,6 +3,7 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
+using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.Menus;
 using System;
@@ -16,12 +17,13 @@ namespace SocialPageOrderMenu
     public class ModEntry : Mod
     {
         public static ModConfig Config;
-        public static Dictionary<string, object> outdoorAreas = new Dictionary<string, object>();
         public static IMonitor SMonitor;
         public static IModHelper SHelper;
         public static int xOffset = 16;
-        public static MyOptionsDropDown dropDown;
-        public static bool wasSorted = false;
+
+        public static readonly PerScreen<MyOptionsDropDown> dropDown = new();
+        public static readonly PerScreen<bool> wasSorted = new PerScreen<bool>(() => false);
+        public static readonly PerScreen<int> currentSort = new PerScreen<int>(() => 0);
 
 
         public override void Entry(IModHelper helper)
@@ -81,22 +83,22 @@ namespace SocialPageOrderMenu
                 return;
             if (e.Button == Config.prevButton)
             {
-                int sort = Config.CurrentSort;
+                int sort = currentSort.Value;
                 sort--;
                 if (sort < 0)
                     sort = 3;
-                Config.CurrentSort = sort;
+                currentSort.Value = sort;
             }
             else if (e.Button == Config.nextButton)
             {
-                int sort = Config.CurrentSort;
+                int sort = currentSort.Value;
                 sort++;
                 sort %= 4;
-                Config.CurrentSort = sort;
+                currentSort.Value = sort;
             }
             else
                 return;
-            dropDown.selectedOption = Config.CurrentSort;
+            dropDown.Value.selectedOption = currentSort.Value;
             Helper.WriteConfig(Config);
             ResortSocialList();
         }
@@ -109,15 +111,15 @@ namespace SocialPageOrderMenu
             {
                 if (!Config.EnableMod)
                     return;
-                dropDown = new MyOptionsDropDown("", 0);
+                dropDown.Value = new MyOptionsDropDown("", 0);
                 for(int i = 0; i < 4; i++)
                 {
-                    dropDown.dropDownDisplayOptions.Add(SHelper.Translation.Get($"sort-{i}"));
-                    dropDown.dropDownOptions.Add(SHelper.Translation.Get($"sort-{i}"));
+                    dropDown.Value.dropDownDisplayOptions.Add(SHelper.Translation.Get($"sort-{i}"));
+                    dropDown.Value.dropDownOptions.Add(SHelper.Translation.Get($"sort-{i}"));
                 }
-                dropDown.RecalculateBounds();
-                dropDown.selectedOption = Config.CurrentSort;
-                wasSorted = false;
+                dropDown.Value.RecalculateBounds();
+                dropDown.Value.selectedOption = currentSort.Value;
+                wasSorted.Value = false;
             }
         }
         [HarmonyPatch(typeof(SocialPage), nameof(SocialPage.draw), new Type[] { typeof(SpriteBatch) })]
@@ -127,9 +129,9 @@ namespace SocialPageOrderMenu
             {
                 if (!Config.EnableMod)
                     return;
-                if (!wasSorted)
+                if (!wasSorted.Value)
                 {
-                    wasSorted = true;
+                    wasSorted.Value = true;
                     ResortSocialList();
                 }
             }
@@ -152,10 +154,10 @@ namespace SocialPageOrderMenu
             {
                 if (!Config.EnableMod)
                     return;
-                dropDown.draw(b, page.xPositionOnScreen + page.width / 2 - dropDown.bounds.Width / 2, page.yPositionOnScreen + page.height);
-                if (SHelper.Input.IsDown(SButton.MouseLeft) && AccessTools.FieldRefAccess<OptionsDropDown, bool>(dropDown, "clicked") && dropDown.dropDownBounds.Contains(Game1.getMouseX() - (page.xPositionOnScreen + page.width / 2 - dropDown.bounds.Width / 2), Game1.getMouseY() - (page.yPositionOnScreen + page.height)))
+                dropDown.Value.draw(b, page.xPositionOnScreen + page.width / 2 - dropDown.Value.bounds.Width / 2, page.yPositionOnScreen + page.height);
+                if (SHelper.Input.IsDown(SButton.MouseLeft) && AccessTools.FieldRefAccess<OptionsDropDown, bool>(dropDown.Value, "clicked") && dropDown.Value.dropDownBounds.Contains(Game1.getMouseX() - (page.xPositionOnScreen + page.width / 2 - dropDown.Value.bounds.Width / 2), Game1.getMouseY() - (page.yPositionOnScreen + page.height)))
                 {
-                    dropDown.selectedOption = (int)Math.Max(Math.Min((float)(Game1.getMouseY() - page.yPositionOnScreen - page.height - dropDown.dropDownBounds.Y) / (float)dropDown.bounds.Height, (float)(dropDown.dropDownOptions.Count - 1)), 0f);
+                    dropDown.Value.selectedOption = (int)Math.Max(Math.Min((float)(Game1.getMouseY() - page.yPositionOnScreen - page.height - dropDown.Value.dropDownBounds.Y) / (float)dropDown.Value.bounds.Height, (float)(dropDown.Value.dropDownOptions.Count - 1)), 0f);
                 }
             }
         }
@@ -166,9 +168,9 @@ namespace SocialPageOrderMenu
             {
                 if (!Config.EnableMod)
                     return true;
-                if (dropDown.bounds.Contains(x - (__instance.xPositionOnScreen + __instance.width / 2 - dropDown.bounds.Width / 2), y - __instance.yPositionOnScreen - __instance.height))
+                if (dropDown.Value.bounds.Contains(x - (__instance.xPositionOnScreen + __instance.width / 2 - dropDown.Value.bounds.Width / 2), y - __instance.yPositionOnScreen - __instance.height))
                 {
-                    dropDown.receiveLeftClick(x - (__instance.xPositionOnScreen + __instance.width / 2 - dropDown.bounds.Width / 2), y - __instance.yPositionOnScreen - __instance.height);
+                    dropDown.Value.receiveLeftClick(x - (__instance.xPositionOnScreen + __instance.width / 2 - dropDown.Value.bounds.Width / 2), y - __instance.yPositionOnScreen - __instance.height);
                     return false;
                 }
                 return true;
@@ -181,11 +183,11 @@ namespace SocialPageOrderMenu
             {
                 if (!Config.EnableMod)
                     return true;
-                if (AccessTools.FieldRefAccess<OptionsDropDown, bool>(dropDown, "clicked"))
+                if (AccessTools.FieldRefAccess<OptionsDropDown, bool>(dropDown.Value, "clicked"))
                 {
-                    if(dropDown.dropDownBounds.Contains(Game1.getMouseX() - (__instance.xPositionOnScreen + __instance.width / 2 - dropDown.bounds.Width / 2), Game1.getMouseY() - __instance.yPositionOnScreen - __instance.height))
+                    if(dropDown.Value.dropDownBounds.Contains(Game1.getMouseX() - (__instance.xPositionOnScreen + __instance.width / 2 - dropDown.Value.bounds.Width / 2), Game1.getMouseY() - __instance.yPositionOnScreen - __instance.height))
                     {
-                        dropDown.leftClickReleased(Game1.getMouseX() - (__instance.xPositionOnScreen + __instance.width / 2 - dropDown.bounds.Width / 2), Game1.getMouseY() - __instance.yPositionOnScreen - __instance.height);
+                        dropDown.Value.leftClickReleased(Game1.getMouseX() - (__instance.xPositionOnScreen + __instance.width / 2 - dropDown.Value.bounds.Width / 2), Game1.getMouseY() - __instance.yPositionOnScreen - __instance.height);
                     }
                     return false;
                 }
@@ -200,22 +202,30 @@ namespace SocialPageOrderMenu
 
                 List<NameSpriteSlot> nameSprites = new List<NameSpriteSlot>();
                 List<ClickableTextureComponent> sprites = new List<ClickableTextureComponent>(SHelper.Reflection.GetField<List<ClickableTextureComponent>>(page, "sprites").GetValue());
-                for (int i = 0; i < page.names.Count; i++)
+                for (int i = 0; i < page.SocialEntries.Count; i++)
                 {
-                    nameSprites.Add(new NameSpriteSlot(page.names[i], sprites[i], page.characterSlots[i]));
+                    nameSprites.Add(new NameSpriteSlot(page.SocialEntries[i], sprites[i], page.characterSlots[i]));
                 }
-                switch (Config.CurrentSort)
+                switch (currentSort.Value)
                 {
                     case 0: // friend asc
                         SMonitor.Log("sorting by friend asc");
                         nameSprites.Sort(delegate (NameSpriteSlot x, NameSpriteSlot y)
                         {
-                            if (x.name is long && y.name is long) return 0;
-                            else if (x.name is long)  return -1;
-                            else if (y.name is long)  return 1;
-                            int c = Game1.player.getFriendshipLevelForNPC(x.name as string).CompareTo(Game1.player.getFriendshipLevelForNPC(y.name as string));
+                            bool xIsPlayerOrNullFriendship = x.name.IsPlayer || x.name.Friendship is null || x.name.IsChild;
+                            bool yIsPlayerOrNullFriendship = y.name.IsPlayer || y.name.Friendship is null || y.name.IsChild;
+                            if (xIsPlayerOrNullFriendship && yIsPlayerOrNullFriendship)
+                                return 0;
+
+                            if (xIsPlayerOrNullFriendship)
+                                return 1;
+
+                            if (yIsPlayerOrNullFriendship)
+                                return -1;
+
+                            int c = x.name.Friendship.Points.CompareTo(y.name.Friendship.Points);
                             if (c == 0)
-                                c = GetNPCDisplayName(x.name as string).CompareTo(GetNPCDisplayName(y.name as string));
+                                c = x.name.DisplayName.CompareTo(y.name.DisplayName);
                             return c;
 
                         });
@@ -224,12 +234,20 @@ namespace SocialPageOrderMenu
                         SMonitor.Log("sorting by friend desc");
                         nameSprites.Sort(delegate (NameSpriteSlot x, NameSpriteSlot y)
                         {
-                            if (x.name is long && y.name is long) return 0;
-                            else if (x.name is long) return -1;
-                            else if (y.name is long) return 1;
-                            int c = -(Game1.player.getFriendshipLevelForNPC(x.name as string).CompareTo(Game1.player.getFriendshipLevelForNPC(y.name as string)));
+                            bool xIsPlayerOrNullFriendship = x.name.IsPlayer || x.name.Friendship is null || x.name.IsChild;
+                            bool yIsPlayerOrNullFriendship = y.name.IsPlayer || y.name.Friendship is null || y.name.IsChild;
+                            if (xIsPlayerOrNullFriendship && yIsPlayerOrNullFriendship)
+                                return 0;
+
+                            if (xIsPlayerOrNullFriendship)
+                                return 1;
+
+                            if (yIsPlayerOrNullFriendship)
+                                return -1;
+
+                            int c = -x.name.Friendship.Points.CompareTo(y.name.Friendship.Points);
                             if (c == 0)
-                                c = GetNPCDisplayName(x.name as string).CompareTo(GetNPCDisplayName(y.name as string));
+                                c = x.name.DisplayName.CompareTo(y.name.DisplayName);
                             return c;
 
                         });
@@ -238,19 +256,31 @@ namespace SocialPageOrderMenu
                         SMonitor.Log("sorting by alpha asc");
                         nameSprites.Sort(delegate (NameSpriteSlot x, NameSpriteSlot y)
                         {
-                            return (x.name is long ? Game1.getFarmer((long)x.name).Name : GetNPCDisplayName(x.name as string)).CompareTo(y.name is long ? Game1.getFarmer((long)y.name).Name : GetNPCDisplayName(y.name as string));
+                            if(!x.name.IsMet && !y.name.IsMet)
+                                return 0;
+                            if (!x.name.IsMet)
+                                return 1;
+                            if (!y.name.IsMet)
+                                return -1;
+
+                            return x.name.DisplayName.CompareTo(y.name.DisplayName);
                         });
                         break;
                     case 3: // alpha desc
                         SMonitor.Log("sorting by alpha desc");
                         nameSprites.Sort(delegate (NameSpriteSlot x, NameSpriteSlot y)
                         {
-                            return -((x.name is long ? Game1.getFarmer((long)x.name).Name : GetNPCDisplayName(x.name as string)).CompareTo(y.name is long ? Game1.getFarmer((long)y.name).Name : GetNPCDisplayName(y.name as string)));
+                            if (!x.name.IsMet && !y.name.IsMet)
+                                return 0;
+                            if (!x.name.IsMet)
+                                return 1;
+                            if (!y.name.IsMet)
+                                return -1;
+                            return -x.name.DisplayName.CompareTo(y.name.DisplayName);
                         });
                         break;
                 }
                 var cslots = ((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab] as SocialPage).characterSlots;
-                var names = ((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab] as SocialPage).names;
                 for (int i = 0; i < nameSprites.Count; i++)
                 {
                     nameSprites[i].slot.myID = i;
@@ -260,18 +290,17 @@ namespace SocialPageOrderMenu
                     {
                         nameSprites[i].slot.upNeighborID = 12342;
                     }
-                    names[i] = nameSprites[i].name;
                     sprites[i] = nameSprites[i].sprite;
                     nameSprites[i].slot.bounds = cslots[i].bounds;
                     cslots[i] = nameSprites[i].slot;
-
+                    page.SocialEntries[i] = nameSprites[i].name;
                 }
                 SHelper.Reflection.GetField<List<ClickableTextureComponent>>((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "sprites").SetValue(new List<ClickableTextureComponent>(sprites));
 
                 int first_character_index = 0;
-                for (int l = 0; l < page.names.Count; l++)
+                for (int l = 0; l < page.SocialEntries.Count; l++)
                 {
-                    if (!(((SocialPage)(Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab]).names[l] is long))
+                    if (!(((SocialPage)(Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab]).SocialEntries[l].IsPlayer))
                     {
                         first_character_index = l;
                         break;
@@ -282,23 +311,15 @@ namespace SocialPageOrderMenu
                 ((SocialPage)(Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab]).updateSlots();
             }
         }
-
-        private static string GetNPCDisplayName(string name)
-        {
-            NPC n = Game1.getCharacterFromName(name);
-            if (n != null)
-                return n.displayName;
-            return name;
-        }
     }
 
     internal class NameSpriteSlot
     {
-        public object name;
+        public SocialPage.SocialEntry name;
         public ClickableTextureComponent sprite;
         public ClickableTextureComponent slot;
 
-        public NameSpriteSlot(object obj, ClickableTextureComponent clickableTextureComponent, ClickableTextureComponent slotComponent)
+        public NameSpriteSlot(SocialPage.SocialEntry obj, ClickableTextureComponent clickableTextureComponent, ClickableTextureComponent slotComponent)
         {
             name = obj;
             sprite = clickableTextureComponent;

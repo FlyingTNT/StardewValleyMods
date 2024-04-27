@@ -29,10 +29,12 @@ namespace ResourceStorage
             if (!dict.TryGetValue(id, out long oldAmount))
             {
                 SMonitor.Log($"{instance.Name} does not have {id}");
-                if (auto && !CanAutoStore(id))
-                    return 0;
                 oldAmount = 0;
             }
+
+            if (auto && !CanAutoStore(id) && amountToAdd > 0)
+                return 0;
+
             var newAmount = Math.Max(oldAmount + amountToAdd, 0);
             if(newAmount != oldAmount)
             {
@@ -244,7 +246,7 @@ namespace ResourceStorage
                 if (CraftingRecipe.ItemMatchesForCrafting(ItemRegistry.Create(kvp.Key), itemId))
                 {
                     SMonitor.Log($"Consuming {kvp.Key}");
-                    totalConsumed -= (int)ModifyResourceLevel(farmer, kvp.Key, -(maxAmount - totalConsumed));
+                    totalConsumed -= (int)ModifyResourceLevel(farmer, kvp.Key, -(maxAmount - totalConsumed), auto: true);
                     SMonitor.Log($"Total consumed thus far: {totalConsumed}");
                     if (totalConsumed >= maxAmount)
                     {

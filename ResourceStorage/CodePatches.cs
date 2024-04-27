@@ -28,7 +28,7 @@ namespace ResourceStorage
                 return true;
             }
 
-            count += (int)ModifyResourceLevel(farmer, ItemRegistry.QualifyItemId(itemId), -count);
+            count += (int)ModifyResourceLevel(farmer, ItemRegistry.QualifyItemId(itemId), -count, auto: true);
             return count > 0;
         }
         public static void Inventory_CountId_Postfix(Inventory __instance, string itemId, ref int __result)
@@ -70,7 +70,7 @@ namespace ResourceStorage
             if (!Config.ModEnabled || Game1.activeClickableMenu is ResourceMenu || item is not Object || !CanStore(item as Object))
                 return true;
 
-            long countAdded = ModifyResourceLevel(__instance, item.QualifiedItemId, item.Stack);
+            long countAdded = ModifyResourceLevel(__instance, item.QualifiedItemId, item.Stack, auto: true);
 
             if(countAdded > 0)
             {
@@ -136,7 +136,7 @@ namespace ResourceStorage
             if (!Config.ModEnabled || !Config.AutoUse)
                 return true;
 
-            amount += (int)ModifyResourceLevel(who, drop_in.QualifiedItemId, -amount);
+            amount += (int)ModifyResourceLevel(who, drop_in.QualifiedItemId, -amount, auto: true);
             return amount > 0;
         }
 
@@ -269,10 +269,10 @@ namespace ResourceStorage
             {
                 if (Game1.player.CursorSlotItem is Object obj)
                 {
-                    if (CanStore(obj) && Game1.objectData.ContainsKey(obj.ItemId))
+                    if (CanStore(obj))
                     {
                         Game1.playSound("Ship");
-                        ModifyResourceLevel(Game1.player, obj.QualifiedItemId, Game1.player.CursorSlotItem.Stack, false);
+                        ModifyResourceLevel(Game1.player, obj.QualifiedItemId, Game1.player.CursorSlotItem.Stack, auto: false);
                         Game1.player.CursorSlotItem = null;
                     }
                 }
@@ -326,7 +326,7 @@ namespace ResourceStorage
                 Object obj = new Object(DequalifyItemId(res.Key), (int)res.Value);
                 if (matcher(obj))
                 {
-                    amount += (int)ModifyResourceLevel(Game1.player, res.Key, -amount);
+                    amount += (int)ModifyResourceLevel(Game1.player, res.Key, -amount, auto: true);
                     return;
                 }
             }

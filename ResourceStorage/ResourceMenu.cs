@@ -227,7 +227,7 @@ namespace ResourceStorage
                     if (amountLeft < stack)
                     {
                         Game1.playSound("Ship");
-                        ModEntry.ModifyResourceLevel(Game1.player, obj.QualifiedItemId, -(stack - amountLeft));
+                        ModEntry.ModifyResourceLevel(Game1.player, obj.QualifiedItemId, -(stack - amountLeft), auto: false);
                         RepopulateComponentList();
                     }
                     else

@@ -72,9 +72,13 @@ namespace ResourceStorage
 
             long countAdded = ModifyResourceLevel(__instance, item.QualifiedItemId, item.Stack);
 
-            __instance.OnItemReceived(item, (int)countAdded, null, !Config.ShowMessage);
+            if(countAdded > 0)
+            {
+                __instance.OnItemReceived(item, (int)countAdded, null, true);
+                return false;
+            }
 
-            return countAdded <= 0;
+            return true;
         }
 
         // Transpiled becaues it was getting inlined

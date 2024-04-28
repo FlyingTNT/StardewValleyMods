@@ -530,7 +530,7 @@ namespace SocialPageOrderRedux
         public static void UpdateFilterPosition(SocialPage page)
         {
             filterField.Value.X = page.xPositionOnScreen + page.width / 2 - filterField.Value.Width / 2 + Config.FilterOffsetX;
-            filterField.Value.Y = page.yPositionOnScreen + page.height + dropDown.Value.bounds.Height + dropdownYOffset + 20 + Config.FilterOffsetY;
+            filterField.Value.Y = page.yPositionOnScreen + page.height + (Config.UseDropdown ? dropDown.Value.bounds.Height + dropdownYOffset + 20 : 0) + Config.FilterOffsetY;
         }
 
         public static int GetDropdownX(SocialPage page)

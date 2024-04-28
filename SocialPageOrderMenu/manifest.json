@@ -4,7 +4,7 @@
   "Version": "0.2.0",
   "Description": "Lets you reorder the social page.",
   "UniqueID": "aedenthorn.SocialPageOrderMenu",
-  "EntryDll": "SocialPageOrderMenu.dll",
+  "EntryDll": "SocialPageOrderRedux.dll",
   "MinimumApiVersion": "4.0.4",
   "UpdateKeys": [ "Nexus:13698" ],
   "ModUpdater": {

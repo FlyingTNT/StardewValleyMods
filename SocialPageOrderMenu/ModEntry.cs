@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using static StardewValley.Menus.SocialPage;
 
 namespace SocialPageOrderRedux
 {
@@ -22,6 +23,7 @@ namespace SocialPageOrderRedux
         public static IModHelper SHelper;
         public static readonly Rectangle buttonTextureSource = new Rectangle(162, 440, 16, 16); // Location of the organize button within LooseSprites/Cursors
         private const int xOffset = -16;
+        private const int dropdownYOffset = -28;
         private const int buttonId = 231445356;
 
         public static readonly PerScreen<MyOptionsDropDown> dropDown = new();
@@ -262,7 +264,7 @@ namespace SocialPageOrderRedux
                     button.Value.draw(b);
                     if (button.Value.bounds.Contains(Game1.getMousePosition()))
                     {
-                        (Game1.activeClickableMenu as GameMenu).hoverText = SHelper.Translation.Get($"sort-{currentSort.Value}");
+                        (Game1.activeClickableMenu as GameMenu).hoverText = SHelper.Translation.Get($"sort-by") + SHelper.Translation.Get($"sort-{currentSort.Value}");
                     }
                 }
             }
@@ -342,6 +344,8 @@ namespace SocialPageOrderRedux
 
             __instance.SocialEntries.AddRange(filterField.Value.Text == "" ? allEntries.Value : allEntries.Value.Where((entry)=>entry.DisplayName.ToLower().StartsWith(filterField.Value.Text)));
 
+            SHelper.Reflection.GetField<int>(__instance, "numFarmers").SetValue(__instance.SocialEntries.Count((SocialEntry p) => p.IsPlayer));
+
             __instance.CreateComponents();
 
             ResortSocialList();
@@ -357,7 +361,8 @@ namespace SocialPageOrderRedux
                 if (Config.UseButton)
                     __instance.tabs[GameMenu.inventoryTab].leftNeighborID = buttonId;
                 ResortSocialList();
-                __instance.snapToDefaultClickableComponent();
+                if(Game1.options.SnappyMenus)
+                    __instance.snapToDefaultClickableComponent();
             }
 
             if (Config.UseFilter && filterField.Value is not null && !Game1.options.gamepadControls)
@@ -382,15 +387,24 @@ namespace SocialPageOrderRedux
                         SMonitor.Log("sorting by friend asc");
                         nameSprites.Sort(delegate (NameSpriteSlot x, NameSpriteSlot y)
                         {
-                            bool xIsPlayerOrNullFriendship = x.entry.IsPlayer || x.entry.Friendship is null || x.entry.IsChild;
-                            bool yIsPlayerOrNullFriendship = y.entry.IsPlayer || y.entry.Friendship is null || y.entry.IsChild;
-                            if (xIsPlayerOrNullFriendship && yIsPlayerOrNullFriendship)
+                            if (x.entry.IsPlayer && y.entry.IsPlayer)
                                 return 0;
 
-                            if (xIsPlayerOrNullFriendship)
+                            if (x.entry.IsPlayer)
+                                return -1;
+
+                            if (y.entry.IsPlayer)
                                 return 1;
 
-                            if (yIsPlayerOrNullFriendship)
+                            bool xIsNullFriendship = x.entry.Friendship is null || x.entry.IsChild;
+                            bool yIsNullFriendship = y.entry.Friendship is null || y.entry.IsChild;
+                            if (xIsNullFriendship && yIsNullFriendship)
+                                return 0;
+
+                            if (xIsNullFriendship)
+                                return 1;
+
+                            if (yIsNullFriendship)
                                 return -1;
 
                             int c = x.entry.Friendship.Points.CompareTo(y.entry.Friendship.Points);
@@ -404,15 +418,24 @@ namespace SocialPageOrderRedux
                         SMonitor.Log("sorting by friend desc");
                         nameSprites.Sort(delegate (NameSpriteSlot x, NameSpriteSlot y)
                         {
-                            bool xIsPlayerOrNullFriendship = x.entry.IsPlayer || x.entry.Friendship is null || x.entry.IsChild;
-                            bool yIsPlayerOrNullFriendship = y.entry.IsPlayer || y.entry.Friendship is null || y.entry.IsChild;
-                            if (xIsPlayerOrNullFriendship && yIsPlayerOrNullFriendship)
+                            if (x.entry.IsPlayer && y.entry.IsPlayer)
                                 return 0;
 
-                            if (xIsPlayerOrNullFriendship)
+                            if (x.entry.IsPlayer)
+                                return -1;
+
+                            if (y.entry.IsPlayer)
                                 return 1;
 
-                            if (yIsPlayerOrNullFriendship)
+                            bool xIsNullFriendship = x.entry.Friendship is null || x.entry.IsChild;
+                            bool yIsNullFriendship = y.entry.Friendship is null || y.entry.IsChild;
+                            if (xIsNullFriendship && yIsNullFriendship)
+                                return 0;
+
+                            if (xIsNullFriendship)
+                                return 1;
+
+                            if (yIsNullFriendship)
                                 return -1;
 
                             int c = -x.entry.Friendship.Points.CompareTo(y.entry.Friendship.Points);
@@ -426,7 +449,16 @@ namespace SocialPageOrderRedux
                         SMonitor.Log("sorting by alpha asc");
                         nameSprites.Sort(delegate (NameSpriteSlot x, NameSpriteSlot y)
                         {
-                            if(!x.entry.IsMet && !y.entry.IsMet)
+                            if (x.entry.IsPlayer && y.entry.IsPlayer)
+                                return 0;
+
+                            if (x.entry.IsPlayer)
+                                return -1;
+
+                            if (y.entry.IsPlayer)
+                                return 1;
+
+                            if (!x.entry.IsMet && !y.entry.IsMet)
                                 return 0;
                             if (!x.entry.IsMet)
                                 return 1;
@@ -440,6 +472,15 @@ namespace SocialPageOrderRedux
                         SMonitor.Log("sorting by alpha desc");
                         nameSprites.Sort(delegate (NameSpriteSlot x, NameSpriteSlot y)
                         {
+                            if (x.entry.IsPlayer && y.entry.IsPlayer)
+                                return 0;
+
+                            if (x.entry.IsPlayer)
+                                return -1;
+
+                            if (y.entry.IsPlayer)
+                                return 1;
+
                             if (!x.entry.IsMet && !y.entry.IsMet)
                                 return 0;
                             if (!x.entry.IsMet)
@@ -464,7 +505,6 @@ namespace SocialPageOrderRedux
                     {
                         nameSprites[i].slot.leftNeighborID = buttonId;
                     }
-
                     sprites[i] = nameSprites[i].sprite;
                     nameSprites[i].slot.bounds = cslots[i].bounds;
                     cslots[i] = nameSprites[i].slot;
@@ -490,7 +530,7 @@ namespace SocialPageOrderRedux
         public static void UpdateFilterPosition(SocialPage page)
         {
             filterField.Value.X = page.xPositionOnScreen + page.width / 2 - filterField.Value.Width / 2 + Config.FilterOffsetX;
-            filterField.Value.Y = page.yPositionOnScreen + page.height + dropDown.Value.bounds.Height + 20 + Config.FilterOffsetY;
+            filterField.Value.Y = page.yPositionOnScreen + page.height + dropDown.Value.bounds.Height + dropdownYOffset + 20 + Config.FilterOffsetY;
         }
 
         public static int GetDropdownX(SocialPage page)
@@ -499,7 +539,7 @@ namespace SocialPageOrderRedux
         }
         public static int GetDropdownY(SocialPage page)
         {
-            return page.yPositionOnScreen + page.height + Config.DropdownOffsetY;
+            return page.yPositionOnScreen + page.height + Config.DropdownOffsetY + dropdownYOffset;
         }
 
         public static int GetButtonX(SocialPage page)

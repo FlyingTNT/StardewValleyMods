@@ -204,9 +204,14 @@ namespace SocialPageOrderRedux
         {
             lastFilterString.Value += "dirty";// Force an update
 
-            if (Config.UseFilter && Game1.activeClickableMenu is GameMenu && e.OldMenu is not ProfileMenu)
+            if (Game1.activeClickableMenu is GameMenu)
             {
-                filterField.Value.Text = "";
+                if(Config.UseFilter && e.OldMenu is not ProfileMenu)
+                {
+                    filterField.Value.Text = "";
+                }
+
+                ResortSocialList();
             }
         }
 

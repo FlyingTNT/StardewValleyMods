@@ -1,6 +1,6 @@
 ﻿using StardewValley.Menus;
 
-namespace SocialPageOrderMenu
+namespace SocialPageOrderRedux
 {
     public class MyOptionsDropDown : OptionsDropDown
     {

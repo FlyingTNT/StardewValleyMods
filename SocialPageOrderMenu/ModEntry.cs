@@ -49,6 +49,7 @@ namespace SocialPageOrderRedux
             SHelper = Helper;
 
             helper.Events.Input.ButtonPressed += Input_ButtonPressed;
+            helper.Events.Display.MenuChanged += Display_MenuChanged;
 
             var harmony = new Harmony(ModManifest.UniqueID);
             harmony.PatchAll();
@@ -67,6 +68,10 @@ namespace SocialPageOrderRedux
             
             harmony.Patch(AccessTools.Method(typeof(SocialPage), nameof(SocialPage.updateSlots)),
                 prefix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_updateSlots_Prefix))
+            );
+            
+            harmony.Patch(AccessTools.Method(typeof(SocialPage), nameof(SocialPage.FindSocialCharacters)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_FindSocialCharacters_Postfix))
             );
             
             harmony.Patch(AccessTools.Method(typeof(IClickableMenu), nameof(IClickableMenu.populateClickableComponentList)),
@@ -195,21 +200,28 @@ namespace SocialPageOrderRedux
             }
         }
 
+        private void Display_MenuChanged(object sender, MenuChangedEventArgs e)
+        {
+            lastFilterString.Value += "dirty";// Force an update
+
+            if (Config.UseFilter && Game1.activeClickableMenu is GameMenu && e.OldMenu is not ProfileMenu)
+            {
+                filterField.Value.Text = "";
+            }
+        }
+
         public static void SocialPage_Constructor_Postfix(SocialPage __instance)
         {
             if (!Config.EnableMod)
                 return;
 
             InitElements();
+        }
 
-            if(Config.UseFilter)
-            {
-                lastFilterString.Value = "";
-                filterField.Value.Text = "";
-            }
-
+        public static void SocialPage_FindSocialCharacters_Postfix(List<SocialEntry> __result)
+        {
             allEntries.Value.Clear();
-            allEntries.Value.AddRange(__instance.SocialEntries);
+            allEntries.Value.AddRange(__result);
         }
 
         public static void IClickableMenu_populateClickableComponentList_Postfix(IClickableMenu __instance)

@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Microsoft.Xna.Framework.Input;
 using Netcode;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
@@ -9,6 +10,7 @@ using StardewValley;
 using StardewValley.Menus;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SocialPageOrderButton
 {
@@ -18,16 +20,15 @@ namespace SocialPageOrderButton
         public static ModConfig Config;
         public static IMonitor SMonitor;
         public static IModHelper SHelper;
-        private static Texture2D buttonTexture;
-        private static int xOffset = 16;
+        public static Texture2D buttonTexture;
+        private const int xOffset = -16;
         public static readonly PerScreen<bool> wasSorted = new PerScreen<bool>(() => false);
         public static readonly PerScreen<int> currentSort = new PerScreen<int>(() => 0);
 
-        /*********
-        ** Public methods
-        *********/
-        /// <summary>The mod entry point, called after the mod is first loaded.</summary>
-        /// <param name="helper">Provides simplified APIs for writing mods.</param>
+        private static readonly PerScreen<string> lastFilterString = new PerScreen<string>(() => "");
+        private static readonly PerScreen<TextBox> filterField = new();
+        private static readonly PerScreen<List<SocialPage.SocialEntry>> allEntries = new PerScreen<List<SocialPage.SocialEntry>>(() => new List<SocialPage.SocialEntry>());
+
         public override void Entry(IModHelper helper)
         {
             Config = Helper.ReadConfig<ModConfig>();
@@ -39,56 +40,228 @@ namespace SocialPageOrderButton
             buttonTexture = helper.ModContent.Load<Texture2D>("assets/button.png");
 
             Helper.Events.Input.ButtonPressed += Input_ButtonPressed;
-            Helper.Events.GameLoop.UpdateTicked += GameLoop_UpdateTicked;
+            Helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
 
             var harmony = new Harmony(ModManifest.UniqueID);
             harmony.PatchAll();
+
+            harmony.Patch(AccessTools.Constructor(typeof(SocialPage), new Type[] { typeof(int), typeof(int), typeof(int), typeof(int) }),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_Constructor_Postfix))
+            );
+
+            harmony.Patch(AccessTools.Method(typeof(IClickableMenu), nameof(IClickableMenu.receiveKeyPress)),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_recieveKeyPress_Prefix))
+            );
+
+            harmony.Patch(AccessTools.Method(typeof(SocialPage), nameof(SocialPage.performHoverAction)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_performHoverAction_Postfix))
+            );
+
+            harmony.Patch(AccessTools.Method(typeof(SocialPage), nameof(SocialPage.updateSlots)),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_updateSlots_Prefix))
+            );
+
+            harmony.Patch(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.changeTab)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(GameMenu_changeTab_Postfix))
+            );
         }
 
-        private void GameLoop_UpdateTicked(object sender, UpdateTickedEventArgs e)
+        private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
 
-            if (Game1.activeClickableMenu is GameMenu)
-            {
-                if (!wasSorted.Value)
-                {
-                    ResortSocialList();
-                    wasSorted.Value = true;
-                }
-            }
-            else
-                wasSorted.Value = false;
+            // get Generic Mod Config Menu's API (if it's installed)
+            var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            if (configMenu is null)
+                return;
+
+            // register mod
+            configMenu.Register(
+                mod: ModManifest,
+                reset: () => Config = new ModConfig(),
+                save: () => Helper.WriteConfig(Config)
+            );
+
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => "Mod Enabled?",
+                getValue: () => Config.EnableMod,
+                setValue: value => Config.EnableMod = value
+            );
+
+            configMenu.AddKeybind(
+                mod: ModManifest,
+                name: () => "Prev Sort Key",
+                getValue: () => Config.prevButton,
+                setValue: value => Config.prevButton = value
+            );
+
+            configMenu.AddKeybind(
+                mod: ModManifest,
+                name: () => "Next Sort Key",
+                getValue: () => Config.nextButton,
+                setValue: value => Config.nextButton = value
+            );
+
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => "Use Filter",
+                getValue: () => Config.UseFilter,
+                setValue: (value) => SetUseFilter(value));
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => "Button X Offset",
+                getValue: () => Config.ButtonOffsetX,
+                setValue: value => Config.ButtonOffsetX = value
+            );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => "Button Y Offset",
+                getValue: () => Config.ButtonOffsetY,
+                setValue: value => Config.ButtonOffsetY = value
+            );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => "Filter X Offset",
+                getValue: () => Config.FilterOffsetX,
+                setValue: value => Config.FilterOffsetX = value
+            );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => "Filter Y Offset",
+                getValue: () => Config.FilterOffsetY,
+                setValue: value => Config.FilterOffsetY = value
+            );
         }
+
         private void Input_ButtonPressed(object sender, ButtonPressedEventArgs e)
         {
-            if (Game1.activeClickableMenu is GameMenu && (Game1.activeClickableMenu as GameMenu).currentTab == GameMenu.socialTab)
+            if (!Config.EnableMod || Game1.activeClickableMenu is not GameMenu || (Game1.activeClickableMenu as GameMenu).GetCurrentPage() is not SocialPage)
+                return;
+            if (e.Button == Config.prevButton)
             {
-                Rectangle rect = new Rectangle(Game1.activeClickableMenu.xPositionOnScreen - xOffset, Game1.activeClickableMenu.yPositionOnScreen, buttonTexture.Width * 4, buttonTexture.Height * 4);
-                if (rect.Contains(Game1.getMousePosition()))
-                {
-                    currentSort.Value++;
-                    currentSort.Value %= 4;
-                    Helper.WriteConfig(Config);
-                    ResortSocialList();
-                }
+                DecrementSort();
             }
+            else if (e.Button == Config.nextButton)
+            {
+                IncrementSort();
+            }
+            else
+                return;
+        }
+
+        [HarmonyPatch(typeof(SocialPage), nameof(SocialPage.receiveLeftClick))]
+        public class SocialPage_receiveLeftClick_Patch
+        {
+            public static bool Prefix(SocialPage __instance, int x, int y)
+            {
+                if (!Config.EnableMod)
+                    return true;
+
+                Rectangle rect = GetButtonRectangle(__instance);
+                if (rect.Contains(x, y))
+                {
+                    IncrementSort();
+                    return false;
+                }
+
+                if (Config.UseFilter)
+                    filterField.Value.Update();
+                return true;
+            }
+        }
+
+        public static void SocialPage_Constructor_Postfix(SocialPage __instance)
+        {
+            if (!Config.EnableMod)
+                return;
+
+            if (Config.UseFilter)
+            {
+                filterField.Value = new TextBox(Game1.content.Load<Texture2D>("LooseSprites\\textBox"), null, Game1.smallFont, Game1.textColor)
+                {
+                    Text = ""
+                };
+            }
+
+            allEntries.Value.Clear();
+            allEntries.Value.AddRange(__instance.SocialEntries);
+
+            wasSorted.Value = false;
         }
 
         [HarmonyPatch(typeof(SocialPage), nameof(SocialPage.draw), new Type[] { typeof(SpriteBatch) })]
-        public class IClickableMenu_drawTextureBox_Patch
+        public class SocialPage_draw_Patch
         {
-            public static void Prefix(SpriteBatch b)
+            public static void Prefix(SocialPage __instance, SpriteBatch b)
             {
                 if (!Config.EnableMod)
                     return;
-                b.Draw(buttonTexture, new Rectangle(Game1.activeClickableMenu.xPositionOnScreen - xOffset, Game1.activeClickableMenu.yPositionOnScreen, buttonTexture.Width * 4, buttonTexture.Height * 4), null, Color.White);
-                Rectangle rect = new Rectangle(Game1.activeClickableMenu.xPositionOnScreen - xOffset, Game1.activeClickableMenu.yPositionOnScreen, buttonTexture.Width * 4, buttonTexture.Height * 4);
+                Rectangle rect = GetButtonRectangle(__instance);
+                b.Draw(buttonTexture, rect, null, Color.White);
                 if (rect.Contains(Game1.getMousePosition()))
                 {
                     (Game1.activeClickableMenu as GameMenu).hoverText = SHelper.Translation.Get($"sort-{currentSort.Value}");
                 }
+
+                if (Config.UseFilter)
+                {
+                    UpdateFilterPosition(__instance);
+                    filterField.Value.Draw(b);
+                }
             }
         }
+
+        public static bool SocialPage_recieveKeyPress_Prefix(IClickableMenu __instance, Keys key)
+        {
+            if (!Config.EnableMod || !Config.UseFilter || filterField.Value is null || !filterField.Value.Selected || key == Keys.Escape || __instance is not SocialPage socialPage)
+                return true;
+
+            socialPage.updateSlots();
+            return false;
+        }
+
+        public static void SocialPage_performHoverAction_Postfix(int x, int y)
+        {
+            if (!Config.EnableMod || !Config.UseFilter)
+                return;
+            filterField.Value.Hover(x, y);
+        }
+
+        public static void SocialPage_updateSlots_Prefix(SocialPage __instance)
+        {
+            if (!Config.EnableMod || !Config.UseFilter || filterField.Value is null || lastFilterString.Value == filterField.Value.Text)
+                return;
+
+            lastFilterString.Value = filterField.Value.Text;
+
+            __instance.SocialEntries.Clear();
+
+            __instance.SocialEntries.AddRange(filterField.Value.Text == "" ? allEntries.Value : allEntries.Value.Where((entry) => entry.DisplayName.ToLower().StartsWith(filterField.Value.Text)));
+
+            __instance.CreateComponents();
+
+            ResortSocialList();
+        }
+
+        public static void GameMenu_changeTab_Postfix(GameMenu __instance)
+        {
+            if (!Config.EnableMod)
+                return;
+
+            if (!wasSorted.Value && __instance.currentTab == GameMenu.socialTab)
+            {
+                ResortSocialList();
+                wasSorted.Value = true;
+            }
+
+            if (Config.UseFilter && filterField.Value is not null)
+                filterField.Value.Selected = __instance.currentTab == GameMenu.socialTab;
+        }
+
         public static void ResortSocialList()
         {
             if (Game1.activeClickableMenu is GameMenu)
@@ -205,6 +378,58 @@ namespace SocialPageOrderButton
                 SHelper.Reflection.GetMethod((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "setScrollBarToCurrentIndex").Invoke();
                 ((SocialPage)(Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab]).updateSlots();
             }
+        }
+
+        public static int GetButtonX(SocialPage page)
+        {
+            return page.xPositionOnScreen + xOffset + Config.ButtonOffsetX;
+        }
+        
+        public static int GetButtonY(SocialPage page)
+        {
+            return page.yPositionOnScreen + Config.ButtonOffsetY;
+        }
+
+        public static Rectangle GetButtonRectangle(SocialPage page)
+        {
+            return new Rectangle(GetButtonX(page), GetButtonY(page), buttonTexture.Width * 4, buttonTexture.Height * 4);
+        }
+
+        public static void UpdateFilterPosition(SocialPage page)
+        {
+            filterField.Value.X = page.xPositionOnScreen + page.width / 2 - filterField.Value.Width / 2 + Config.FilterOffsetX;
+            filterField.Value.Y = page.yPositionOnScreen + page.height + Config.FilterOffsetY;
+        }
+
+        public static void SetUseFilter(bool value)
+        {
+            if (value)
+            {
+                if (filterField.Value is null)
+                {
+                    filterField.Value = new TextBox(Game1.content.Load<Texture2D>("LooseSprites\\textBox"), null, Game1.smallFont, Game1.textColor)
+                    {
+                        Text = ""
+                    };
+                }
+            }
+
+            Config.UseFilter = value;
+        }
+
+        public static void IncrementSort()
+        {
+            currentSort.Value++;
+            currentSort.Value %= 4;
+            ResortSocialList();
+        }
+
+        public static void DecrementSort()
+        {
+            currentSort.Value--;
+            if (currentSort.Value < 0)
+                currentSort.Value = 3;
+            ResortSocialList();
         }
     }
 

@@ -342,6 +342,7 @@ namespace Swim
                 {
                     SMonitor.Log($"Clearing overlay objects from GameLocation {location.Name} ");
                     location.overlayObjects.Clear();
+                    location.numberOfSpawnedObjectsOnMap = 0;
                 }
                 if (kvp.Value.Features.Contains("OceanTreasure"))
                 {
@@ -560,7 +561,16 @@ namespace Swim
                 Game1.player.position.Value = new Vector2(endJumpLoc.Value.X - (difx * completed), endJumpLoc.Value.Y - (dify * completed) - (float)Math.Sin(completed * Math.PI) * 64);
                 return;
             }
+
             if (!SwimUtils.CanSwimHere())
+                return;
+
+            if (!Context.IsPlayerFree)
+            {
+                return;
+            }
+
+            if (Game1.player.swimming.Value && tryToWarp()) // Returns true if it is warping
                 return;
 
             if (Game1.player.swimming.Value && !SwimUtils.IsInWater() && !isJumping.Value)
@@ -596,14 +606,6 @@ namespace Swim
                     Game1.player.changeIntoSwimsuit();
             }
 
-            if (!Context.IsPlayerFree)
-            {
-                return;
-            }
-
-            if (Game1.player.swimming.Value && tryToWarp()) // Returns true if it is warping
-                return;
-
             if (Game1.player.swimming.Value)
             {
                 if (SwimUtils.IsWearingScubaGear() && !Config.SwimSuitAlways && SwimUtils.IsMapUnderwater(Game1.currentLocation.Name))
@@ -633,8 +635,7 @@ namespace Swim
                     }
                 }
 
-                Game1.player.canOnlyWalk = !Config.AllowActionsWhileInSwimsuit;
-                if(Game1.player.running && !Config.AllowRunningWhileInSwimsuit && !SwimUtils.IsWearingScubaGear())
+                if(Game1.player.running)
                 {
                     Game1.player.setRunning(false);
                 }

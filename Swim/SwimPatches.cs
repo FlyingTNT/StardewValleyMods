@@ -174,10 +174,18 @@ namespace Swim
         {
             try
             {
+                __state = __instance.bathingClothes.Value;
+
+                if(__instance.swimming.Value)
+                {
+                    __instance.bathingClothes.Value = true;
+                    return;
+                }
+
                 if (__instance.bathingClothes.Value && Config.AllowRunningWhileInSwimsuit)
                 {
                     __instance.bathingClothes.Value = false;
-                    __state = true;
+                    return;
                 }
             }
             catch (Exception ex)
@@ -189,8 +197,7 @@ namespace Swim
         {
             try
             {
-                if(!__instance.bathingClothes.Value && Config.AllowRunningWhileInSwimsuit && __state == true)
-                    __instance.bathingClothes.Value = true;
+                __instance.bathingClothes.Value = __state;
             }
             catch (Exception ex)
             {
@@ -447,7 +454,8 @@ namespace Swim
                 if (__result == false || !Game1.IsMasterGame || !SwimUtils.DebrisIsAnItem(debris))
                     return;
 
-                SMonitor.Log($"Sinking debris: {debris.itemId.Value} ({debris.item.Name})");
+                if(debris.item != null)
+                    SMonitor.Log($"Sinking debris: {debris.itemId.Value} ({debris.item.Name})");
 
                 if (ModEntry.diveMaps.ContainsKey(__instance.Name) && ModEntry.diveMaps[__instance.Name].DiveLocations.Count > 0)
                 {
@@ -496,8 +504,7 @@ namespace Swim
                             Vector2 newPos = new Vector2(newTile.X * Game1.tileSize, newTile.Y * Game1.tileSize);
                             if (debris.item != null)
                             {
-                                newDebris = Game1.createItemDebris(debris.item, newPos, Game1.random.Next(4));
-                                Game1.getLocationFromName(diveLocation.OtherMapName).debris.Add(newDebris);
+                                newDebris = Game1.createItemDebris(debris.item, newPos, Game1.random.Next(4), Game1.getLocationFromName(diveLocation.OtherMapName));
                             }
                             else
                             {

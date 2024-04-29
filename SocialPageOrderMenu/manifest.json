@@ -3,7 +3,7 @@
   "Author": "aedenthorn, FlyingTNT",
   "Version": "1.0.0",
   "Description": "Lets you reorder and search the social page.",
-  "UniqueID": "FlyingTNT.SocialPageOrderRexux",
+  "UniqueID": "FlyingTNT.SocialPageOrderRedux",
   "EntryDll": "SocialPageOrderRedux.dll",
   "MinimumApiVersion": "4.0.4",
   "UpdateKeys": [ "Nexus:23374" ],

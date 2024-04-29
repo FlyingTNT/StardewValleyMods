@@ -63,6 +63,10 @@ namespace SocialPageOrderRedux
                 prefix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_recieveKeyPress_Prefix))
             );
             
+            harmony.Patch(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.receiveKeyPress)),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(GameMenu_recieveKeyPress_Prefix))
+            );
+            
             harmony.Patch(AccessTools.Method(typeof(SocialPage), nameof(SocialPage.performHoverAction)),
                 postfix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_performHoverAction_Postfix))
             );
@@ -359,6 +363,15 @@ namespace SocialPageOrderRedux
         public static bool SocialPage_recieveKeyPress_Prefix(IClickableMenu __instance, Keys key)
         {
             if (!Config.EnableMod || !Config.UseFilter || filterField.Value is null || !filterField.Value.Selected || key == Keys.Escape || __instance is not SocialPage socialPage || Game1.options.gamepadControls)
+                return true;
+
+            socialPage.updateSlots();
+            return false;
+        }
+
+        public static bool GameMenu_recieveKeyPress_Prefix(GameMenu __instance, Keys key)
+        {
+            if (!Config.EnableMod || !Config.UseFilter || filterField.Value is null || !filterField.Value.Selected || key == Keys.Escape || __instance.GetCurrentPage() is not SocialPage socialPage || Game1.options.gamepadControls)
                 return true;
 
             socialPage.updateSlots();

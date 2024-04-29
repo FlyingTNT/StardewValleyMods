@@ -190,7 +190,7 @@ namespace Swim
             }
             catch (Exception ex)
             {
-                SMonitor.Log($"Failed in {nameof(Farmer_changeIntoSwimsuit_Postfix)}:\n{ex}", LogLevel.Error);
+                SMonitor.Log($"Failed in {nameof(Farmer_setRunning_Prefix)}:\n{ex}", LogLevel.Error);
             }
         }
         public static void Farmer_setRunning_Postfix(Farmer __instance, bool __state)

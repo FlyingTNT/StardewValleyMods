@@ -102,6 +102,13 @@ namespace Swim
                     Y = pos.Y
                 };
             }
+
+            if (Game1.getLocationFromName(diveLocation.OtherMapName) is not GameLocation location || !IsValidDiveLocation(location, new Vector2(dp.X, dp.Y)))
+            {
+                SMonitor.Log($"Invalid dive location: {diveLocation.OtherMapName} ({dp.X}, {dp.Y})");
+                return;
+            }
+
             if (!IsMapUnderwater(Game1.player.currentLocation.Name))
             {
                 ModEntry.bubbles.Value.Clear();
@@ -114,6 +121,12 @@ namespace Swim
             Game1.playSound("pullItemFromWater");
             Game1.warpFarmer(diveLocation.OtherMapName, dp.X, dp.Y, false);
         }
+
+        public static bool IsValidDiveLocation(GameLocation map, Vector2 location)
+        {
+            return map.isTileOnMap(location) && (!map.IsTileBlockedBy(location, CollisionMask.Buildings, CollisionMask.Buildings) || IsWaterTile(location, map)) && map.getTileIndexAt((int)location.X, (int)location.Y, "Back") != -1;
+        }
+
         public static int MaxOxygen()
         {
             return Game1.player.MaxStamina * Math.Max(1, Config.OxygenMult);
@@ -474,9 +487,14 @@ namespace Swim
 
         public static bool IsWaterTile(Vector2 tilePos)
         {
-            if (Game1.player.currentLocation != null && Game1.player.currentLocation.waterTiles != null && tilePos.X >= 0 && tilePos.Y >= 0 && Game1.player.currentLocation.waterTiles.waterTiles.GetLength(0) > tilePos.X && Game1.player.currentLocation.waterTiles.waterTiles.GetLength(1) > tilePos.Y)
+            return IsWaterTile(tilePos, Game1.player.currentLocation);
+        }
+
+        public static bool IsWaterTile(Vector2 tilePos, GameLocation location)
+        {
+            if (location != null && location.waterTiles != null && tilePos.X >= 0 && tilePos.Y >= 0 && location.waterTiles.waterTiles.GetLength(0) > tilePos.X && location.waterTiles.waterTiles.GetLength(1) > tilePos.Y)
             {
-                return Game1.player.currentLocation.waterTiles[(int)tilePos.X, (int)tilePos.Y];
+                return location.waterTiles[(int)tilePos.X, (int)tilePos.Y];
             }
             return false;
         }

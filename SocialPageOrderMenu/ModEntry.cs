@@ -578,7 +578,7 @@ namespace SocialPageOrderRedux
                 }
                 else
                 {
-                    //page.updateSlots();
+                    page.updateSlots();
                     page.currentlySnappedComponent = page.characterSlots[indexToSelect];
                     SHelper.Reflection.GetField<int>((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "slotPosition").SetValue(lastSlotPosition.Value);
                     SHelper.Reflection.GetMethod((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "setScrollBarToCurrentIndex").Invoke();

@@ -638,7 +638,7 @@ namespace SocialPageOrderRedux
             if (!WasModEnabled)
                 return;
 
-            if (Config.UseFilter && filterField.Value is null)
+            if (filterField.Value is null)
             {
                 filterField.Value = new TextBox(Game1.content.Load<Texture2D>("LooseSprites\\textBox"), null, Game1.smallFont, Game1.textColor)
                 {
@@ -646,7 +646,7 @@ namespace SocialPageOrderRedux
                 };
             }
 
-            if(Config.UseDropdown && dropDown.Value is null)
+            if(dropDown.Value is null)
             {
                 dropDown.Value = new MyOptionsDropDown("", -1);
 
@@ -659,7 +659,7 @@ namespace SocialPageOrderRedux
                 dropDown.Value.selectedOption = currentSort.Value;
             }
 
-            if(Config.UseButton)
+            if(button.Value is null)
             {
                 button.Value = new ClickableTextureComponent(Rectangle.Empty, Game1.mouseCursors, buttonTextureSource, 4, false)
                 {

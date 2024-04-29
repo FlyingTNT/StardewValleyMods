@@ -30,6 +30,7 @@ namespace SocialPageOrderRedux
         public static readonly PerScreen<ClickableTextureComponent> button = new();
         public static readonly PerScreen<bool> wasSorted = new PerScreen<bool>(() => false);
         public static readonly PerScreen<int> currentSort = new PerScreen<int>(() => 0);
+        public static readonly PerScreen<int> lastSlotPosition = new PerScreen<int>(() => 0); // The position to return to when leaving a ProfileMenu
 
         private static readonly PerScreen<string> lastFilterString = new PerScreen<string>(()=>"");
         private static readonly PerScreen<TextBox> filterField = new();
@@ -204,14 +205,33 @@ namespace SocialPageOrderRedux
         {
             lastFilterString.Value += "dirty";// Force an update
 
-            if (Game1.activeClickableMenu is GameMenu)
+            if (Game1.activeClickableMenu is GameMenu menu)
             {
                 if(Config.UseFilter && e.OldMenu is not ProfileMenu)
                 {
                     filterField.Value.Text = "";
                 }
 
-                ResortSocialList();
+                if(menu.GetCurrentPage() is SocialPage socialPage)
+                {
+                    ResortSocialList(slotToSelect: e.OldMenu is ProfileMenu pm ? pm.Current : null);
+
+                    if (Game1.options.snappyMenus && Game1.options.gamepadControls)
+                    {
+                        if(socialPage.currentlySnappedComponent is not null)
+                        {
+                            // For some reason, the snapping doesn't work correctly in local multiplayer. I have no idea why. With moveCursorInDirection(-1), the cursor is at least consistently *in* the correct box.
+                            if (Context.IsSplitScreen)
+                                socialPage.moveCursorInDirection(-1);
+                            else
+                                socialPage.snapCursorToCurrentSnappedComponent();
+                        }
+                        else
+                        {
+                            SMonitor.Log("Currently snapped component is null.");
+                        }
+                    }
+                }
             }
         }
 
@@ -294,6 +314,8 @@ namespace SocialPageOrderRedux
                 if (!Config.EnableMod)
                     return true;
 
+                lastSlotPosition.Value = SHelper.Reflection.GetField<int>(__instance, "slotPosition").GetValue();
+
                 if (Config.UseDropdown && dropDown.Value.bounds.Contains(x - GetDropdownX(__instance), y - GetDropdownY(__instance)))
                 {
                     dropDown.Value.receiveLeftClick(x - GetDropdownX(__instance), y - GetDropdownY(__instance));
@@ -336,7 +358,7 @@ namespace SocialPageOrderRedux
 
         public static bool SocialPage_recieveKeyPress_Prefix(IClickableMenu __instance, Keys key)
         {
-            if (!Config.EnableMod || !Config.UseFilter || filterField.Value is null || !filterField.Value.Selected || key == Keys.Escape || __instance is not SocialPage socialPage)
+            if (!Config.EnableMod || !Config.UseFilter || filterField.Value is null || !filterField.Value.Selected || key == Keys.Escape || __instance is not SocialPage socialPage || Game1.options.gamepadControls)
                 return true;
 
             socialPage.updateSlots();
@@ -386,7 +408,7 @@ namespace SocialPageOrderRedux
                 filterField.Value.Selected = __instance.currentTab == GameMenu.socialTab;
         }
 
-        public static void ResortSocialList()
+        public static void ResortSocialList(SocialEntry slotToSelect = null)
         {
             if (Game1.activeClickableMenu is GameMenu)
             {
@@ -508,6 +530,8 @@ namespace SocialPageOrderRedux
                         });
                         break;
                 }
+                int indexToSelect = -1;
+
                 var cslots = page.characterSlots;
                 for (int i = 0; i < nameSprites.Count; i++)
                 {
@@ -526,21 +550,40 @@ namespace SocialPageOrderRedux
                     nameSprites[i].slot.bounds = cslots[i].bounds;
                     cslots[i] = nameSprites[i].slot;
                     page.SocialEntries[i] = nameSprites[i].entry;
+                    if(slotToSelect is not null && slotToSelect.InternalName == nameSprites[i].entry.InternalName && slotToSelect.IsPlayer == nameSprites[i].entry.IsPlayer && slotToSelect.IsChild == nameSprites[i].entry.IsChild)
+                    {
+                        indexToSelect = i;
+                    }
                 }
                 SHelper.Reflection.GetField<List<ClickableTextureComponent>>((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "sprites").SetValue(new List<ClickableTextureComponent>(sprites));
 
-                int first_character_index = 0;
-                for (int l = 0; l < page.SocialEntries.Count; l++)
+                if(indexToSelect == -1)
                 {
-                    if (!page.SocialEntries[l].IsPlayer)
+                    for (int l = 0; l < page.SocialEntries.Count; l++)
                     {
-                        first_character_index = l;
-                        break;
+                        if (!page.SocialEntries[l].IsPlayer)
+                        {
+                            indexToSelect = l;
+                            break;
+                        }
                     }
                 }
-                
-                SHelper.Reflection.GetField<int>((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "slotPosition").SetValue(first_character_index);
-                SHelper.Reflection.GetMethod((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "setScrollBarToCurrentIndex").Invoke();
+
+                indexToSelect = indexToSelect == -1 ? 0 : indexToSelect;
+
+                if(slotToSelect is null)
+                {
+                    SHelper.Reflection.GetField<int>((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "slotPosition").SetValue(indexToSelect);
+                    SHelper.Reflection.GetMethod((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "setScrollBarToCurrentIndex").Invoke();
+                }
+                else
+                {
+                    //page.updateSlots();
+                    page.currentlySnappedComponent = page.characterSlots[indexToSelect];
+                    SHelper.Reflection.GetField<int>((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "slotPosition").SetValue(lastSlotPosition.Value);
+                    SHelper.Reflection.GetMethod((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "setScrollBarToCurrentIndex").Invoke();
+                    page.updateSlots();
+                }
             }
         }
 

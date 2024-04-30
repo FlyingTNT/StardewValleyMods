@@ -159,7 +159,7 @@ namespace Swim
             }
 
             // Player input checks
-            if (!((Game1.player.isMoving() && Config.ReadyToSwim) || (SHelper.Input.IsDown(Config.ManualJumpButton) && Config.EnableClickToSwim)) || SHelper.Input.IsDown(SButton.LeftShift))
+            if (!((Game1.player.isMoving() && Config.ReadyToSwim) || (Config.ManualJumpButton.IsDown() && Config.EnableClickToSwim)) || Config.PreventJumpButton.IsDown())
             {
                 return false;
             }
@@ -531,9 +531,15 @@ namespace Swim
             return result;
         }
 
-        public static bool isMouseButton(SButton button)
+        public static bool isMouseButtonDown(KeybindList keybindList)
         {
-            return button == SButton.MouseLeft || button == SButton.MouseRight || button == SButton.MouseMiddle || button == SButton.MouseX1 || button == SButton.MouseX2;
+            if(keybindList.GetKeybindCurrentlyDown() is not Keybind keybind)
+                return false;
+
+            if (keybind.Buttons.Length == 0)
+                return false;
+
+            return keybind.Buttons[0] == SButton.MouseLeft || keybind.Buttons[0] == SButton.MouseRight || keybind.Buttons[0] == SButton.MouseMiddle || keybind.Buttons[0] == SButton.MouseX1 || keybind.Buttons[0] == SButton.MouseX2;
         }
         public static bool DebrisIsAnItem(Debris debris)
         {

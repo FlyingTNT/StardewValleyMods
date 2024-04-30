@@ -422,8 +422,11 @@ namespace Swim
                 SwimDialog.OldMarinerDialogue(resps[resp].responseKey);
                 return;
             }
+        }
 
-            if (e.Button == Config.DiveKey && Game1.activeClickableMenu == null && !Game1.player.UsingTool && ModEntry.diveMaps.ContainsKey(Game1.player.currentLocation.Name) && ModEntry.diveMaps[Game1.player.currentLocation.Name].DiveLocations.Count > 0)
+        public static void Input_ButtonsChanged(object sender, ButtonsChangedEventArgs e)
+        {
+            if (Config.DiveKey.JustPressed() && Game1.activeClickableMenu == null && Context.IsPlayerFree && Context.CanPlayerMove && ModEntry.diveMaps.ContainsKey(Game1.player.currentLocation.Name) && ModEntry.diveMaps[Game1.player.currentLocation.Name].DiveLocations.Count > 0)
             {
                 SMonitor.Log("Trying to dive!");
                 Point pos = Game1.player.TilePoint;
@@ -463,7 +466,7 @@ namespace Swim
                 return;
             }
 
-            if (e.Button == Config.SwimKey && Game1.activeClickableMenu == null && (!Game1.player.swimming.Value || !Config.ReadyToSwim) && !isJumping.Value)
+            if (Config.SwimKey.JustPressed() && Game1.activeClickableMenu == null && (!Game1.player.swimming.Value || !Config.ReadyToSwim) && !isJumping.Value)
             {
                 Config.ReadyToSwim = !Config.ReadyToSwim;
                 SHelper.WriteConfig(Config);
@@ -471,7 +474,7 @@ namespace Swim
                 return;
             }
 
-            if (e.Button == Config.SwimSuitKey && Game1.activeClickableMenu == null)
+            if (Config.SwimSuitKey.JustPressed() && Game1.activeClickableMenu == null)
             {
                 Config.SwimSuitAlways = !Config.SwimSuitAlways;
                 SHelper.WriteConfig(Config);
@@ -484,7 +487,6 @@ namespace Swim
                 }
                 return;
             }
-
         }
 
         public static void GameLoop_UpdateTicked(object sender, UpdateTickedEventArgs e)
@@ -651,7 +653,7 @@ namespace Swim
             bool didJump = tryToJumpInDirection(direction); // Try to jump in the direction the player is facing
 
             // If we didn't just jump, 
-            if (!didJump && SHelper.Input.IsDown(Config.ManualJumpButton) && SwimUtils.isMouseButton(Config.ManualJumpButton) && Config.EnableClickToSwim)
+            if (!didJump && Config.ManualJumpButton.IsDown() && SwimUtils.isMouseButtonDown(Config.ManualJumpButton) && Config.EnableClickToSwim)
             {
                 try
                 {

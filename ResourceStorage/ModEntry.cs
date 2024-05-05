@@ -181,7 +181,7 @@ namespace ResourceStorage
 
         public void GameLoop_SaveLoaded(object sender, StardewModdingAPI.Events.SaveLoadedEventArgs e)
         {
-            if(Context.IsMainPlayer)
+            if(Game1.IsMasterGame)
             {
                 SMonitor.Log("Clearing the resource dictionary!");
                 resourceDict.Clear();

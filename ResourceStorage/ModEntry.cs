@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using Newtonsoft.Json;
 using StardewModdingAPI;
+using StardewModdingAPI.Events;
 using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.Inventories;
@@ -41,6 +42,7 @@ namespace ResourceStorage
             SHelper = helper;
 
             Helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
+            Helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
             Helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
             Helper.Events.GameLoop.Saving += GameLoop_Saving;
 
@@ -167,25 +169,21 @@ namespace ResourceStorage
             #endregion
         }
 
-        public void GameLoop_Saving(object sender, StardewModdingAPI.Events.SavingEventArgs e)
+        public void GameLoop_Saving(object sender, SavingEventArgs e)
         {
-            foreach (var f in Game1.getAllFarmers())
-            {
-                if (resourceDict.TryGetValue(f.UniqueMultiplayerID, out var dict))
-                {
-                    SMonitor.Log($"Saving resource dictionary for {f.Name}");
-                    f.modData[dictKey] = JsonConvert.SerializeObject(dict);
-                }
-            }
+            SaveResourceDictionary(Game1.player);
         }
 
-        public void GameLoop_SaveLoaded(object sender, StardewModdingAPI.Events.SaveLoadedEventArgs e)
+        public void GameLoop_SaveLoaded(object sender, SaveLoadedEventArgs e)
         {
-            if(Game1.IsMasterGame)
-            {
-                SMonitor.Log("Clearing the resource dictionary!");
-                resourceDict.Clear();
-            }
+            SMonitor.Log("Removing this player's dictionary.");
+            resourceDict.Remove(Game1.player.UniqueMultiplayerID);
+        }
+
+        public void GameLoop_ReturnedToTitle(object sender, ReturnedToTitleEventArgs e)
+        {
+            SMonitor.Log("Removing this player's dictionary.");
+            resourceDict.Remove(Game1.player.UniqueMultiplayerID);
         }
 
         public void GameLoop_GameLaunched(object sender, StardewModdingAPI.Events.GameLaunchedEventArgs e)

@@ -296,5 +296,13 @@ namespace ResourceStorage
 
             return count;
         }
+        public static void SaveResourceDictionary(Farmer farmer)
+        {
+            if (resourceDict.TryGetValue(farmer.UniqueMultiplayerID, out var dict))
+            {
+                SMonitor.Log($"Saving resource dictionary for {farmer.Name}");
+                farmer.modData[dictKey] = JsonConvert.SerializeObject(dict);
+            }
+        }
     }
 }

@@ -50,6 +50,13 @@ namespace ResourceStorage
                     catch { }
                 }
             }
+
+            if(SharedResourceManager.ShouldUseSharedResources(instance))
+            {
+                SharedResourceManager.ReportResourceChange(id, newAmount - oldAmount);
+                return newAmount - oldAmount;
+            }
+
             if (newAmount <= 0)
                 dict.Remove(id);
             else
@@ -57,9 +64,16 @@ namespace ResourceStorage
             return newAmount - oldAmount;
         }
 
-        public static Dictionary<string, long> GetFarmerResources(Farmer instance)
+        public static Dictionary<string, long> GetFarmerResources(Farmer instance, bool allowShared = true)
         {
             SMonitor.Log($"Getting resource dictionary for {instance.Name}");
+
+            if(allowShared && SharedResourceManager.ShouldUseSharedResources(instance))
+            {
+                SMonitor.Log("Using the shared dictionary!");
+                return SharedResourceManager.GetDictionary();
+            }
+
             if (!resourceDict.TryGetValue(instance.UniqueMultiplayerID, out var dict))
             {
                 SMonitor.Log($"Checking mod data for {instance.Name}");
@@ -295,6 +309,15 @@ namespace ResourceStorage
             }
 
             return count;
+        }
+
+        public static void SaveResourceDictionary(Farmer farmer)
+        {
+            if (resourceDict.TryGetValue(farmer.UniqueMultiplayerID, out var dict))
+            {
+                SMonitor.Log($"Saving resource dictionary for {farmer.Name}");
+                farmer.modData[dictKey] = JsonConvert.SerializeObject(dict);
+            }
         }
     }
 }

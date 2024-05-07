@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using StardewModdingAPI;
+using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.BellsAndWhistles;
 using StardewValley.Menus;
@@ -31,6 +32,7 @@ namespace ResourceStorage
         public ClickableTextureComponent scrollBar;
         public Rectangle scrollBarRunner;
         public bool scrolling;
+        public static readonly PerScreen<bool> resourceListDirty = new PerScreen<bool>(() => true);
 
         public ResourceMenu() : base(Game1.uiViewport.Width / 2 - (windowWidth + borderWidth * 2) / 2, -borderWidth, windowWidth + borderWidth * 2, Game1.uiViewport.Height, false)
         {
@@ -131,13 +133,20 @@ namespace ResourceStorage
 
             }
             populateClickableComponentList();
+            resourceListDirty.Value = false;
         }
 
 
         public override void draw(SpriteBatch b)
         {
-            if(ModEntry.gameMenu.Value is not null)
+            if (resourceListDirty.Value)
+            {
+                RepopulateComponentList();
+            }
+
+            if (ModEntry.gameMenu.Value is not null)
                 ModEntry.gameMenu.Value.draw(b);
+
             Game1.drawDialogueBox(xPositionOnScreen, yPositionOnScreen, width, height, false, true, null, false, true);
             SpriteText.drawStringHorizontallyCenteredAt(b, ModEntry.SHelper.Translation.Get("resources"), Game1.uiViewport.Width / 2, yPositionOnScreen + spaceToClearTopBorder + borderWidth / 2);
             b.Draw(Game1.menuTexture, new Rectangle(xPositionOnScreen + 32, yPositionOnScreen + borderWidth + spaceToClearTopBorder + 48, width - 64, 16), new Rectangle(40, 16, 1, 16), Color.White);
@@ -436,7 +445,7 @@ namespace ResourceStorage
         {
             base.gameWindowSizeChanged(oldBounds, newBounds);
             scrolled = Math.Min(scrolled, resourceList.Count - ((Game1.uiViewport.Height + 72 - spaceToClearTopBorder * 2 - 108) / 64));
-            RepopulateComponentList();
+            resourceListDirty.Value = true; // Make sure the menu is updated next draw
         }
 
     }

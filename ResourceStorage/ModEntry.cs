@@ -2,6 +2,7 @@
 using Microsoft.Xna.Framework.Graphics;
 using Newtonsoft.Json;
 using StardewModdingAPI;
+using StardewModdingAPI.Events;
 using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.Inventories;
@@ -15,7 +16,6 @@ namespace ResourceStorage
     /// <summary>The mod entry point.</summary>
     public partial class ModEntry : Mod
     {
-
         public static IMonitor SMonitor;
         public static IModHelper SHelper;
         public static ModConfig Config;
@@ -23,6 +23,8 @@ namespace ResourceStorage
         public static ModEntry context;
         public static string dictKey = "aedenthorn.ResourceStorage/dictionary"; // Not updating to FlyingTNT.ResourceStorage for backwards compatibility
         public static Dictionary<long, Dictionary<string, long>> resourceDict = new();
+
+        public const string sharedDictionaryKey = "FlyingTNT.ResourceStorage/sharedDictionary";
 
         public static PerScreen<GameMenu> gameMenu = new PerScreen<GameMenu>();
         public static PerScreen<ClickableTextureComponent> resourceButton = new PerScreen<ClickableTextureComponent>();
@@ -41,8 +43,10 @@ namespace ResourceStorage
             SHelper = helper;
 
             Helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
-            Helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
+            Helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
             Helper.Events.GameLoop.Saving += GameLoop_Saving;
+
+            SharedResourceManager.Initialize(Monitor, helper, Config, ModManifest);
 
             harmony = new Harmony(ModManifest.UniqueID);
 
@@ -167,28 +171,18 @@ namespace ResourceStorage
             #endregion
         }
 
-        public void GameLoop_Saving(object sender, StardewModdingAPI.Events.SavingEventArgs e)
+        public void GameLoop_Saving(object sender, SavingEventArgs e)
         {
-            foreach (var f in Game1.getAllFarmers())
-            {
-                if (resourceDict.TryGetValue(f.UniqueMultiplayerID, out var dict))
-                {
-                    SMonitor.Log($"Saving resource dictionary for {f.Name}");
-                    f.modData[dictKey] = JsonConvert.SerializeObject(dict);
-                }
-            }
+            SaveResourceDictionary(Game1.player);
         }
 
-        public void GameLoop_SaveLoaded(object sender, StardewModdingAPI.Events.SaveLoadedEventArgs e)
+        public void GameLoop_ReturnedToTitle(object sender, ReturnedToTitleEventArgs e)
         {
-            if(Game1.IsMasterGame)
-            {
-                SMonitor.Log("Clearing the resource dictionary!");
-                resourceDict.Clear();
-            }
+            SMonitor.Log("Removing this player's dictionary.");
+            resourceDict.Remove(Game1.player.UniqueMultiplayerID);
         }
 
-        public void GameLoop_GameLaunched(object sender, StardewModdingAPI.Events.GameLaunchedEventArgs e)
+        public void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
             var bcapi = Helper.ModRegistry.GetApi("leclair.bettercrafting");
             if (bcapi is not null)
@@ -253,7 +247,14 @@ namespace ResourceStorage
                     getValue: () => Config.ShowMessage,
                     setValue: value => Config.ShowMessage = value
                 );
-                
+
+                configMenu.AddBoolOption(
+                    mod: ModManifest,
+                    name: () => SHelper.Translation.Get("GMCM_UseSharedResources_Name"),
+                    getValue: () => SharedResourceManager.UseSharedResources.Value,
+                    setValue: value => SharedResourceManager.ChangeShouldUseShared(value)
+                );
+
                 configMenu.AddKeybind(
                     mod: ModManifest,
                     name: () => SHelper.Translation.Get("GMCM_Option_ResourcesKey_Name"),

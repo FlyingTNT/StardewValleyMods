@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
+using ResourceStorage.BetterCrafting;
 using StardewModdingAPI;
 using StardewValley;
 using StardewValley.GameData.Objects;
@@ -16,10 +17,10 @@ namespace ResourceStorage
 {
     public partial class ModEntry
     {
-        public static long ModifyResourceLevel(Farmer instance, string id, int amountToAdd, bool auto = true)
+        public static long ModifyResourceLevel(Farmer instance, string id, int amountToAdd, bool auto = true, bool notifyBetterCraftingIntegration = true)
         {
             id = ItemRegistry.QualifyItemId(id);
-            if(id == null)
+            if (id == null)
             {
                 return 0;
             }
@@ -36,7 +37,7 @@ namespace ResourceStorage
                 return 0;
 
             var newAmount = Math.Max(oldAmount + amountToAdd, 0);
-            if(newAmount != oldAmount)
+            if (newAmount != oldAmount)
             {
                 SMonitor.Log($"Modified {instance.Name}'s resource {id} from {oldAmount} to {newAmount}");
                 if (Config.ShowMessage)
@@ -54,6 +55,12 @@ namespace ResourceStorage
                 dict.Remove(id);
             else
                 dict[id] = newAmount;
+
+            if (notifyBetterCraftingIntegration)
+            {
+                BetterCraftingIntegration.NotifyResourceChange(id, amountToAdd, instance.UniqueMultiplayerID);
+            }
+
             return newAmount - oldAmount;
         }
 

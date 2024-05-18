@@ -1,6 +1,7 @@
 ﻿using HarmonyLib;
 using Microsoft.Xna.Framework.Graphics;
 using Newtonsoft.Json;
+using ResourceStorage.BetterCrafting;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewModdingAPI.Utilities;
@@ -186,49 +187,19 @@ namespace ResourceStorage
             resourceDict.Remove(Game1.player.UniqueMultiplayerID);
         }
 
-        public void GameLoop_GameLaunched(object sender, StardewModdingAPI.Events.GameLaunchedEventArgs e)
+        public void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
-            var bcapi = Helper.ModRegistry.GetApi("leclair.bettercrafting");
-            if (bcapi is not null)
-            {
-                var type = bcapi.GetType().Assembly.GetType("Leclair.Stardew.Common.InventoryHelper");
-                if (type is not null)
-                {
-                    try
-                    {
-                        foreach(var m in type.GetMethods())
-                        {
-                            if(m.Name == "CountItem" && m.GetParameters().Length > 1 && m.GetParameters()[1].ParameterType == typeof(Farmer))
-                            {
-                                harmony.Patch(
-                                    original: m,
-                                    postfix: new HarmonyMethod(typeof(ModEntry), nameof(Leclair_Stardew_Common_InventoryHelper_CountItem_Postfix))
-                                );
-                            }
-                            else if (m.Name == "ConsumeItem")
-                            {
-                                harmony.Patch(
-                                    original: m,
-                                    prefix: new HarmonyMethod(typeof(ModEntry), nameof(Leclair_Stardew_Common_InventoryHelper_ConsumeItem_Prefix))
-                                );
-                            }
-                        }
-                    }
-                    catch(Exception ex)
-                    {
-                        Monitor.Log($"Error: {ex}", LogLevel.Error);
-                    }
-                }
-            }
+            BetterCraftingIntegration.Initialize(SMonitor, SHelper, Config);
+
             // get Generic Mod Config Menu's API (if it's installed)
-            var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            var configMenu = SHelper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
             if (configMenu is not null)
             {
                 // register mod
                 configMenu.Register(
                     mod: ModManifest,
                     reset: () => Config = new ModConfig(),
-                    save: () => Helper.WriteConfig(Config)
+                    save: () => SHelper.WriteConfig(Config)
                 );
 
                 configMenu.AddBoolOption(

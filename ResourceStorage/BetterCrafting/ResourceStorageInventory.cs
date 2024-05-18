@@ -357,12 +357,12 @@ namespace ResourceStorage.BetterCrafting
 
             if(discrepencies.Count == 0)
             {
-                ModEntry.SMonitor.Log("No discrepencies found after crafting!");
+                BetterCraftingIntegration.SMonitor.Log("No discrepencies found after crafting!");
             }
 
             foreach(var kvp in discrepencies)
             {
-                ModEntry.SMonitor.Log("Discrepency found after crafting!");
+                BetterCraftingIntegration.SMonitor.Log("Discrepency found after crafting!");
                 ModEntry.ModifyResourceLevel(Owner, kvp.Key, (int)kvp.Value, notifyBetterCraftingIntegration: false);
             }
         }

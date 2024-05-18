@@ -49,7 +49,6 @@ namespace ResourceStorage.BetterCrafting
 
         public static void BetterCrafting_MenuPopulateContainers(IPopulateContainersEvent e)
         {
-            SMonitor.Log("pop");
             IsBetterCraftingMenuOpen.Value = true;
             ThisPlayerStorage.Value.ReloadFromFarmerResources();
             e.Containers.Add(new Tuple<object, GameLocation>(ThisPlayerStorage.Value, null));
@@ -57,7 +56,6 @@ namespace ResourceStorage.BetterCrafting
 
         public static void BetterCrafting_PostCraft(IPostCraftEvent e)
         {
-            SMonitor.Log("pc");
             ThisPlayerStorage.Value.SquareWithFarmerResources(e.Recipe);
         }
 

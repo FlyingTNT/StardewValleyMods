@@ -52,7 +52,12 @@ namespace ResourceStorage
                 }
             }
 
-            if(SharedResourceManager.ShouldUseSharedResources(instance))
+            if (notifyBetterCraftingIntegration)
+            {
+                BetterCraftingIntegration.NotifyResourceChange(id, amountToAdd, instance.UniqueMultiplayerID);
+            }
+
+            if (SharedResourceManager.ShouldUseSharedResources(instance))
             {
                 SharedResourceManager.ReportResourceChange(id, newAmount - oldAmount);
                 return newAmount - oldAmount;
@@ -62,11 +67,6 @@ namespace ResourceStorage
                 dict.Remove(id);
             else
                 dict[id] = newAmount;
-
-            if (notifyBetterCraftingIntegration)
-            {
-                BetterCraftingIntegration.NotifyResourceChange(id, amountToAdd, instance.UniqueMultiplayerID);
-            }
 
             return newAmount - oldAmount;
         }

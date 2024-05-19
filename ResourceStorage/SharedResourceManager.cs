@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using ResourceStorage.BetterCrafting;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewModdingAPI.Utilities;
@@ -194,6 +195,8 @@ namespace ResourceStorage
                     newAmount = request.NewAmount;
                 }
 
+                BetterCraftingIntegration.NotifyResourceChange(request.ItemId, (int)(newAmount-currentAmount), Game1.player.UniqueMultiplayerID);
+
                 // Update the dictionary
                 ChangeResourceAmount(request.ItemId, newAmount);
             }
@@ -212,6 +215,8 @@ namespace ResourceStorage
 
                 long currentAmount = GetResourceAmount(request.ItemId);
                 long newAmount = Math.Max(currentAmount + request.Change, 0);
+
+                BetterCraftingIntegration.NotifyResourceChange(request.ItemId, (int)(newAmount - currentAmount), Game1.player.UniqueMultiplayerID);
 
                 // Send the resource change to the other players
                 ReportResourceChange(request.ItemId, newAmount - currentAmount);

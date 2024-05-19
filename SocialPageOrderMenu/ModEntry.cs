@@ -51,6 +51,7 @@ namespace SocialPageOrderRedux
 
             helper.Events.Input.ButtonPressed += Input_ButtonPressed;
             helper.Events.Display.MenuChanged += Display_MenuChanged;
+            helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
 
             var harmony = new Harmony(ModManifest.UniqueID);
             harmony.PatchAll();
@@ -237,6 +238,13 @@ namespace SocialPageOrderRedux
                     }
                 }
             }
+        }
+
+        public static void GameLoop_ReturnedToTitle(object sender, ReturnedToTitleEventArgs args)
+        {
+            // Null the dropdown. This forces a reload next time the dropdown is loaded. This is necessary in case the player changes their language - the dropdown
+            // sets the text for its options when it is created, so if the player changes the language the options won't be updated unless we reload the dropdown.
+            dropDown.Value = null;
         }
 
         public static void SocialPage_Constructor_Postfix(SocialPage __instance)

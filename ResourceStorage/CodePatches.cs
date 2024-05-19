@@ -299,37 +299,5 @@ namespace ResourceStorage
 
             __instance.allClickableComponents.Add(resourceButton.Value);
         }
-
-        public static void Leclair_Stardew_Common_InventoryHelper_CountItem_Postfix(Farmer who, Func<Item, bool> matcher, ref int __result)
-        {
-            if (!Config.ModEnabled)
-                return;
-            var resDict = GetFarmerResources(who);
-            foreach(var res in resDict)
-            {
-                Object obj = new Object(DequalifyItemId(res.Key), (int)res.Value);
-                if (matcher(obj))
-                {
-                    __result = (int.MaxValue - (int)res.Value < __result) ? int.MaxValue : (int)res.Value + __result;
-                    return;
-                }
-            }
-        }
-        public static void Leclair_Stardew_Common_InventoryHelper_ConsumeItem_Prefix(Func<Item, bool> matcher, IList<Item> items, ref int amount)
-        {
-            if (!Config.ModEnabled || items != Game1.player.Items)
-                return;
-
-            var resDict = GetFarmerResources(Game1.player);
-            foreach(var res in resDict)
-            {
-                Object obj = new Object(DequalifyItemId(res.Key), (int)res.Value);
-                if (matcher(obj))
-                {
-                    amount += (int)ModifyResourceLevel(Game1.player, res.Key, -amount, auto: true);
-                    return;
-                }
-            }
-        }
     }
 }

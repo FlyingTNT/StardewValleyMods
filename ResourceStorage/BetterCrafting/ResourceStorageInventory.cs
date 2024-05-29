@@ -340,6 +340,11 @@ namespace ResourceStorage.BetterCrafting
 
             foreach (Item item in items)
             {
+                if(item is null)
+                {
+                    continue;
+                }
+
                 if(discrepencies.ContainsKey(item.QualifiedItemId))
                 {
                     discrepencies[item.QualifiedItemId] += item.Stack;

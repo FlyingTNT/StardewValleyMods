@@ -16,8 +16,9 @@ namespace LongerSeasons
     /// <summary>The mod entry point.</summary>
     public partial class ModEntry
     {
-
-
+        /// <summary>
+        /// Replaces the part of Game1._newDayAfterFade that changes the season if the day is over 28
+        /// </summary>
         public static IEnumerable<CodeInstruction> Game1__newDayAfterFade_Transpiler(IEnumerable<CodeInstruction> instructions)
         {
             SMonitor.Log($"Transpiling Game1._newDayAfterFade");
@@ -25,11 +26,12 @@ namespace LongerSeasons
             var codes = new List<CodeInstruction>(instructions);
             for (int i = 0; i < codes.Count; i++)
             {
-                if (codes[i].opcode == OpCodes.Ldsfld && (FieldInfo)codes[i].operand == typeof(Game1).GetField(nameof(Game1.dayOfMonth), BindingFlags.Public | BindingFlags.Static) && codes[i + 1].opcode == OpCodes.Ldc_I4_S && (sbyte)codes[i + 1].operand == 29)
+                if (codes[i].opcode == OpCodes.Ldsfld && (FieldInfo)codes[i].operand == typeof(Game1).GetField(nameof(Game1.dayOfMonth), BindingFlags.Public | BindingFlags.Static) && codes[i + 1].opcode == OpCodes.Ldc_I4_S && (sbyte)codes[i + 1].operand == 28)
                 {
-                    SMonitor.Log($"Changing days per month to {Config.DaysPerMonth}");
-                    codes[i + 1].operand = Config.DaysPerMonth + 1;
-                    codes[i + 2].opcode = OpCodes.Blt_Un_S;
+                    // Replaces the number 28 with a call to GetDaysPerMonth()
+                    SMonitor.Log($"Changing days per month");
+                    codes[i + 1].opcode = OpCodes.Call;
+                    codes[i + 1].operand = AccessTools.Method(typeof(Utilities), nameof(Utilities.GetDaysPerMonth));
                     break;
                 }
             }
@@ -41,26 +43,5 @@ namespace LongerSeasons
         {
             SMonitor.Log($"dom {Game1.dayOfMonth}, year {Game1.year}, season {Game1.currentSeason}");
         }
-        private static bool Game1_newSeason_Prefix()
-        {
-            SMonitor.Log($"{Environment.StackTrace} dom {Game1.dayOfMonth}, year {Game1.year}, season {Game1.currentSeason}");
-
-            var model = SHelper.Data.ReadSaveData<SeasonMonth>(context.GetType().Namespace) ?? new SeasonMonth();
-            if (model.month >= Config.MonthsPerSeason)
-            {
-                model.month = 1;
-                SHelper.Data.WriteSaveData(context.GetType().Namespace, model);
-                SMonitor.Log($"Allowing season change");
-                return true;
-            }
-            SMonitor.Log($"Preventing season change");
-            Game1.dayOfMonth = 1;
-            if(Game1.currentSeason.ToLower() == "spring")
-                Game1.year--;
-            model.month++;
-            SHelper.Data.WriteSaveData(context.GetType().Namespace, model);
-            return false;
-        }
-
     }
 }

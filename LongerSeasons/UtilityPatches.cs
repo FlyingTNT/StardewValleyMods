@@ -26,8 +26,9 @@ namespace LongerSeasons
             {
                 if (codes[i].opcode == OpCodes.Ldc_I4_S && (sbyte)codes[i].operand == 28)
                 {
-                    SMonitor.Log($"Changing days per month to {Config.DaysPerMonth}");
-                    codes[i] = new CodeInstruction(OpCodes.Ldc_I4, Config.DaysPerMonth);
+                    SMonitor.Log($"Changing days per month");
+                    codes[i].opcode = OpCodes.Call;
+                    codes[i].operand = AccessTools.Method(typeof(Utilities), nameof(Utilities.GetDaysPerMonth));
                 }
             }
 

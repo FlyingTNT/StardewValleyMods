@@ -15,8 +15,9 @@ namespace LongerSeasons
     /// <summary>The mod entry point.</summary>
     public partial class ModEntry
     {
+        public static readonly Color BILLBOARD_COLOR = new Color(251/255f, 235/255f, 194/255f); // The color of the paper on the calendar
 
-        private static void Billboard_Postfix(Billboard __instance, bool dailyQuest, Dictionary<ClickableTextureComponent, List<string>> ____upcomingWeddings)
+        private static void Billboard_Postfix(Billboard __instance, bool dailyQuest)
         {
             if (dailyQuest || Game1.dayOfMonth < 29)
                 return;
@@ -24,7 +25,7 @@ namespace LongerSeasons
             Dictionary<int, NPC> birthdays = new Dictionary<int, NPC>();
             foreach (NPC i in Utility.getAllCharacters())
             {
-                if (i.isVillager() && i.Birthday_Season != null && i.Birthday_Season.Equals(Game1.currentSeason) && !birthdays.ContainsKey(i.Birthday_Day) && (Game1.player.friendshipData.ContainsKey(i.Name) || (!i.Name.Equals("Dwarf") && !i.Name.Equals("Sandy") && !i.Name.Equals("Krobus"))))
+                if (i.IsVillager && i.Birthday_Season != null && i.Birthday_Season.Equals(Game1.currentSeason) && !birthdays.ContainsKey(i.Birthday_Day) && (Game1.player.friendshipData.ContainsKey(i.Name) || (!i.Name.Equals("Dwarf") && !i.Name.Equals("Sandy") && !i.Name.Equals("Krobus"))))
                 {
                     birthdays.Add(i.Birthday_Day, i);
                 }
@@ -36,7 +37,7 @@ namespace LongerSeasons
                 string festival = "";
                 string birthday = "";
                 NPC npc = birthdays.ContainsKey(j) ? birthdays[j] : null;
-                if (Utility.isFestivalDay(j, Game1.currentSeason))
+                if (Utility.isFestivalDay(j, Game1.season))
                 {
                     festival = Game1.temporaryContent.Load<Dictionary<string, string>>("Data\\Festivals\\" + Game1.currentSeason + j.ToString())["name"];
                 }
@@ -104,16 +105,6 @@ namespace LongerSeasons
                                 wedding_date = new WorldDate(Game1.Date);
                                 wedding_date.TotalDays++;
                             }
-                            if (wedding_date != null && wedding_date.TotalDays >= Game1.Date.TotalDays && Utility.getSeasonNumber(Game1.currentSeason) == wedding_date.SeasonIndex && j == wedding_date.DayOfMonth)
-                            {
-                                if (!____upcomingWeddings.ContainsKey(calendar_day))
-                                {
-                                    ____upcomingWeddings[calendar_day] = new List<string>();
-                                }
-                                traversed_farmers.Add(farmer);
-                                ____upcomingWeddings[calendar_day].Add(farmer.Name);
-                                ____upcomingWeddings[calendar_day].Add(spouse_name);
-                            }
                         }
                     }
                 }
@@ -121,11 +112,12 @@ namespace LongerSeasons
             }
         }
 
-        private static void Billboard_draw_Postfix(Billboard __instance, Texture2D ___billboardTexture, bool ___dailyQuestBoard, SpriteBatch b)
+        private static void Billboard_draw_Postfix(Billboard __instance, bool ___dailyQuestBoard, SpriteBatch b)
         {
             if (___dailyQuestBoard)
                 return;
-            int add = Game1.dayOfMonth / 28 * 28;
+
+            int add = Game1.dayOfMonth / 28 * 28; // The day before the first date that should be displayed on this page (0 for first page, 28 for second,...)
             for (int i = 0; i < __instance.calendarDays.Count; i++)
             {
                 if (Game1.dayOfMonth > add + i + 1)
@@ -139,7 +131,7 @@ namespace LongerSeasons
                 }
                 else if (i + add >= Config.DaysPerMonth)
                 {
-                    b.Draw(Game1.staminaRect, __instance.calendarDays[i].bounds, Color.White);
+                    b.Draw(Game1.staminaRect, __instance.calendarDays[i].bounds, BILLBOARD_COLOR);
                 }
             }
         }

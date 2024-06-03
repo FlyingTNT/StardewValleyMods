@@ -1,4 +1,5 @@
-﻿using StardewValley;
+﻿using StardewModdingAPI;
+using StardewValley;
 using StardewValley.Inventories;
 using System;
 using System.Collections;
@@ -216,32 +217,39 @@ namespace ResourceStorage.BetterCrafting
 
         public int ReduceIdWithoutNotifyingResourceStorage(string itemId, int count)
         {
-            itemId = ItemRegistry.QualifyItemId(itemId);
-
             int amountRemoved = 0;
 
-            for (int i = items.Count - 1; i >= 0; i--)
+            try
             {
-                if (items[i].QualifiedItemId != itemId)
-                    continue;
+                itemId = ItemRegistry.QualifyItemId(itemId);
 
-                if (items[i].Stack > count - amountRemoved)
+                for (int i = items.Count - 1; i >= 0; i--)
                 {
-                    items[i].Stack -= count - amountRemoved;
+                    if (items[i].QualifiedItemId != itemId)
+                        continue;
 
-                    amountRemoved = count;
-                    break;
-                }
-                else
-                {
-                    amountRemoved += items[i].Stack;
-                    items.RemoveAt(i);
-
-                    if (amountRemoved == count)
+                    if (items[i].Stack > count - amountRemoved)
                     {
+                        items[i].Stack -= count - amountRemoved;
+
+                        amountRemoved = count;
                         break;
                     }
+                    else
+                    {
+                        amountRemoved += items[i].Stack;
+                        items.RemoveAt(i);
+
+                        if (amountRemoved == count)
+                        {
+                            break;
+                        }
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                BetterCraftingIntegration.SMonitor.Log($"Failed in {nameof(ReduceIdWithoutNotifyingResourceStorage)}:\n{ex}", LogLevel.Error);
             }
 
             return amountRemoved;
@@ -314,14 +322,21 @@ namespace ResourceStorage.BetterCrafting
         /// </summary>
         public void ReloadFromFarmerResources()
         {
-            BetterCraftingIntegration.SMonitor.Log("Reloading farmer resources for the BC integration!");
-            items.Clear();
-            foreach (var kvp in ModEntry.GetFarmerResources(Owner))
+            try
             {
-                items.AddRange(Utilities.CreateItemsWithTotalAmount(kvp.Key, kvp.Value));
-            }
+                BetterCraftingIntegration.SMonitor.Log("Reloading farmer resources for the BC integration!");
+                items.Clear();
+                foreach (var kvp in ModEntry.GetFarmerResources(Owner))
+                {
+                    items.AddRange(Utilities.CreateItemsWithTotalAmount(kvp.Key, kvp.Value));
+                }
 
-            LastTickSlotChanged = DateTime.UtcNow.Ticks;
+                LastTickSlotChanged = DateTime.UtcNow.Ticks;
+            }
+            catch (Exception ex)
+            {
+                BetterCraftingIntegration.SMonitor.Log($"Failed in {nameof(ReloadFromFarmerResources)}:\n{ex}", LogLevel.Error);
+            }
         }
 
         /// <summary>
@@ -330,52 +345,71 @@ namespace ResourceStorage.BetterCrafting
         /// <param name="afterRecipe"></param>
         public void SquareWithFarmerResources(IRecipe afterRecipe = null)
         {
-            // The differences between the amount of each item in this storage and the amount in the resource storage
-            Dictionary<string, long> discrepencies = new();
-
-            foreach(var kvp in ModEntry.GetFarmerResources(Owner))
+            try
             {
-                discrepencies.Add(kvp.Key, -kvp.Value);
-            }
+                // The differences between the amount of each item in this storage and the amount in the resource storage
+                Dictionary<string, long> discrepencies = new();
 
-            foreach (Item item in items)
-            {
-                if(discrepencies.ContainsKey(item.QualifiedItemId))
+                foreach (var kvp in ModEntry.GetFarmerResources(Owner))
                 {
-                    discrepencies[item.QualifiedItemId] += item.Stack;
-                }
-                else
-                {
-                    discrepencies[item.QualifiedItemId] = item.Stack;
+                    discrepencies.Add(kvp.Key, -kvp.Value);
                 }
 
-                if (discrepencies[item.QualifiedItemId] == 0)
+                foreach (Item item in items)
                 {
-                    discrepencies.Remove(item.QualifiedItemId);
+                    if (item is null)
+                    {
+                        continue;
+                    }
+
+                    if (discrepencies.ContainsKey(item.QualifiedItemId))
+                    {
+                        discrepencies[item.QualifiedItemId] += item.Stack;
+                    }
+                    else
+                    {
+                        discrepencies[item.QualifiedItemId] = item.Stack;
+                    }
+
+                    if (discrepencies[item.QualifiedItemId] == 0)
+                    {
+                        discrepencies.Remove(item.QualifiedItemId);
+                    }
+                }
+
+                if (discrepencies.Count == 0)
+                {
+                    BetterCraftingIntegration.SMonitor.Log("No discrepencies found after crafting!");
+                }
+
+                foreach (var kvp in discrepencies)
+                {
+                    BetterCraftingIntegration.SMonitor.Log("Discrepency found after crafting!");
+                    ModEntry.ModifyResourceLevel(Owner, kvp.Key, (int)kvp.Value, notifyBetterCraftingIntegration: false);
                 }
             }
-
-            if(discrepencies.Count == 0)
+            catch (Exception ex)
             {
-                BetterCraftingIntegration.SMonitor.Log("No discrepencies found after crafting!");
-            }
-
-            foreach(var kvp in discrepencies)
-            {
-                BetterCraftingIntegration.SMonitor.Log("Discrepency found after crafting!");
-                ModEntry.ModifyResourceLevel(Owner, kvp.Key, (int)kvp.Value, notifyBetterCraftingIntegration: false);
+                BetterCraftingIntegration.SMonitor.Log($"Failed in {nameof(SquareWithFarmerResources)}:\n{ex}", LogLevel.Error);
             }
         }
 
         public void NotifyOfChangeInResourceStorage(string itemId, int changeAmount)
         {
-            if(changeAmount > 0)
+            try
             {
-                items.AddRange(Utilities.CreateItemsWithTotalAmount(itemId, changeAmount));
+                if (changeAmount > 0)
+                {
+                    items.AddRange(Utilities.CreateItemsWithTotalAmount(itemId, changeAmount));
+                }
+                else
+                {
+                    ReduceIdWithoutNotifyingResourceStorage(itemId, -changeAmount);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                ReduceIdWithoutNotifyingResourceStorage(itemId, -changeAmount);
+                BetterCraftingIntegration.SMonitor.Log($"Failed in {nameof(NotifyOfChangeInResourceStorage)}:\n{ex}", LogLevel.Error);
             }
         }
     }

@@ -20,65 +20,107 @@ namespace ResourceStorage.BetterCrafting
 
         public static void Initialize(IMonitor monitor, IModHelper helper, ModConfig config)
         {
-            // Make sure this isn't run twice
-            if(IsBetterCraftingLoaded)
+            try
             {
-                return;
+                // Make sure this isn't run twice
+                if (IsBetterCraftingLoaded)
+                {
+                    return;
+                }
+
+                SMonitor = monitor;
+                SHelper = helper;
+                Config = config;
+
+                BetterCraftingAPI = SHelper.ModRegistry.GetApi<IBetterCrafting>("leclair.bettercrafting");
+
+                if (BetterCraftingAPI is null)
+                    return;
+
+                IsBetterCraftingLoaded = true;
+                InventoryProvider = new();
+
+                BetterCraftingAPI.RegisterInventoryProvider(typeof(ResourceStorageInventory), InventoryProvider);
+
+                BetterCraftingAPI.MenuPopulateContainers += BetterCrafting_MenuPopulateContainers;
+                BetterCraftingAPI.PostCraft += BetterCrafting_PostCraft;
+
+                SHelper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
+                SHelper.Events.Display.MenuChanged += Display_MenuChanged;
             }
-
-            SMonitor = monitor;
-            SHelper = helper;
-            Config = config;
-
-            BetterCraftingAPI = SHelper.ModRegistry.GetApi<IBetterCrafting>("leclair.bettercrafting");
-
-            if (BetterCraftingAPI is null)
-                return;
-
-            IsBetterCraftingLoaded = true;
-            InventoryProvider = new();
-
-            BetterCraftingAPI.RegisterInventoryProvider(typeof(ResourceStorageInventory), InventoryProvider);
-
-            BetterCraftingAPI.MenuPopulateContainers += BetterCrafting_MenuPopulateContainers;
-            BetterCraftingAPI.PostCraft += BetterCrafting_PostCraft;
-
-            SHelper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
-            SHelper.Events.Display.MenuChanged += Display_MenuChanged;
+            catch(Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(Initialize)}:\n{ex}", LogLevel.Error);
+            }
         }
 
         public static void BetterCrafting_MenuPopulateContainers(IPopulateContainersEvent e)
         {
-            IsBetterCraftingMenuOpen.Value = true;
-            ThisPlayerStorage.Value.ReloadFromFarmerResources();
-            e.Containers.Add(new Tuple<object, GameLocation>(ThisPlayerStorage.Value, null));
+            try
+            {
+                IsBetterCraftingMenuOpen.Value = true;
+                ThisPlayerStorage.Value.ReloadFromFarmerResources();
+                e.Containers.Add(new Tuple<object, GameLocation>(ThisPlayerStorage.Value, null));
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(BetterCrafting_MenuPopulateContainers)}:\n{ex}", LogLevel.Error);
+            }
         }
 
         public static void BetterCrafting_PostCraft(IPostCraftEvent e)
         {
-            ThisPlayerStorage.Value.SquareWithFarmerResources(e.Recipe);
+            try
+            {
+                ThisPlayerStorage.Value.SquareWithFarmerResources(e.Recipe);
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(BetterCrafting_PostCraft)}:\n{ex}", LogLevel.Error);
+            }
         }
 
         public static void GameLoop_SaveLoaded(object sender, SaveLoadedEventArgs args)
         {
-            ResourceStorageInventoryProvider.playerInventory.Value = new(Game1.player);
-            ThisPlayerStorage.Value = ResourceStorageInventoryProvider.playerInventory.Value;
+            try
+            {
+                ResourceStorageInventoryProvider.playerInventory.Value = new(Game1.player);
+                ThisPlayerStorage.Value = ResourceStorageInventoryProvider.playerInventory.Value;
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(GameLoop_SaveLoaded)}:\n{ex}", LogLevel.Error);
+            }
         }
 
         public static void Display_MenuChanged(object sender, MenuChangedEventArgs args)
         {
-            if(args.NewMenu is not IBetterCraftingMenu && BetterCraftingAPI.GetActiveMenu() is null)
+            try
             {
-                IsBetterCraftingMenuOpen.Value = false;
+                if (args.NewMenu is not IBetterCraftingMenu && BetterCraftingAPI.GetActiveMenu() is null)
+                {
+                    IsBetterCraftingMenuOpen.Value = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(Display_MenuChanged)}:\n{ex}", LogLevel.Error);
             }
         }
 
         public static void NotifyResourceChange(string itemId, int changeAmount, long playerUniqueId)
         {
-            if (!(IsBetterCraftingLoaded && IsBetterCraftingMenuOpen.Value && playerUniqueId == ThisPlayerStorage.Value.OwnerId))
-                return;
+            try
+            {
+                if (!(IsBetterCraftingLoaded && IsBetterCraftingMenuOpen.Value && playerUniqueId == ThisPlayerStorage.Value.OwnerId))
+                    return;
 
-            ThisPlayerStorage.Value.NotifyOfChangeInResourceStorage(itemId, changeAmount);
+                ThisPlayerStorage.Value.NotifyOfChangeInResourceStorage(itemId, changeAmount);
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(NotifyResourceChange)}:\n{ex}", LogLevel.Error);
+            }
         }
     }
 }

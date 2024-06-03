@@ -10,6 +10,18 @@ using StardewValley;
 using StardewValley.Menus;
 using StardewValley.Inventories;
 
+
+#if IS_BETTER_CRAFTING
+
+using Leclair.Stardew.Common.Inventory;
+using Leclair.Stardew.Common.Crafting;
+using Leclair.Stardew.BetterCrafting.DynamicRules;
+using Leclair.Stardew.BetterCrafting.Models;
+
+namespace Leclair.Stardew.BetterCrafting;
+
+#else
+
 using StardewValley.Network;
 using Newtonsoft.Json.Linq;
 
@@ -832,6 +844,8 @@ public interface ISimpleInputRuleHandler : IDynamicRuleHandler
 
 }
 
+#endif
+
 /// <summary>
 /// This class allows you to easily modify any part of an <see cref="IRecipe"/>'s
 /// behavior, including its appearance, cost, and the item(s) it produces.
@@ -1331,57 +1345,7 @@ public interface IBetterCraftingConfig
 
 public interface IBetterCrafting
 {
-
-    /// <summary>
-    /// This allows you to read some configuration values from
-    /// Better Crafting, which may be useful when interacting
-    /// with the API.
-    /// </summary>
-    IBetterCraftingConfig Config { get; }
-
     #region GUI
-
-    /// <summary>
-    /// Try to open the Better Crafting menu. This may fail if there is another
-    /// menu open that cannot be replaced.
-    ///
-    /// If opening the menu from an object in the world, such as a workbench,
-    /// its location and tile position can be provided for automatic detection
-    /// of nearby chests.
-    ///
-    /// Better Crafting has its own handling of mutexes, so please do not worry
-    /// about locking Chests before handing them off to the menu.
-    ///
-    /// When discovering additional containers, Better Crafting scans all tiles
-    /// around each of its existing known containers. If a location and position
-    /// for the menu source is provided, the tiles around that position will
-    /// be scanned as well.
-    ///
-    /// Discovery depends on the user's settings, though at a minimum a 3x3 area
-    /// will be scanned to mimic the scanning radius of the vanilla workbench.
-    /// </summary>
-    /// <param name="cooking">If true, open the cooking menu. If false, open the crafting menu.</param>
-    /// <param name="silent_open">If true, do not make a sound upon opening the menu.</param>
-    /// <param name="location">The map the associated object is in, or null if there is no object</param>
-    /// <param name="position">The tile position the associated object is at, or null if there is no object</param>
-    /// <param name="area">The tile area the associated object covers, or null if there is no object or if the object only covers a single tile</param>
-    /// <param name="discover_containers">If true, attempt to discover additional material containers.</param>
-    /// <param name="containers">An optional list of containers to draw extra crafting materials from.</param>
-    /// <param name="listed_recipes">An optional list of recipes by name. If provided, only these recipes will be listed in the crafting menu.</param>
-    /// <param name="discover_buildings">If true, attempt to discover additional containers inside of adjacent buildings.</param>
-    /// <returns>Whether or not the menu was opened successfully</returns>
-    bool OpenCraftingMenu(
-        bool cooking,
-        bool silent_open = false,
-        GameLocation? location = null,
-        Vector2? position = null,
-        Rectangle? area = null,
-        bool discover_containers = true,
-        IList<Tuple<object, GameLocation?>>? containers = null,
-        IList<string>? listed_recipes = null,
-        bool discover_buildings = false
-    );
-
     /// <summary>
     /// Return the Better Crafting menu's type. In case you want to do
     /// spooky stuff to it, I guess.
@@ -1394,17 +1358,9 @@ public interface IBetterCrafting
     /// the menu is still opening.
     /// </summary>
     IBetterCraftingMenu? GetActiveMenu();
-
     #endregion
 
     #region Events
-
-    /// <summary>
-    /// This event is fired when the player opens the category icon picker,
-    /// and can be used to register extra icons for the player to pick from.
-    /// </summary>
-    event Action<IDiscoverIconsEvent>? DiscoverIcons;
-
     /// <summary>
     /// This event is fired whenever a new Better Crafting menu is opened,
     /// allowing other mods to manipulate the list of containers.
@@ -1425,289 +1381,6 @@ public interface IBetterCrafting
     /// <see cref="IPostCraftEventRecipe.PostCraft(IPostCraftEvent)"/>.
     /// </summary>
     event Action<IPostCraftEvent>? PostCraft;
-
-    #endregion
-
-    #region Recipes
-
-    /// <summary>
-    /// Return a list of all recipes that are exclusive to a specific
-    /// crafting station. These recipes should not be listed in general
-    /// crafting stations.
-    /// </summary>
-    /// <param name="cooking">If true, return cooking recipes. If false, return
-    /// crafting recipes.</param>
-    /// <returns>An enumeration of recipe names.</returns>
-    IEnumerable<string> GetExclusiveRecipes(bool cooking);
-
-    /// <summary>
-    /// Register a recipe provider with Better Crafting. Calling this
-    /// will also invalidate the recipe cache.
-    ///
-    /// If the recipe provider was already registered, this does nothing.
-    /// </summary>
-    /// <param name="provider">The recipe provider to add</param>
-    void AddRecipeProvider(IRecipeProvider provider);
-
-    /// <summary>
-    /// Unregister a recipe provider. Calling this will also invalidate
-    /// the recipe cache.
-    ///
-    /// If the recipe provider was not registered, this does nothing.
-    /// </summary>
-    /// <param name="provider">The recipe provider to remove</param>
-    void RemoveRecipeProvider(IRecipeProvider provider);
-
-    /// <summary>
-    /// Invalidate the recipe cache. You should call this if your recipe
-    /// provider ever adds new recipes after registering it.
-    /// </summary>
-    void InvalidateRecipeCache();
-
-    /// <summary>
-    /// Get all known recipes from all providers.
-    /// </summary>
-    /// <param name="cooking">If true, return cooking recipes. If false, return
-    /// crafting recipes.</param>
-    /// <returns>A collection of the recipes.</returns>
-    IReadOnlyCollection<IRecipe> GetRecipes(bool cooking);
-
-    /// <summary>
-    /// Get a new <see cref="IRecipeBuilder"/> for customizing a recipe.
-    /// </summary>
-    /// <param name="recipe">The recipe to customize.</param>
-    IRecipeBuilder RecipeBuilder(CraftingRecipe recipe);
-
-    /// <summary>
-    /// Get a new <see cref="IRecipeBuilder"/> for creating a new recipe, not
-    /// based on an existing crafting recipe. If not replacing an existing
-    /// <see cref="CraftingRecipe"/> then <paramref name="name"/> should be
-    /// a new, unique string.
-    /// </summary>
-    /// <param name="name">The recipe's name.</param>
-    IRecipeBuilder RecipeBuilder(string name);
-
-    [Obsolete("Do not use this anymore, we have magic now to make optional interfaces work.")]
-    IRecipe WrapDynamicRecipe(IDynamicDrawingRecipe recipe);
-
-    /// <summary>
-    /// Report a custom <see cref="IRecipe"/> type to Better Crafting.
-    /// This can be used to prime the proxy factory cache, which will
-    /// prevent any performance hiccups once the game has loaded.
-    /// </summary>
-    /// <param name="type">The type to report.</param>
-    void ReportRecipeType(Type type);
-
-    #endregion
-
-    #region Ingredients
-
-    /// <summary>
-    /// Create a simple <see cref="IIngredient"/> that matches an item by ID
-    /// and that consumes an exact quantity.
-    /// </summary>
-    /// <param name="item">The item ID to match.</param>
-    /// <param name="quantity">The quantity to consume.</param>
-    /// <param name="recycleRate">The percentage of items to return when recycling.</param>
-    IIngredient CreateBaseIngredient(string item, int quantity, float recycleRate = 1f);
-
-
-    [Obsolete("Use the method that takes a string.")]
-    IIngredient CreateBaseIngredient(int item, int quantity, float recycleRate = 1f);
-
-    /// <summary>
-    /// Create a simple <see cref="IIngredient"/> that matches items using a
-    /// function and that consumes an exact quantity.
-    /// </summary>
-    /// <param name="matcher">The function to check items</param>
-    /// <param name="quantity">The quantity to consume.</param>
-    /// <param name="displayName">The name to display for the ingredient.</param>
-    /// <param name="texture">The texture to display the ingredient with.</param>
-    /// <param name="source">The source rectangle of the texture to display.</param>
-    /// <param name="recycleTo">An optional item to return when recycling this
-    /// ingredient. Providing a value here marks this ingredients as non-fuzzy
-    /// for the purpose of recycling. If you want fuzzy behavior, just leave
-    /// this as null and an appropriate item will be discovered.</param>
-    /// <param name="recycleRate">The percentage of items to return when recycling.</param>
-    IIngredient CreateMatcherIngredient(Func<Item, bool> matcher, int quantity, Func<string> displayName, Func<Texture2D> texture, Rectangle? source = null, Func<Item?>? recycleTo = null, float recycleRate = 1f);
-
-    [Obsolete("Use the version that takes a function for the recycleTo item.")]
-    IIngredient CreateMatcherIngredient(Func<Item, bool> matcher, int quantity, Func<string> displayName, Func<Texture2D> texture, Rectangle? source = null, Item? recycleTo = null, float recycleRate = 1f);
-
-    /// <summary>
-    /// Create a simple <see cref="IIngredient"/> that matches a specific
-    /// currency and consumes an exact quantity.
-    /// </summary>
-    /// <param name="type">The currency to match.</param>
-    /// <param name="quantity">The quantity to consume.</param>
-    /// <param name="recycleRate">The percentage of items to return when recycling.</param>
-    IIngredient CreateCurrencyIngredient(CurrencyType type, int quantity, float recycleRate = 1f);
-
-    /// <summary>
-    /// Create a simple <see cref="IIngredient"/> that does not match anything
-    /// but requires a quantity of one, thus always preventing a recipe
-    /// from being crafted. It displays as an error item in the
-    /// ingredients list.
-    /// </summary>
-    IIngredient CreateErrorIngredient();
-
-    #endregion
-
-    #region Item Manipulation
-
-    /// <summary>
-    /// Lock the provided inventories and call a delegate with the locked
-    /// <see cref="IBCInventory"/> instances, ready to be safely manipulated.
-    ///
-    /// This is the same method used internally by the crafting menu to do
-    /// just-in-time mutex locks when crafting.
-    ///
-    /// The delegate's first argument is a list of locked inventories, and
-    /// the second argument is an Action to call when you are done.
-    /// </summary>
-    /// <param name="inventories">The list of things with inventories you want
-    /// to lock, the same as you'd pass into other API instances. Each one
-    /// is handled using an <see cref="IInventoryProvider"/>.</param>
-    /// <param name="who">The relevant farmer.</param>
-    /// <param name="withLocks">A delegate to call when the locks are ready,
-    /// which will not be immediate.</param>
-    void WithInventories(
-        IEnumerable<Tuple<object, GameLocation?>> inventories,
-        Farmer? who,
-        Action<IList<IBCInventory>, Action> withLocks
-    );
-
-    /// <summary>
-    /// Consume matching items from a player, and also from a set of
-    /// <see cref="IBCInventory"/> instances. This is a helper method for
-    /// building custom <see cref="IIngredient"/>s.
-    ///
-    /// This method is aware of the mod "Stack Quality" and handles merged
-    /// stacks correctly.
-    /// </summary>
-    /// <param name="items">An enumeration of tuples where the function
-    /// matches items, and the integer is the quantity to consume.</param>
-    /// <param name="who">The player to consume items from, if any. Items
-    /// are consumed from the player's inventory first.</param>
-    /// <param name="inventories">An enumeration of <see cref="IBCInventory"/>
-    /// instances to consume items from, such as the one passed to
-    /// <see cref="IIngredient.Consume(Farmer, IList{IBCInventory}?, int, bool)"/>.</param>
-    /// <param name="maxQuality">The maximum quality to consume.</param>
-    /// <param name="lowQualityFirst">Whether or not to consume low quality
-    /// items first.</param>
-    /// <param name="consumedItems">An optional list that will contain copies
-    /// of the consumed Items.</param>
-    /// <param name="matchedItems">An optional list of item instances that,
-    /// if provided, will prevent any item instances not in the list from
-    /// being consumed.</param>
-    void ConsumeItems(IEnumerable<(Func<Item, bool>, int)> items, Farmer? who, IEnumerable<IBCInventory>? inventories, int maxQuality = int.MaxValue, bool lowQualityFirst = false, IList<Item>? consumedItems = null, IList<Item>? matchedItems = null);
-
-    [Obsolete("Use the version with an optional parameter for matchedItems.")]
-    void ConsumeItems(IEnumerable<(Func<Item, bool>, int)> items, Farmer? who, IEnumerable<IBCInventory>? inventories, int maxQuality = int.MaxValue, bool lowQualityFirst = false, IList<Item>? consumedItems = null);
-
-    [Obsolete("Use the version with an optional parameter for consumedItems.")]
-    void ConsumeItems(IEnumerable<(Func<Item, bool>, int)> items, Farmer? who, IEnumerable<IBCInventory>? inventories, int maxQuality = int.MaxValue, bool lowQualityFirst = false);
-
-    /// <summary>
-    /// Count the number of <see cref="Item"/>s available that match the given
-    /// predicate, between the given player's inventory and the given enumeration
-    /// of <see cref="Item"/>s.
-    ///
-    /// This method is aware of the mod "Stack Quality" and handles merged
-    /// stacks correctly.
-    /// </summary>
-    /// <param name="predicate">A method for checking whether a given <see cref="Item"/> should be counted.</param>
-    /// <param name="who">An optional player, to include that player's inventory in the search.</param>
-    /// <param name="items">An optional enumeration of <see cref="Item"/>s to include in the search.</param>
-    /// <param name="maxQuality">The maximum quality of item to count.</param>
-    /// <param name="matchingItems">An optional list of item instances. If set,
-    /// we will add every counted item instance to the list.</param>
-    /// <returns>The number of matching items.</returns>
-    int CountItem(Func<Item, bool> predicate, Farmer? who, IEnumerable<Item?>? items, int maxQuality = int.MaxValue, IList<Item>? matchingItems = null);
-
-    [Obsolete("Use the version with an optional matchingItems parameter.")]
-    int CountItem(Func<Item, bool> predicate, Farmer? who, IEnumerable<Item?>? items, int maxQuality = int.MaxValue);
-
-    #endregion
-
-    #region Categories
-
-    /// <summary>
-    /// Create a new default category for recipes. Every player will receive
-    /// this category, but they may delete it or alter it as they see fit.
-    /// </summary>
-    /// <param name="cooking">If true, this category is added to cooking.
-    /// Otherwise, crafting.</param>
-    /// <param name="categoryId">An internal ID for the category. Make sure
-    /// this is unique.</param>
-    /// <param name="Name">A method returning a human-readable name to be
-    /// displayed in the menu.</param>
-    /// <param name="recipeNames">An enumeration of recipe names for recipes to
-    /// display in the category.</param>
-    /// <param name="iconRecipe">The name of a recipe to use as the category's
-    /// default icon.</param>
-    ///
-    void CreateDefaultCategory(bool cooking, string categoryId, Func<string> Name, IEnumerable<string>? recipeNames = null, string? iconRecipe = null, bool useRules = false, IEnumerable<IDynamicRuleData>? rules = null);
-
-    /// <summary>
-    /// Add recipes to a default category. If a player has modified their
-    /// category, this will not affect them.
-    /// </summary>
-    /// <param name="cooking">If true, we alter a cooking category.
-    /// Otherwise, crafting.</param>
-    /// <param name="categoryId">The ID of the category to alter.</param>
-    /// <param name="recipeNames">An enumeration of recipe names for recipes to
-    /// add to the category.</param>
-    void AddRecipesToDefaultCategory(bool cooking, string categoryId, IEnumerable<string> recipeNames);
-
-    /// <summary>
-    /// Remove recipes from a default category. If a player has modified their
-    /// category, this will not affect them.
-    /// </summary>
-    /// <param name="cooking">If true, we alter a cooking category.
-    /// Otherwise, crafting.</param>
-    /// <param name="categoryId">The ID of the category to alter.</param>
-    /// <param name="recipeNames">An enumeration of recipe names for recipes to
-    /// remove from the category.</param>
-    void RemoveRecipesFromDefaultCategory(bool cooking, string categoryId, IEnumerable<string> recipeNames);
-
-    #endregion
-
-    #region Dynamic Rules
-
-    /// <summary>
-    /// Get the absolute rule ID of a rule added via <see cref="RegisterRuleHandler(string, IDynamicRuleHandler)"/>
-    /// so that you can reference it when manipulating categories using the API.
-    /// </summary>
-    /// <param name="id">An ID for the rule handler. This should be unique
-    /// within your mod, but can overlap with IDs from other mods as rule IDs
-    /// are prefixed with your mod ID internally.</param>
-    /// <returns>The prefixed rule ID.</returns>
-    string GetAbsoluteRuleId(string id);
-
-    /// <summary>
-    /// Register a new dynamic rule handler for use with dynamic categories.
-    /// </summary>
-    /// <param name="id">An ID for the rule handler. This should be unique
-    /// within your mod, but can overlap with IDs from other mods as rule IDs
-    /// are prefixed with your mod ID internally.</param>
-    /// <param name="handler">The rule handler instance.</param>
-    /// <returns>Whether or not the handler was successfully registered.</returns>
-    bool RegisterRuleHandler(string id, IDynamicRuleHandler handler);
-
-    /// <summary>
-    /// See <see cref="RegisterRuleHandler(string, IDynamicRuleHandler)"/>
-    /// for details. This method exists to ensure the API translation layer functions
-    /// as you would expect.
-    /// </summary>
-    bool RegisterRuleHandler(string id, ISimpleInputRuleHandler handler);
-
-    /// <summary>
-    /// Unregister a dynamic rule handler.
-    /// </summary>
-    /// <param name="id">The ID of the rule handler.</param>
-    /// /// <returns>Whether or not the handler was successfully unregistered.</returns>
-    bool UnregisterRuleHandler(string id);
 
     #endregion
 

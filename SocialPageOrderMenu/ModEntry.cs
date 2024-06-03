@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common.Utilities;
+using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
@@ -29,7 +30,6 @@ namespace SocialPageOrderRedux
         public static readonly PerScreen<MyOptionsDropDown> dropDown = new();
         public static readonly PerScreen<ClickableTextureComponent> button = new();
         public static readonly PerScreen<bool> wasSorted = new PerScreen<bool>(() => false);
-        public static readonly PerScreen<int> currentSort = new PerScreen<int>(() => 0);
         public static readonly PerScreen<int> lastSlotPosition = new PerScreen<int>(() => 0); // The position to return to when leaving a ProfileMenu
 
         private static readonly PerScreen<string> lastFilterString = new PerScreen<string>(()=>"");
@@ -38,6 +38,17 @@ namespace SocialPageOrderRedux
 
         private static bool WasModEnabled = false;
 
+        public static int CurrentSort
+        {
+            get
+            {
+                return PerPlayerConfig.LoadConfigOption(Game1.player, "FlyingTNT.SocialPageOrderRedux.CurrentSort", defaultValue: 0);
+            }
+            set
+            {
+                PerPlayerConfig.SaveConfigOption(Game1.player, "FlyingTNT.SocialPageOrderRedux.CurrentSort", value);
+            }
+        }
 
         public override void Entry(IModHelper helper)
         {
@@ -313,7 +324,7 @@ namespace SocialPageOrderRedux
                     button.Value.draw(b);
                     if (button.Value.bounds.Contains(Game1.getMousePosition()))
                     {
-                        (Game1.activeClickableMenu as GameMenu).hoverText = SHelper.Translation.Get($"sort-by") + SHelper.Translation.Get($"sort-{currentSort.Value}");
+                        (Game1.activeClickableMenu as GameMenu).hoverText = SHelper.Translation.Get($"sort-by") + SHelper.Translation.Get($"sort-{CurrentSort}");
                     }
                 }
             }
@@ -441,7 +452,7 @@ namespace SocialPageOrderRedux
                 {
                     nameSprites.Add(new NameSpriteSlot(page.SocialEntries[i], sprites[i], page.characterSlots[i]));
                 }
-                switch (currentSort.Value)
+                switch (CurrentSort)
                 {
                     case 0: // friend asc
                         SMonitor.Log("sorting by friend asc");
@@ -677,7 +688,7 @@ namespace SocialPageOrderRedux
                     dropDown.Value.dropDownOptions.Add(SHelper.Translation.Get($"sort-{i}"));
                 }
                 dropDown.Value.RecalculateBounds();
-                dropDown.Value.selectedOption = currentSort.Value;
+                dropDown.Value.selectedOption = CurrentSort;
             }
 
             if(button.Value is null)
@@ -692,24 +703,24 @@ namespace SocialPageOrderRedux
 
         public static void IncrementSort()
         {
-            currentSort.Value++;
-            currentSort.Value %= 4;
+            CurrentSort++;
+            CurrentSort %= 4;
             ResortSocialList();
             if(Config.UseDropdown)
             {
-                dropDown.Value.selectedOption = currentSort.Value;
+                dropDown.Value.selectedOption = CurrentSort;
             }
         }
 
         public static void DecrementSort()
         {
-            currentSort.Value--;
-            if (currentSort.Value < 0)
-                currentSort.Value = 3;
+            CurrentSort--;
+            if (CurrentSort < 0)
+                CurrentSort = 3;
             ResortSocialList();
             if (Config.UseDropdown)
             {
-                dropDown.Value.selectedOption = currentSort.Value;
+                dropDown.Value.selectedOption = CurrentSort;
             }
         }
     }

@@ -1,0 +1,22 @@
+﻿{
+  "Name": "Longer Seasons",
+  "Author": "aedenthorn",
+  "Version": "1.0.0",
+  "Description": "Longer seasons.",
+  "UniqueID": "aedenthorn.LongerSeasons",
+  "EntryDll": "LongerSeasons.dll",
+  "MinimumApiVersion": "4.0.7",
+  "ModUpdater": {
+    "Repository": "StardewValleyMods",
+    "User": "aedenthorn",
+    "Directory": "_releases",
+    "ModFolder": "LongerSeasons"
+  },
+  "UpdateKeys": [ "Nexus:10108" ],
+  "Dependencies": [
+    {
+      "UniqueID": "Platonymous.ModUpdater",
+      "IsRequired": false
+    }
+  ]
+}

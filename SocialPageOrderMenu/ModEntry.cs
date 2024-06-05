@@ -22,22 +22,44 @@ namespace SocialPageOrderRedux
         public static ModConfig Config;
         public static IMonitor SMonitor;
         public static IModHelper SHelper;
-        public static readonly Rectangle buttonTextureSource = new Rectangle(162, 440, 16, 16); // Location of the organize button within LooseSprites/Cursors
+
+        /// <summary> Location of the organize button within LooseSprites/Cursors </summary>
+        public static readonly Rectangle buttonTextureSource = new Rectangle(162, 440, 16, 16);
+
+        /// <summary> The X offset of the sort button from the left of the game menu. </summary>
         private const int xOffset = -16;
+
+        /// <summary> The Y offset ot the dropdown from the bottom of the game menu. </summary>
         private const int dropdownYOffset = -28;
+
+        /// <summary> The unique id of the sort button Clickable Component. </summary>
         private const int buttonId = 231445356;
 
+        /// <summary> The dropdown object. </summary>
         public static readonly PerScreen<MyOptionsDropDown> dropDown = new();
+
+        /// <summary> The button object. </summary>
         public static readonly PerScreen<ClickableTextureComponent> button = new();
-        public static readonly PerScreen<bool> wasSorted = new PerScreen<bool>(() => false);
-        public static readonly PerScreen<int> lastSlotPosition = new PerScreen<int>(() => 0); // The position to return to when leaving a ProfileMenu
 
+        /// <summary> The position to return to when returning to the social page after clicking to a ProfileMenu (the npc at the top of the screen when you click on a character to open their page).  </summary>
+        public static readonly PerScreen<int> lastSlotPosition = new PerScreen<int>(() => 0);
+
+        /// <summary> The string that was in the filter field the last time it was checked. </summary>
         private static readonly PerScreen<string> lastFilterString = new PerScreen<string>(()=>"");
-        private static readonly PerScreen<TextBox> filterField = new();
-        private static readonly PerScreen<List<SocialPage.SocialEntry>> allEntries = new PerScreen<List<SocialPage.SocialEntry>>(() => new List<SocialPage.SocialEntry>());
 
+        /// <summary> The filter field (search bar) object. </summary>
+        private static readonly PerScreen<TextBox> filterField = new();
+
+        /// <summary> All of the entries in the social page, before we removed any when searching. Used to restore the page when we clear the search bar. </summary>
+        private static readonly PerScreen<List<SocialEntry>> allEntries = new PerScreen<List<SocialEntry>>(() => new List<SocialEntry>());
+
+        /// <summary> Whether the mod was enabled when the game was loaded. If it wasn't, we don't do anything because the patches weren't applied. </summary>
         private static bool WasModEnabled = false;
 
+        /// <summary>
+        /// The sort curently selected by Game1.player. It is stored in their mod data so that it is preserved between sessions, and for splitscreen support (it used to be stored in the config file,
+        /// but this would link the two screens' sorts together).
+        /// </summary>
         public static int CurrentSort
         {
             get

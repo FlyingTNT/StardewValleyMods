@@ -8,6 +8,7 @@ using StardewValley;
 using StardewValley.Menus;
 using StardewValley.TerrainFeatures;
 using System;
+using Common.Integrations;
 
 namespace LongerSeasons
 {

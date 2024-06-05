@@ -2940,7 +2940,18 @@ Global
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		_releases\_releases.projitems*{047040e0-3d07-46e5-852b-d1d45cd57bb8}*SharedItemsImports = 13
+		Common\Common.projitems*{07cf99e7-5432-4eef-ad7f-64467387f895}*SharedItemsImports = 5
+		Common\Common.projitems*{0990e06a-1f38-4833-b86a-9ebbe89a0eec}*SharedItemsImports = 5
+		Common\Common.projitems*{3e392312-b4c5-4c3a-84b6-ef5016c82831}*SharedItemsImports = 5
 		Common\Common.projitems*{4c2aed95-7d7c-4293-bd07-a176e30b3033}*SharedItemsImports = 5
+		Common\Common.projitems*{5ceed33a-f22d-45bd-a7d5-915bb24b9b4e}*SharedItemsImports = 5
+		Common\Common.projitems*{7dbb20d7-1b51-495a-bbc9-3cd66bf314a1}*SharedItemsImports = 5
 		Common\Common.projitems*{7f39da90-d6a7-44f3-95d0-122c6b2746a0}*SharedItemsImports = 13
+		Common\Common.projitems*{ad41cef4-4754-4fb5-b02a-0c4ce0d3bd3a}*SharedItemsImports = 5
+		Common\Common.projitems*{b131fdb6-c89a-45f6-90c5-6e71eb10a9bd}*SharedItemsImports = 5
+		Common\Common.projitems*{b29914e4-9637-412c-b9e9-0747981bf0ad}*SharedItemsImports = 5
+		Common\Common.projitems*{c24a056e-001f-4eb6-8d66-2b287ec24e1c}*SharedItemsImports = 5
+		Common\Common.projitems*{e5aaf77f-b9ce-42a1-b976-9caaf066a9c7}*SharedItemsImports = 5
+		Common\Common.projitems*{f95fa072-6d9e-44fa-a7b9-3423d5ea970a}*SharedItemsImports = 5
 	EndGlobalSection
 EndGlobal

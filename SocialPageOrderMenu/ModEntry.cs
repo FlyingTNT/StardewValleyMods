@@ -82,7 +82,7 @@ namespace SocialPageOrderRedux
             SMonitor = Monitor;
             SHelper = Helper;
 
-            helper.Events.Input.ButtonPressed += Input_ButtonPressed;
+            helper.Events.Input.ButtonsChanged += Input_ButtonsChanged;
             helper.Events.Display.MenuChanged += Display_MenuChanged;
             helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
 
@@ -144,14 +144,14 @@ namespace SocialPageOrderRedux
                 setValue: value => Config.EnableMod = value
             );
 
-            configMenu.AddKeybind(
+            configMenu.AddKeybindList(
                 mod: ModManifest,
                 name: () => "Prev Sort Key",
                 getValue: () => Config.prevButton,
                 setValue: value => Config.prevButton = value
             );
 
-            configMenu.AddKeybind(
+            configMenu.AddKeybindList(
                 mod: ModManifest,
                 name: () => "Next Sort Key",
                 getValue: () => Config.nextButton,
@@ -225,15 +225,15 @@ namespace SocialPageOrderRedux
             );
         }
 
-        private void Input_ButtonPressed(object sender, ButtonPressedEventArgs e)
+        private void Input_ButtonsChanged(object sender, ButtonsChangedEventArgs e)
         {
             if (!WasModEnabled || Game1.activeClickableMenu is not GameMenu || (Game1.activeClickableMenu as GameMenu).GetCurrentPage() is not SocialPage)
                 return;
-            if (e.Button == Config.prevButton)
+            if (Config.prevButton.JustPressed())
             {
                 DecrementSort();
             }
-            else if (e.Button == Config.nextButton)
+            else if (Config.nextButton.JustPressed())
             {
                 IncrementSort();
             }

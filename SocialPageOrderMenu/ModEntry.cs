@@ -117,7 +117,11 @@ namespace SocialPageOrderRedux
             harmony.Patch(AccessTools.Method(typeof(IClickableMenu), nameof(IClickableMenu.populateClickableComponentList)),
                 postfix: new HarmonyMethod(typeof(ModEntry), nameof(IClickableMenu_populateClickableComponentList_Postfix))
             );
-            
+
+            harmony.Patch(AccessTools.Method(typeof(IClickableMenu), nameof(IClickableMenu.readyToClose)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(IClickableMenu_readyToClose_Postfix))
+            );
+
             harmony.Patch(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.changeTab)),
                 postfix: new HarmonyMethod(typeof(ModEntry), nameof(GameMenu_changeTab_Postfix))
             );
@@ -303,6 +307,16 @@ namespace SocialPageOrderRedux
             __instance.allClickableComponents.Add(button.Value);
         }
 
+        public static void IClickableMenu_readyToClose_Postfix(IClickableMenu __instance, ref bool __result)
+        {
+            if (!Config.EnableMod || __instance is not SocialPage || filterField.Value is null)
+                return;
+
+            // If the filter is selected, make the result false. This is because some mods that add their own menus will overwrite the current one when their menu's key is pressed,
+            // but if the player has the filter selected, they didn't mean to open the other menu; they were just typing in the search bar.
+            __result &= !filterField.Value.Selected;
+        }
+
         [HarmonyPatch(typeof(SocialPage), nameof(SocialPage.draw), new Type[] { typeof(SpriteBatch) })]
         public class SocialPage_drawTextureBox_Patch
         {
@@ -404,8 +418,14 @@ namespace SocialPageOrderRedux
 
         public static bool SocialPage_recieveKeyPress_Prefix(IClickableMenu __instance, Keys key)
         {
-            if (!Config.EnableMod || !Config.UseFilter || filterField.Value is null || !filterField.Value.Selected || key == Keys.Escape || __instance is not SocialPage socialPage || Game1.options.gamepadControls)
+            if (!Config.EnableMod || __instance is not SocialPage socialPage || !Config.UseFilter || filterField.Value is null || !filterField.Value.Selected || Game1.options.gamepadControls)
                 return true;
+
+            if(key == Keys.Escape)
+            {
+                filterField.Value.Selected = false;
+                return true;
+            }
 
             socialPage.updateSlots();
             return false;
@@ -413,8 +433,14 @@ namespace SocialPageOrderRedux
 
         public static bool GameMenu_recieveKeyPress_Prefix(GameMenu __instance, Keys key)
         {
-            if (!Config.EnableMod || !Config.UseFilter || filterField.Value is null || !filterField.Value.Selected || key == Keys.Escape || __instance.GetCurrentPage() is not SocialPage socialPage || Game1.options.gamepadControls)
+            if (!Config.EnableMod || __instance.GetCurrentPage() is not SocialPage socialPage || !Config.UseFilter || filterField.Value is null || !filterField.Value.Selected || Game1.options.gamepadControls)
                 return true;
+
+            if (key == Keys.Escape)
+            {
+                filterField.Value.Selected = false;
+                return true;
+            }
 
             socialPage.updateSlots();
             return false;
@@ -699,6 +725,9 @@ namespace SocialPageOrderRedux
                 {
                     Text = ""
                 };
+
+                filterField.Value.OnEnterPressed += sender => sender.Selected = false;
+                filterField.Value.OnTabPressed += sender => sender.Selected = false;
             }
 
             if(dropDown.Value is null)

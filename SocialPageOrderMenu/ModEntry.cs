@@ -248,32 +248,34 @@ namespace SocialPageOrderRedux
         {
             lastFilterString.Value += "dirty";// Force an update
 
-            if (Game1.activeClickableMenu is GameMenu menu)
+            if (Game1.activeClickableMenu is not GameMenu menu)
+                return;
+
+            if(Config.UseFilter && e.OldMenu is not ProfileMenu)
             {
-                if(Config.UseFilter && e.OldMenu is not ProfileMenu)
+                filterField.Value.Text = "";
+            }
+
+            if (menu.GetCurrentPage() is not SocialPage socialPage)
+                return;
+
+            // Resort the social page (it is reset when the menu is changed); if the previous menu was a ProfileMenu (the menu that pops up when you click on a npc in the social page), scroll the menu to that npc
+            ResortSocialList(slotToSelect: e.OldMenu is ProfileMenu pm ? pm.Current : null);
+
+            // Snap the cursor to the selected item if necessary
+            if (Game1.options.snappyMenus && Game1.options.gamepadControls)
+            {
+                if(socialPage.currentlySnappedComponent is not null)
                 {
-                    filterField.Value.Text = "";
+                    // For some reason, the snapping doesn't work correctly in local multiplayer. I have no idea why. With moveCursorInDirection(-1), the cursor is at least consistently *in* the correct box.
+                    if (Context.IsSplitScreen)
+                        socialPage.moveCursorInDirection(-1);
+                    else
+                        socialPage.snapCursorToCurrentSnappedComponent();
                 }
-
-                if(menu.GetCurrentPage() is SocialPage socialPage)
+                else
                 {
-                    ResortSocialList(slotToSelect: e.OldMenu is ProfileMenu pm ? pm.Current : null);
-
-                    if (Game1.options.snappyMenus && Game1.options.gamepadControls)
-                    {
-                        if(socialPage.currentlySnappedComponent is not null)
-                        {
-                            // For some reason, the snapping doesn't work correctly in local multiplayer. I have no idea why. With moveCursorInDirection(-1), the cursor is at least consistently *in* the correct box.
-                            if (Context.IsSplitScreen)
-                                socialPage.moveCursorInDirection(-1);
-                            else
-                                socialPage.snapCursorToCurrentSnappedComponent();
-                        }
-                        else
-                        {
-                            SMonitor.Log("Currently snapped component is null.");
-                        }
-                    }
+                    SMonitor.Log("Currently snapped component is null.");
                 }
             }
         }
@@ -295,6 +297,8 @@ namespace SocialPageOrderRedux
 
         public static void SocialPage_FindSocialCharacters_Postfix(List<SocialEntry> __result)
         {
+            // __result is the list of all of the entries
+
             allEntries.Value.Clear();
             allEntries.Value.AddRange(__result);
         }
@@ -340,29 +344,36 @@ namespace SocialPageOrderRedux
                 if (!Config.EnableMod)
                     return;
 
-                if (Config.UseFilter)
+                try
                 {
-                    UpdateFilterPosition(page);
-                    filterField.Value.Draw(b);
-                }
-
-                if (Config.UseDropdown)
-                {
-                    dropDown.Value.draw(b, GetDropdownX(page), GetDropdownY(page));
-                    if (SHelper.Input.IsDown(SButton.MouseLeft) && AccessTools.FieldRefAccess<OptionsDropDown, bool>(dropDown.Value, "clicked") && dropDown.Value.dropDownBounds.Contains(Game1.getMouseX() - GetDropdownX(page), Game1.getMouseY() - GetDropdownY(page)))
+                    if (Config.UseFilter)
                     {
-                        dropDown.Value.selectedOption = (int)Math.Max(Math.Min((float)(Game1.getMouseY() - GetDropdownY(page) - dropDown.Value.dropDownBounds.Y) / (float)dropDown.Value.bounds.Height, (float)(dropDown.Value.dropDownOptions.Count - 1)), 0f);
+                        UpdateFilterPosition(page);
+                        filterField.Value.Draw(b);
+                    }
+
+                    if (Config.UseDropdown)
+                    {
+                        dropDown.Value.draw(b, GetDropdownX(page), GetDropdownY(page));
+                        if (SHelper.Input.IsDown(SButton.MouseLeft) && AccessTools.FieldRefAccess<OptionsDropDown, bool>(dropDown.Value, "clicked") && dropDown.Value.dropDownBounds.Contains(Game1.getMouseX() - GetDropdownX(page), Game1.getMouseY() - GetDropdownY(page)))
+                        {
+                            dropDown.Value.selectedOption = (int)Math.Max(Math.Min((float)(Game1.getMouseY() - GetDropdownY(page) - dropDown.Value.dropDownBounds.Y) / (float)dropDown.Value.bounds.Height, (float)(dropDown.Value.dropDownOptions.Count - 1)), 0f);
+                        }
+                    }
+
+                    if (Config.UseButton)
+                    {
+                        button.Value.bounds = GetButtonRectangle(page);
+                        button.Value.draw(b);
+                        if (button.Value.bounds.Contains(Game1.getMousePosition()))
+                        {
+                            (Game1.activeClickableMenu as GameMenu).hoverText = SHelper.Translation.Get($"sort-by") + SHelper.Translation.Get($"sort-{CurrentSort}");
+                        }
                     }
                 }
-
-                if(Config.UseButton)
+                catch(Exception ex)
                 {
-                    button.Value.bounds = GetButtonRectangle(page);
-                    button.Value.draw(b);
-                    if (button.Value.bounds.Contains(Game1.getMousePosition()))
-                    {
-                        (Game1.activeClickableMenu as GameMenu).hoverText = SHelper.Translation.Get($"sort-by") + SHelper.Translation.Get($"sort-{CurrentSort}");
-                    }
+                    SMonitor.Log($"Failed in {nameof(DrawDropDown)}: {ex}", LogLevel.Error);
                 }
             }
         }
@@ -404,6 +415,7 @@ namespace SocialPageOrderRedux
             {
                 if (!Config.EnableMod || !Config.UseDropdown)
                     return true;
+
                 if (AccessTools.FieldRefAccess<OptionsDropDown, bool>(dropDown.Value, "clicked"))
                 {
                     if(dropDown.Value.dropDownBounds.Contains(Game1.getMouseX() - GetDropdownX(__instance), Game1.getMouseY() - GetDropdownY(__instance)))

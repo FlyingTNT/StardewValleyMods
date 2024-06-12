@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common.Utilities;
+using HarmonyLib;
 using StardewModdingAPI;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,9 +13,10 @@ namespace LongerSeasons
 
         private static void Utility_getSeasonNameFromNumber_Postfix(ref string __result)
         {
+            // Check IsWorldReady b/c the month is stored in the save file, and so we don't know it until the world is ready (basically save is loaded)
             if(Config.MonthsPerSeason > 1 && Context.IsWorldReady)
             {
-                __result += $" {(SHelper.Data.ReadSaveData<SeasonMonth>(context.GetType().Namespace) ?? new SeasonMonth()).month}";
+                __result += $" {CurrentSeasonMonth}";
             }
         }
         public static IEnumerable<CodeInstruction> Utility_getDateStringFor_Transpiler(IEnumerable<CodeInstruction> instructions)

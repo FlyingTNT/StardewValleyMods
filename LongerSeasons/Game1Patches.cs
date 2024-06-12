@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common.Utilities;
+using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
@@ -32,9 +33,26 @@ namespace LongerSeasons
                     SMonitor.Log($"Changing days per month");
                     codes[i + 1].opcode = OpCodes.Call;
                     codes[i + 1].operand = AccessTools.Method(typeof(Utilities), nameof(Utilities.GetDaysPerMonth));
+
+
+                    if (codes[i+5].opcode == OpCodes.Ldsfld && codes[i+5].operand is FieldInfo info && info == AccessTools.Field(typeof(Game1), nameof(Game1.season)) &&
+                        codes[i+9].opcode == OpCodes.Br_S && codes[i+9].operand is Label breakToLabel)
+                    {
+                        // Adds a brfalse that will skip the section of code that increments the current season. The brfalse is only hit if there are multiple months per season and the current season is not in its last month.
+                        SMonitor.Log("Changing conditions for changing the season");
+                        codes.Insert(i + 5, new CodeInstruction(OpCodes.Brfalse, breakToLabel));
+                        codes.Insert(i + 5, new CodeInstruction(CodeInstruction.Call(typeof(ModEntry), nameof(IncrementSeasonMonth))));
+                    }
+
                     break;
                 }
             }
+
+            // For some reason, ILSpy really didn't want to show me the bytecodes for this method so I had to print them out.
+            /*foreach(var code in codes)
+            {
+                SMonitor.Log($"{((code.labels?.Count ?? 0) > 0 ? code.labels[0] : null)}|{code.opcode}|{code.operand}");
+            }*/
 
             return codes.AsEnumerable();
         }
@@ -42,6 +60,19 @@ namespace LongerSeasons
         private static void Game1__newDayAfterFade_Prefix()
         {
             SMonitor.Log($"dom {Game1.dayOfMonth}, year {Game1.year}, season {Game1.currentSeason}");
+        }
+
+        /// <summary>
+        /// This is added in the Game1._newDayAfterFade transpiler. If it returns false, the code that increments the season will be skipped.
+        /// </summary>
+        /// <returns>True if the current season should be incremented; i.e. the current month is the last in the season.</returns>
+        protected static bool IncrementSeasonMonth()
+        {
+            bool shouldIncrementSeason = CurrentSeasonMonth >= Config.MonthsPerSeason;
+
+            CurrentSeasonMonth = shouldIncrementSeason ? 1 : CurrentSeasonMonth + 1;
+
+            return shouldIncrementSeason;
         }
     }
 }

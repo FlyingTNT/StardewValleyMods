@@ -21,7 +21,7 @@ namespace LongerSeasons
         {
             int totalMonths = value / Config.DaysPerMonth;
             __instance.DayOfMonth = value % Config.DaysPerMonth + 1;
-            __instance.Season = Utilities.SeasonsByIndex[totalMonths % (4 * Config.MonthsPerSeason)];
+            __instance.Season = Utilities.SeasonsByIndex[(totalMonths / Config.MonthsPerSeason) % 4];
             __instance.Year = totalMonths / (4 * Config.MonthsPerSeason) + 1;
             return false;
         }

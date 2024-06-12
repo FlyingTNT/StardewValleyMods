@@ -9,6 +9,7 @@ using StardewValley.Menus;
 using StardewValley.TerrainFeatures;
 using System;
 using Common.Integrations;
+using Common.Utilities;
 
 namespace LongerSeasons
 {
@@ -18,17 +19,34 @@ namespace LongerSeasons
 
         public static IMonitor SMonitor;
         public static IModHelper SHelper;
-        public static ModConfig Config;
 
         public static ModEntry context;
+
+        private static ModConfig LocalConfig;
+        private static MultiplayerSynced<ModConfig> CommonConfig;
+        public static ModConfig Config => Context.IsWorldReady ? CommonConfig.Value : LocalConfig;
+
+        private static MultiplayerSynced<int> currentSeasonMonth;
+        public static int CurrentSeasonMonth
+        {
+            get
+            {
+                return Context.IsWorldReady ? currentSeasonMonth.Value : 1;
+            }
+
+            set
+            {
+                currentSeasonMonth.Value = value;
+            }
+        }
 
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
         {
-            Config = Helper.ReadConfig<ModConfig>();
+            LocalConfig = Helper.ReadConfig<ModConfig>();
 
-            if (!Config.EnableMod)
+            if (!LocalConfig.EnableMod)
                 return;
 
             context = this;
@@ -36,10 +54,12 @@ namespace LongerSeasons
             SMonitor = Monitor;
             SHelper = helper;
 
-            Utilities.Initialize(Config);
+            CommonConfig = new MultiplayerSynced<ModConfig>(helper, "Config", initializer: () => LocalConfig);
+            currentSeasonMonth = new MultiplayerSynced<int>(helper, "CurrentSeasonMonth", initializer: () => PerSaveConfig.LoadConfigOption<SeasonMonth>(SHelper, "CurrentSeasonMonth", new()).month);
 
             Helper.Events.GameLoop.DayStarted += GameLoop_DayStarted;
             Helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
+            Helper.Events.GameLoop.Saving += GameLoop_Saving;
             Helper.Events.Content.AssetRequested += Content_AssetRequested;
 
             var harmony = new Harmony(ModManifest.UniqueID);
@@ -124,11 +144,6 @@ namespace LongerSeasons
             );
         }
 
-        private void Content_AssetRequested1(object sender, AssetRequestedEventArgs e)
-        {
-            throw new NotImplementedException();
-        }
-
         private void GameLoop_GameLaunched(object sender, StardewModdingAPI.Events.GameLaunchedEventArgs e)
         {
             // get Generic Mod Config Menu's API (if it's installed)
@@ -139,8 +154,18 @@ namespace LongerSeasons
             // register mod
             configMenu.Register(
                 mod: ModManifest,
-                reset: () => Config = new ModConfig(),
-                save: () => Helper.WriteConfig(Config)
+                reset: () => 
+                { 
+                    LocalConfig = new ModConfig();
+                    if (Context.IsMainPlayer)
+                        CommonConfig.Value = LocalConfig;
+                },
+                save: () => 
+                {
+                    Helper.WriteConfig(LocalConfig);
+                    if (Context.IsMainPlayer)
+                        CommonConfig.Value = LocalConfig;
+                }
             );
 
             configMenu.AddBoolOption(
@@ -169,7 +194,7 @@ namespace LongerSeasons
             );
         }
 
-        private void GameLoop_DayStarted(object sender, StardewModdingAPI.Events.DayStartedEventArgs e)
+        private void GameLoop_DayStarted(object sender, DayStartedEventArgs e)
         {
             Helper.GameContent.InvalidateCache("LooseSprites/Billboard");
         }
@@ -202,6 +227,16 @@ namespace LongerSeasons
                     }
                 });
             }
+        }
+
+        private void GameLoop_Saving(object sender, SavingEventArgs args)
+        {
+            if(!Context.IsMainPlayer)
+            {
+                return;
+            }
+
+            PerSaveConfig.SaveConfigOption(SHelper, "CurrentSeasonMonth", new SeasonMonth(){ month = CurrentSeasonMonth });
         }
     }
 

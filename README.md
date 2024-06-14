@@ -4,6 +4,7 @@ These are all continuations of mods from aedenthorn. The original code can be fo
 - [Better Elevator](https://www.nexusmods.com/stardewvalley/mods/22340/)
 - [Catalogue Filter](https://www.nexusmods.com/stardewvalley/mods/22379)
 - [Custom Gift Limits](https://www.nexusmods.com/stardewvalley/mods/22385)
+- [Longer Seasons](https://www.nexusmods.com/stardewvalley/mods/25164)
 - [Pacifist Valley](https://www.nexusmods.com/stardewvalley/mods/23109)
 - [Quest Time Limits](https://www.nexusmods.com/stardewvalley/mods/22349/)
 - [Resource Storage](https://www.nexusmods.com/stardewvalley/mods/22539)

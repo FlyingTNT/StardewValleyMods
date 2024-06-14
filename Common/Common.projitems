@@ -10,7 +10,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)Integrations\GenericModConfigMenu\IGenericModConfigMenuApi.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)multiplayer\MultiplayerSync.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)multiplayer\MultiplayerSynced.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utilities\PerSaveConfig.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utilities\PerPlayerConfig.cs" />
   </ItemGroup>

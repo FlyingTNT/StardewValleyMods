@@ -36,5 +36,23 @@ namespace LongerSeasons
 
             return codes.AsEnumerable();
         }
+
+        /// <summary>
+        /// Increases the number of bookseller days in extended months by just repeating the bookseller every 28 days.
+        /// </summary>
+        public static void Utility_getDaysOfBooksellerThisSeason_Postfix(ref List<int> __result)
+        {
+            if (Config.DaysPerMonth <= 28 || !Config.ExtendBerry)
+                return;
+
+            for(int i = 0; i < __result.Count; i++)
+            {
+                if (__result[i] + 28 <= Config.DaysPerMonth)
+                {
+                    __result.Add(__result[i] + 28);
+                }
+            }
+        }
+
     }
 }

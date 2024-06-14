@@ -20,8 +20,6 @@ namespace LongerSeasons
         public static IMonitor SMonitor;
         public static IModHelper SHelper;
 
-        public static ModEntry context;
-
         private static ModConfig LocalConfig;
         private static MultiplayerSynced<ModConfig> CommonConfig;
         public static ModConfig Config => Context.IsWorldReady ? CommonConfig.Value : LocalConfig;
@@ -48,8 +46,6 @@ namespace LongerSeasons
 
             if (!LocalConfig.EnableMod)
                 return;
-
-            context = this;
 
             SMonitor = Monitor;
             SHelper = helper;
@@ -110,6 +106,11 @@ namespace LongerSeasons
             );
 
             harmony.Patch(
+               original: AccessTools.Method(typeof(Utility), nameof(Utility.getDaysOfBooksellerThisSeason)),
+               postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Utility_getDaysOfBooksellerThisSeason_Postfix))
+            );
+
+            harmony.Patch(
                original: AccessTools.Method(typeof(Utility), nameof(Utility.getSeasonNameFromNumber)),
                postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Utility_getSeasonNameFromNumber_Postfix))
             );
@@ -119,12 +120,12 @@ namespace LongerSeasons
 
             harmony.Patch(
                original: AccessTools.Constructor(typeof(Billboard), new Type[]{ typeof(bool) }),
-               postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Billboard_Postfix))
+               transpiler: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Billboard_Constructor_Transpiler))
             );
+
             harmony.Patch(
                original: AccessTools.Method(typeof(Billboard), nameof(Billboard.draw), new Type[] { typeof(SpriteBatch) }),
-               transpiler: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Billboard_draw_Transpiler)),
-               postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Billboard_draw_Postfix))
+               transpiler: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Billboard_draw_Transpiler))
             );
 
             // WorldDate Patches
@@ -144,7 +145,7 @@ namespace LongerSeasons
             );
         }
 
-        private void GameLoop_GameLaunched(object sender, StardewModdingAPI.Events.GameLaunchedEventArgs e)
+        private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
             // get Generic Mod Config Menu's API (if it's installed)
             var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
@@ -172,25 +173,28 @@ namespace LongerSeasons
                 mod: ModManifest,
                 name: () => "Enable Mod",
                 getValue: () => Config.EnableMod,
-                setValue: value => Config.EnableMod = value
+                setValue: value => (Context.IsMainPlayer ? Config : LocalConfig).EnableMod = value
             );
             configMenu.AddBoolOption(
                 mod: ModManifest,
                 name: () => "Extend Berry Seasons",
                 getValue: () => Config.ExtendBerry,
-                setValue: value => Config.ExtendBerry = value
+                setValue: value => (Context.IsMainPlayer ? Config : LocalConfig).ExtendBerry = value
             );
             configMenu.AddNumberOption(
                 mod: ModManifest,
                 name: () => "Days per Month",
                 getValue: () => Config.DaysPerMonth,
-                setValue: value => Config.DaysPerMonth = value
+                setValue: value => {
+                    (Context.IsMainPlayer ? Config : LocalConfig).DaysPerMonth = value;
+                    Helper.GameContent.InvalidateCache("LooseSprites/Billboard");
+                }
             );
             configMenu.AddNumberOption(
                 mod: ModManifest,
                 name: () => "Months per Season",
                 getValue: () => Config.MonthsPerSeason,
-                setValue: value => Config.MonthsPerSeason = value
+                setValue: value => (Context.IsMainPlayer ? Config : LocalConfig).MonthsPerSeason = value
             );
         }
 
@@ -207,11 +211,14 @@ namespace LongerSeasons
                 {
                     var editor = asset.AsImage();
 
-                    Texture2D sourceImage = Helper.ModContent.Load<Texture2D>("assets/numbers.png");
+                    IRawTextureData sourceImage = Helper.ModContent.Load<IRawTextureData>("assets/numbers.png");
+                    IRawTextureData blankImage = Helper.ModContent.Load<IRawTextureData>("assets/BlankBillboard.png");
 
                     int startDay = 28 * (Game1.dayOfMonth / 28) + 1;
+                    int daysCount = Config.DaysPerMonth - startDay + 1;
 
-                    for (int i = startDay; i < startDay + 28; i++)
+                    // Add the correct numbers to the billboard
+                    for (int i = startDay; i < startDay + daysCount; i++)
                     {
                         int cents = i / 100;
                         int tens = (i - cents * 100) / 10;
@@ -224,6 +231,12 @@ namespace LongerSeasons
                         }
                         editor.PatchImage(sourceImage, new Rectangle(6 * tens, 0, 7, 11), new Rectangle(32 + xOff + (i - 1) % 7 * 32, 248 + (i - startDay) / 7 * 32, 7, 11), PatchMode.Overlay);
                         editor.PatchImage(sourceImage, new Rectangle(6 * ones, 0, 7, 11), new Rectangle(39 + xOff + (i - 1) % 7 * 32, 248 + (i - startDay) / 7 * 32, 7, 11), PatchMode.Overlay);
+                    }
+
+                    // Remove any old numbers if the month does not fill up the entire billboard
+                    for(int i = startDay + daysCount; i < startDay + 28; i++)
+                    {
+                        editor.PatchImage(blankImage, new Rectangle(0, 0, 31, 31), new Rectangle(38 + (i - 1) % 7 * 32, 248 + (i - startDay) / 7 * 32, 31, 31), PatchMode.Overlay);
                     }
                 });
             }

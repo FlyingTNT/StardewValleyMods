@@ -8,7 +8,7 @@ namespace LongerSeasons
 
         public static int GetDaysPerMonth()
         {
-            return ModEntry.Config.DaysPerMonth;
+            return ModEntry.Config?.DaysPerMonth ?? 28;
         }
     }
 }

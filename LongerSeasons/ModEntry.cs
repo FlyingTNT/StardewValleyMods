@@ -24,14 +24,14 @@ namespace LongerSeasons
 
         private static ModConfig LocalConfig;
         private static MultiplayerSynced<ModConfig> CommonConfig;
-        public static ModConfig Config => Context.IsWorldReady ? CommonConfig.Value : LocalConfig;
+        public static ModConfig Config => (CommonConfig.IsReady ? CommonConfig.Value : LocalConfig) ?? LocalConfig;
 
         private static MultiplayerSynced<int> currentSeasonMonth;
         public static int CurrentSeasonMonth
         {
             get
             {
-                return Context.IsWorldReady ? currentSeasonMonth.Value : 1;
+                return currentSeasonMonth.IsReady ? currentSeasonMonth.Value : 1;
             }
 
             set
@@ -45,6 +45,7 @@ namespace LongerSeasons
         public override void Entry(IModHelper helper)
         {
             LocalConfig = Helper.ReadConfig<ModConfig>();
+            CommonConfig = new MultiplayerSynced<ModConfig>(helper, "Config", initializer: () => LocalConfig);
 
             if (!LocalConfig.EnableMod)
                 return;
@@ -52,7 +53,6 @@ namespace LongerSeasons
             SMonitor = Monitor;
             SHelper = helper;
 
-            CommonConfig = new MultiplayerSynced<ModConfig>(helper, "Config", initializer: () => LocalConfig);
             currentSeasonMonth = new MultiplayerSynced<int>(helper, "CurrentSeasonMonth", initializer: () => PerSaveConfig.LoadConfigOption<SeasonMonth>(SHelper, "CurrentSeasonMonth", new()).month);
 
             Helper.Events.GameLoop.DayStarted += GameLoop_DayStarted;

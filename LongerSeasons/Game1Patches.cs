@@ -51,7 +51,7 @@ namespace LongerSeasons
                 }
 
                 // The special order board is hardcoded to update on the 1st, 8th, 15th, and 22nd. We find those checks and replace them with a call to ShouldUpdateQuestBoard
-                if (updateSpecialOrderBoard && i>8 && codes[i-9].opcode == OpCodes.Ldc_I4_1 && codes[i-6].opcode == OpCodes.Ldc_I4_8 && codes[i-3].opcode == OpCodes.Ldc_I4_S && (sbyte)codes[i-3].operand == 15 && codes[i].opcode == OpCodes.Ldc_I4_S && (sbyte)codes[i].operand == 22 && codes[i+1].opcode == OpCodes.Bne_Un_S && codes[i+1].operand is Label)
+                if (updateSpecialOrderBoard && i>9 && codes[i-9].opcode == OpCodes.Ldc_I4_1 && codes[i-6].opcode == OpCodes.Ldc_I4_8 && codes[i-3].opcode == OpCodes.Ldc_I4_S && (sbyte)codes[i-3].operand == 15 && codes[i].opcode == OpCodes.Ldc_I4_S && (sbyte)codes[i].operand == 22 && codes[i+1].opcode == OpCodes.Bne_Un_S && codes[i+1].operand is Label)
                 {
                     SMonitor.Log("Making the quest board update after the 22nd");
 
@@ -69,10 +69,10 @@ namespace LongerSeasons
             }
 
             // For some reason, ILSpy really didn't want to show me the bytecodes for this method so I had to print them out.
-            foreach(var code in codes)
+            /*foreach(var code in codes)
             {
                 SMonitor.Log($"{((code.labels?.Count ?? 0) > 0 ? code.labels[0] : null)}|{code.opcode}|{code.operand}");
-            }
+            }*/
 
             return codes.AsEnumerable();
         }

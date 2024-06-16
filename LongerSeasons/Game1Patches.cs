@@ -24,10 +24,13 @@ namespace LongerSeasons
         {
             SMonitor.Log($"Transpiling Game1._newDayAfterFade");
 
+            bool preventSeasonChange = true;
+            bool updateSpecialOrderBoard = true;
+
             var codes = new List<CodeInstruction>(instructions);
             for (int i = 0; i < codes.Count; i++)
             {
-                if (codes[i].opcode == OpCodes.Ldsfld && (FieldInfo)codes[i].operand == typeof(Game1).GetField(nameof(Game1.dayOfMonth), BindingFlags.Public | BindingFlags.Static) && codes[i + 1].opcode == OpCodes.Ldc_I4_S && (sbyte)codes[i + 1].operand == 28)
+                if (preventSeasonChange && codes[i].opcode == OpCodes.Ldsfld && (FieldInfo)codes[i].operand == typeof(Game1).GetField(nameof(Game1.dayOfMonth), BindingFlags.Public | BindingFlags.Static) && codes[i + 1].opcode == OpCodes.Ldc_I4_S && (sbyte)codes[i + 1].operand == 28)
                 {
                     // Replaces the number 28 with a call to GetDaysPerMonth()
                     SMonitor.Log($"Changing days per month");
@@ -44,15 +47,32 @@ namespace LongerSeasons
                         codes.Insert(i + 5, new CodeInstruction(CodeInstruction.Call(typeof(ModEntry), nameof(IncrementSeasonMonth))));
                     }
 
-                    break;
+                    preventSeasonChange = false;
+                }
+
+                // The special order board is hardcoded to update on the 1st, 8th, 15th, and 22nd. We find those checks and replace them with a call to ShouldUpdateQuestBoard
+                if (updateSpecialOrderBoard && i>8 && codes[i-9].opcode == OpCodes.Ldc_I4_1 && codes[i-6].opcode == OpCodes.Ldc_I4_8 && codes[i-3].opcode == OpCodes.Ldc_I4_S && (sbyte)codes[i-3].operand == 15 && codes[i].opcode == OpCodes.Ldc_I4_S && (sbyte)codes[i].operand == 22 && codes[i+1].opcode == OpCodes.Bne_Un_S && codes[i+1].operand is Label)
+                {
+                    SMonitor.Log("Making the quest board update after the 22nd");
+
+                    for(int j = -10; j < -1; j++)
+                    {
+                        codes[i + j].opcode = OpCodes.Nop;
+                        codes[i + j].operand = null;
+                    }
+
+                    codes[i] = CodeInstruction.Call(typeof(ModEntry), nameof(ShouldUpdateQuestBoard));
+                    codes[i + 1].opcode = OpCodes.Brfalse;
+
+                    updateSpecialOrderBoard = false;
                 }
             }
 
             // For some reason, ILSpy really didn't want to show me the bytecodes for this method so I had to print them out.
-            /*foreach(var code in codes)
+            foreach(var code in codes)
             {
                 SMonitor.Log($"{((code.labels?.Count ?? 0) > 0 ? code.labels[0] : null)}|{code.opcode}|{code.operand}");
-            }*/
+            }
 
             return codes.AsEnumerable();
         }
@@ -73,6 +93,11 @@ namespace LongerSeasons
             CurrentSeasonMonth = shouldIncrementSeason ? 1 : CurrentSeasonMonth + 1;
 
             return shouldIncrementSeason;
+        }
+
+        private static bool ShouldUpdateQuestBoard(int day)
+        {
+            return (day - 1) % 7 == 0;
         }
     }
 }

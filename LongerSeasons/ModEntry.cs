@@ -10,6 +10,8 @@ using StardewValley.TerrainFeatures;
 using System;
 using Common.Integrations;
 using Common.Utilities;
+using StardewValley.GameData.Characters;
+using System.Collections.Generic;
 
 namespace LongerSeasons
 {
@@ -181,6 +183,24 @@ namespace LongerSeasons
                 getValue: () => Config.ExtendBerry,
                 setValue: value => (Context.IsMainPlayer ? Config : LocalConfig).ExtendBerry = value
             );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => "Distrubute Birthdays",
+                getValue: () => Config.ExtendBirthdays,
+                setValue: value => {
+                    (Context.IsMainPlayer ? Config : LocalConfig).ExtendBirthdays = value;
+                    Helper.GameContent.InvalidateCache("Data/Characters");
+                }
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => "Avoid Birthday Overlap",
+                getValue: () => Config.AvoidBirthdayOverlaps,
+                setValue: value => {
+                    (Context.IsMainPlayer ? Config : LocalConfig).AvoidBirthdayOverlaps = value;
+                    Helper.GameContent.InvalidateCache("Data/Characters");
+                }
+            );
             configMenu.AddNumberOption(
                 mod: ModManifest,
                 name: () => "Days per Month",
@@ -188,6 +208,7 @@ namespace LongerSeasons
                 setValue: value => {
                     (Context.IsMainPlayer ? Config : LocalConfig).DaysPerMonth = value;
                     Helper.GameContent.InvalidateCache("LooseSprites/Billboard");
+                    Helper.GameContent.InvalidateCache("Data/Characters");
                 }
             );
             configMenu.AddNumberOption(
@@ -215,7 +236,7 @@ namespace LongerSeasons
                     IRawTextureData blankImage = Helper.ModContent.Load<IRawTextureData>("assets/BlankBillboard.png");
 
                     int startDay = 28 * (Game1.dayOfMonth / 28) + 1;
-                    int daysCount = Config.DaysPerMonth - startDay + 1;
+                    int daysCount = Utility.Clamp(Config.DaysPerMonth - startDay + 1, 0, 28);
 
                     // Add the correct numbers to the billboard
                     for (int i = startDay; i < startDay + daysCount; i++)
@@ -230,7 +251,7 @@ namespace LongerSeasons
                             editor.PatchImage(sourceImage, new Rectangle(6 * cents, 0, 7, 11), new Rectangle(39 + (i - 1) % 7 * 32, 248 + (i - startDay) / 7 * 32, 7, 11), PatchMode.Overlay);
                         }
                         editor.PatchImage(sourceImage, new Rectangle(6 * tens, 0, 7, 11), new Rectangle(32 + xOff + (i - 1) % 7 * 32, 248 + (i - startDay) / 7 * 32, 7, 11), PatchMode.Overlay);
-                        editor.PatchImage(sourceImage, new Rectangle(6 * ones, 0, 7, 11), new Rectangle(39 + xOff + (i - 1) % 7 * 32, 248 + (i - startDay) / 7 * 32, 7, 11), PatchMode.Overlay);
+                        editor.PatchImage(sourceImage, new Rectangle(6 * ones, 0, 7, 11), new Rectangle(39 + xOff + (i - 1) % 7 * 32, 248 + (i - startDay) / 7 * 32, 7, 11), PatchMode.Overlay); 
                     }
 
                     // Remove any old numbers if the month does not fill up the entire billboard
@@ -239,6 +260,49 @@ namespace LongerSeasons
                         editor.PatchImage(blankImage, new Rectangle(0, 0, 31, 31), new Rectangle(38 + (i - 1) % 7 * 32, 248 + (i - startDay) / 7 * 32, 31, 31), PatchMode.Overlay);
                     }
                 });
+            }
+            else if(args.NameWithoutLocale.IsEquivalentTo("Data/Characters") && Config.ExtendBirthdays)
+            {
+                args.Edit((asset) =>
+                {
+                    var characters = asset.AsDictionary<string, CharacterData>();
+
+                    Dictionary<string, string> birthdays = new();
+
+                    foreach(var character in characters.Data)
+                    {
+                        int proposedBirthday = (int)Math.Round((character.Value.BirthDay / 28f) * Config.DaysPerMonth);
+
+                        // If we don't care about overlaps, take the proposal unless it is a festival day
+                        if(!Config.AvoidBirthdayOverlaps && !Utility.isFestivalDay(proposedBirthday, character.Value.BirthSeason ?? Season.Spring, null))
+                        {
+                            character.Value.BirthDay = proposedBirthday;
+                            continue;
+                        }
+
+                        // Try the days surrounding the proposal until we find one without a birthday / festival
+                        int i = 0;
+                        int newProposal = proposedBirthday;
+
+                        while (Utility.isFestivalDay(newProposal, character.Value.BirthSeason ?? Season.Spring, null) || birthdays.ContainsKey($"{character.Value.BirthSeason}{newProposal}"))
+                        {
+                            // will add +1, -1, +2, -2, +3, -3,.... until it finds a hit
+                            newProposal = Utility.Clamp(proposedBirthday + ((i+2) / 2) * (int)Math.Pow(-1, i), 1, Config.DaysPerMonth);
+                            i++;
+
+                            // If we somehow didn't find a valid spot, just use the OG proposal (2 * days/month is the absolute max number of days we need to check)
+                            if(i >= 2 * Config.DaysPerMonth)
+                            {
+                                newProposal = proposedBirthday;
+                                break;
+                            }
+                        }
+
+                        birthdays[$"{character.Value.BirthSeason}{newProposal}"] = character.Key;
+                        character.Value.BirthDay = newProposal;
+                    }
+
+                }, AssetEditPriority.Late);
             }
         }
 

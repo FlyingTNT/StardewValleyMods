@@ -47,6 +47,9 @@ public class MultiplayerSynced<T>
         }
     }
 
+    /// <summary> Whether or not the Value has been initialized for this save. </summary>
+    public bool IsReady { get; private set; } = false;
+
     /// <summary>
     /// Creates a variable synced across all players in multiplayer.
     /// 
@@ -63,7 +66,8 @@ public class MultiplayerSynced<T>
         Initializer = initializer;
 
         helper.Events.Multiplayer.ModMessageReceived += Multiplayer_ModMessageRecieved;
-        helper.Events.GameLoop.SaveLoaded += GameLoop_OnSaveLoaded;
+        helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
+        helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
     }
 
     private void Multiplayer_ModMessageRecieved(object sender, ModMessageReceivedEventArgs args)
@@ -90,6 +94,7 @@ public class MultiplayerSynced<T>
             if((data.IsFromMainPlayer && !Context.IsOnHostComputer) || (!data.IsFromMainPlayer && Context.IsMainPlayer))
             {
                 internalValue = data.Value;
+                IsReady = true;
             }
 
             // If this is the main player, broadcast the new value
@@ -108,7 +113,7 @@ public class MultiplayerSynced<T>
     /// If this is the main player, it uses the initializer to initialize the value.
     /// If this is not on the host computer, it requests the value from the host.
     /// </summary>
-    private void GameLoop_OnSaveLoaded(object sender, SaveLoadedEventArgs args)
+    private void GameLoop_SaveLoaded(object sender, SaveLoadedEventArgs args)
     {
         if(Context.IsMainPlayer)
         {
@@ -117,11 +122,17 @@ public class MultiplayerSynced<T>
 
         if(Context.IsOnHostComputer)
         {
+            IsReady = true;
             return;
         }
 
         // If the player is remote, request the value from the host.
         SHelper.Multiplayer.SendMessage("", Name + "Request", new string[] {ModId}, null);
+    }
+
+    private void GameLoop_ReturnedToTitle(object sender, ReturnedToTitleEventArgs args)
+    {
+        IsReady = false;
     }
 
     /// <summary>

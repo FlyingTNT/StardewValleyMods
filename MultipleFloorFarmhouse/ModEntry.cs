@@ -9,10 +9,10 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using xTile;
-using xTile.Layers;
 using MultipleFloorFarmhouse;
 using Common.Integrations;
 using xTile.Tiles;
+using StardewValley.Extensions;
 
 namespace MultiStoryFarmhouse
 {
@@ -20,6 +20,7 @@ namespace MultiStoryFarmhouse
     public class ModEntry : Mod
     {
         public const string BaseStairsUpName = "Maps/MultipleFloorFarmhouseBaseStairsUp";
+        public const string StairsUpInlineName = "Maps/MultipleFloorFarmhouseStairsUpInline";
         public const string StairsUpName = "Maps/MultipleFloorFarmhouseStairsUp";
         public const string StairsDownName = "Maps/MultipleFloorFarmhouseStairsDown";
 
@@ -157,6 +158,13 @@ namespace MultiStoryFarmhouse
                 setValue: value => Config.MainFloorStairsY = value
             );
 
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_CombineWithCellarStairs"),
+                getValue: () => Config.CombineWithCellarStairs,
+                setValue: value => Config.CombineWithCellarStairs = value
+            );
+
             configMenu.AddTextOption(
                 mod: ModManifest,
                 name: () => SHelper.Translation.Get("GMCM_FloorNames"),
@@ -209,25 +217,9 @@ namespace MultiStoryFarmhouse
                         int x = Config.MainFloorStairsX;
                         int y = Config.MainFloorStairsY;
 
-                        Layer front = mapData.Data.GetLayer("Front");
-                        Layer buildings = mapData.Data.GetLayer("Buildings");
-                        Layer back = mapData.Data.GetLayer("Back");
+                        Map stairs = SHelper.GameContent.Load<Map>(Config.CombineWithCellarStairs ? BaseStairsUpName : StairsUpInlineName);
 
-                        if(front.LayerWidth <= x + 4 || buildings.LayerWidth <= x + 4 || back.LayerWidth <= x + 4)
-                        {
-                            SMonitor.Log($"The config option \"MainFloorStairsX\" is too large! It must be at most {back.LayerWidth - 5}", LogLevel.Error);
-                            return;
-                        }
-
-                        if (front.LayerHeight <= y + 3 || buildings.LayerHeight <= y + 3 || back.LayerHeight <= y + 3)
-                        {
-                            SMonitor.Log($"The config option \"MainFloorStairsY\" is too large! It must be at most {back.LayerHeight - 4}", LogLevel.Error);
-                            return;
-                        }
-
-                        Map stairs = SHelper.GameContent.Load<Map>(BaseStairsUpName);
-
-                        if (Game1.player?.HouseUpgradeLevel < 3)
+                        if (Game1.player?.HouseUpgradeLevel < 3 && Config.CombineWithCellarStairs)
                         {
                             try
                             {
@@ -237,7 +229,15 @@ namespace MultiStoryFarmhouse
                             catch { }
                         }
 
-                        mapData.PatchMap(stairs, null, new Rectangle(x, y, 5, 4), PatchMapMode.Replace);
+                        try
+                        {
+                            mapData.PatchMap(stairs, null, new Rectangle(x, y, stairs.RequireLayer("Back").LayerWidth, stairs.RequireLayer("Back").LayerHeight), PatchMapMode.Replace);
+                        }
+                        catch(ArgumentOutOfRangeException ex)
+                        {
+                            SMonitor.Log($"There was an error adding the stairs, probably due to invalid config for the stair location: {ex}", LogLevel.Error);
+                            return;
+                        }
 
                         if (!TryGetFloor(0, out Floor floor0))
                             return;
@@ -247,7 +247,7 @@ namespace MultiStoryFarmhouse
                         Utilities.AddWarp(mapData.Data, "MultipleFloors0", Config.MainFloorStairsX + 2, Config.MainFloorStairsY + 3, nextFloorStairsPoint.X + 2, nextFloorStairsPoint.Y + 2);
 
                         SMonitor.Log(mapData.Data.Properties["Warp"]);
-                    });
+                    }, AssetEditPriority.Late);
                 }
                 catch (Exception ex)
                 {
@@ -265,6 +265,10 @@ namespace MultiStoryFarmhouse
             else if (args.NameWithoutLocale.IsEquivalentTo(BaseStairsUpName))
             {
                 args.LoadFrom(() => SHelper.ModContent.Load<Map>("assets/Maps/BaseStairsUp.tmx"), AssetLoadPriority.Medium);
+            }
+            else if (args.NameWithoutLocale.IsEquivalentTo(StairsUpInlineName))
+            {
+                args.LoadFrom(() => SHelper.ModContent.Load<Map>("assets/Maps/StairsUpInline.tmx"), AssetLoadPriority.Medium);
             }
         }
 

@@ -1,0 +1,18 @@
+﻿{
+  "Name": "Multi-Story Farmhouse Floor Content Pack",
+  "Author": "aedenthorn",
+  "Version": "0.1.0",
+  "Description": "",
+  "UniqueID": "aedenthorn.MSFFloorPack",
+  "MinimumApiVersion": "3.5.0",
+  "ContentPackFor": {
+    "UniqueID": "FlyingTNT.MultipleFloorFarmhouse",
+    "MinimumVersion": "0.1.0"
+  },
+  "Dependencies": [
+   {
+      "UniqueID": "FlyingTNT.MultipleFloorFarmhouse",
+      "IsRequired": true
+   },
+  ]
+}

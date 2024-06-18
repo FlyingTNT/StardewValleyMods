@@ -6,12 +6,8 @@ namespace MultiStoryFarmhouse
     public class ModConfig
     {
         public bool EnableMod { get; set; } = true;
-        public List<string> FloorNames { get; set; } = new List<string>()
-        {
-            "ManyRooms",
-            "EmptyHall"
-        };
-        public int MainFloorStairsX { get; set; } = 7;
-        public int MainFloorStairsY { get; set; } = 22;
+        public string FloorNames { get; set; } = "ManyRooms, EmptyHall";
+        public int MainFloorStairsX { get; set; } = 21;
+        public int MainFloorStairsY { get; set; } = 32;
     }
 }

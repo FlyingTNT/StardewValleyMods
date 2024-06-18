@@ -129,8 +129,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MoveablePetBowl", "MoveablePetBowl\MoveablePetBowl.csproj", "{C1DB9307-6E7C-4DD7-B731-F9174F4E4C32}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MultiStoryFarmhouse", "MultiStoryFarmhouse\MultiStoryFarmhouse.csproj", "{9A35505B-D142-4974-B836-4D9488643FBA}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowingMineRocks", "FlowingMineRocks\FlowingMineRocks.csproj", "{8750645C-63BF-4C8B-B956-3A6F41C2FF42}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DialogueTrees", "DialogueTrees\DialogueTrees.csproj", "{1AD85C37-97E5-4141-B825-56804440E744}"
@@ -594,6 +592,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GenieLamp", "GenieLamp\GenieLamp.csproj", "{CB5B27E0-7BE9-4DB5-8CE9-C25D8D6F3089}"
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Common", "Common\Common.shproj", "{7F39DA90-D6A7-44F3-95D0-122C6B2746A0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MultipleFloorFarmhouse", "MultipleFloorFarmhouse\MultipleFloorFarmhouse.csproj", "{87A5C7DF-66C9-4906-8EC6-DDEC8CD51C82}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -1083,14 +1083,6 @@ Global
 		{C1DB9307-6E7C-4DD7-B731-F9174F4E4C32}.Release|Any CPU.Build.0 = Release|Any CPU
 		{C1DB9307-6E7C-4DD7-B731-F9174F4E4C32}.Release|x64.ActiveCfg = Release|x64
 		{C1DB9307-6E7C-4DD7-B731-F9174F4E4C32}.Release|x64.Build.0 = Release|x64
-		{9A35505B-D142-4974-B836-4D9488643FBA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9A35505B-D142-4974-B836-4D9488643FBA}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9A35505B-D142-4974-B836-4D9488643FBA}.Debug|x64.ActiveCfg = Debug|x64
-		{9A35505B-D142-4974-B836-4D9488643FBA}.Debug|x64.Build.0 = Debug|x64
-		{9A35505B-D142-4974-B836-4D9488643FBA}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9A35505B-D142-4974-B836-4D9488643FBA}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9A35505B-D142-4974-B836-4D9488643FBA}.Release|x64.ActiveCfg = Release|x64
-		{9A35505B-D142-4974-B836-4D9488643FBA}.Release|x64.Build.0 = Release|x64
 		{8750645C-63BF-4C8B-B956-3A6F41C2FF42}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8750645C-63BF-4C8B-B956-3A6F41C2FF42}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8750645C-63BF-4C8B-B956-3A6F41C2FF42}.Debug|x64.ActiveCfg = Debug|x64
@@ -2931,6 +2923,14 @@ Global
 		{CB5B27E0-7BE9-4DB5-8CE9-C25D8D6F3089}.Release|Any CPU.Build.0 = Release|Any CPU
 		{CB5B27E0-7BE9-4DB5-8CE9-C25D8D6F3089}.Release|x64.ActiveCfg = Release|x64
 		{CB5B27E0-7BE9-4DB5-8CE9-C25D8D6F3089}.Release|x64.Build.0 = Release|x64
+		{87A5C7DF-66C9-4906-8EC6-DDEC8CD51C82}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{87A5C7DF-66C9-4906-8EC6-DDEC8CD51C82}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{87A5C7DF-66C9-4906-8EC6-DDEC8CD51C82}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{87A5C7DF-66C9-4906-8EC6-DDEC8CD51C82}.Debug|x64.Build.0 = Debug|Any CPU
+		{87A5C7DF-66C9-4906-8EC6-DDEC8CD51C82}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{87A5C7DF-66C9-4906-8EC6-DDEC8CD51C82}.Release|Any CPU.Build.0 = Release|Any CPU
+		{87A5C7DF-66C9-4906-8EC6-DDEC8CD51C82}.Release|x64.ActiveCfg = Release|Any CPU
+		{87A5C7DF-66C9-4906-8EC6-DDEC8CD51C82}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -2947,6 +2947,7 @@ Global
 		Common\Common.projitems*{5ceed33a-f22d-45bd-a7d5-915bb24b9b4e}*SharedItemsImports = 5
 		Common\Common.projitems*{7dbb20d7-1b51-495a-bbc9-3cd66bf314a1}*SharedItemsImports = 5
 		Common\Common.projitems*{7f39da90-d6a7-44f3-95d0-122c6b2746a0}*SharedItemsImports = 13
+		Common\Common.projitems*{87a5c7df-66c9-4906-8ec6-ddec8cd51c82}*SharedItemsImports = 5
 		Common\Common.projitems*{ad41cef4-4754-4fb5-b02a-0c4ce0d3bd3a}*SharedItemsImports = 5
 		Common\Common.projitems*{b131fdb6-c89a-45f6-90c5-6e71eb10a9bd}*SharedItemsImports = 5
 		Common\Common.projitems*{b29914e4-9637-412c-b9e9-0747981bf0ad}*SharedItemsImports = 5

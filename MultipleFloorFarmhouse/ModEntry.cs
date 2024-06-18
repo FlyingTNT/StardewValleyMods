@@ -1,400 +1,389 @@
 ﻿using HarmonyLib;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
+using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Locations;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using xTile;
+using xTile.Layers;
+using MultipleFloorFarmhouse;
+using Common.Integrations;
 using xTile.Tiles;
 
 namespace MultiStoryFarmhouse
 {
     /// <summary>The mod entry point.</summary>
-    public class ModEntry : Mod, IAssetEditor, IAssetLoader
+    public class ModEntry : Mod
     {
+        public const string BaseStairsUpName = "Maps/MultipleFloorFarmhouseBaseStairsUp";
+        public const string StairsUpName = "Maps/MultipleFloorFarmhouseStairsUp";
+        public const string StairsDownName = "Maps/MultipleFloorFarmhouseStairsDown";
 
-        public static IMonitor PMonitor;
-        public static IModHelper PHelper;
-        public static ModEntry context;
-        public static ModConfig config;
-        public static Dictionary<string, Floor> floorsList = new Dictionary<string, Floor>();
-        public static Dictionary<int, Map> floorMaps = new Dictionary<int, Map>();
+        public static IMonitor SMonitor;
+        private static IModHelper SHelper;
+
+        /// <summary> A dictionary of all of the Floors in all of the installed content packs, even if they aren't in use.</summary>
+        private static readonly Dictionary<string, Floor> floorsDict = new();
+
+        /// <summary> A floorNumber => Map dictionary of the floors currently in use. </summary>
+        private static readonly Dictionary<int, Map> floorMaps = new();
+
+        /// <summary> The floors enabled in the config when the game was initially loaded. </summary>
+        private static string[] CachedConfigFloors;
+
+        private static int NumberOfFloors => GetPossibleFloors().Count;
+
+        public static ModConfig Config;
 
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
         {
-            context = this;
-            config = Helper.ReadConfig<ModConfig>();
+            Config = Helper.ReadConfig<ModConfig>();
 
-            if (!config.EnableMod)
+            if (!Config.EnableMod)
                 return;
 
-            PMonitor = Monitor;
-            PHelper = helper;
+            SMonitor = Monitor;
+            SHelper = helper;
+            CachedConfigFloors = Config.FloorNames.Split(',', StringSplitOptions.TrimEntries);
 
             Helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
-            
-            Helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
-            Helper.Events.GameLoop.DayStarted += GameLoop_DayStarted;
-            Helper.Events.GameLoop.DayEnding += GameLoop_DayEnding;
             Helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
+            Helper.Events.Content.AssetRequested += Content_AssetRequested;
 
             var harmony = new Harmony(ModManifest.UniqueID);
 
             harmony.Patch(
                original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.getWalls)),
-               prefix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.getWalls_Prefix))
+               prefix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.GameLocation_getWalls_Prefix))
             );
 
             harmony.Patch(
                original: AccessTools.Method(typeof(DecoratableLocation), nameof(DecoratableLocation.getFloors)),
-               prefix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.getFloors_Prefix))
+               prefix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.DecorableLocation_getFloors_Prefix))
             );
 
             harmony.Patch(
                original: AccessTools.Method(typeof(SaveGame), nameof(SaveGame.loadDataToLocations)),
-               prefix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.loadDataToLocations_Prefix))
+               prefix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.SaveGame_loadDataToLocations_Prefix))
             );
 
             harmony.Patch(
                original: AccessTools.Method(typeof(FarmHouse), "resetLocalState"),
-               prefix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.resetLocalState_Prefix)),
-               postfix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.resetLocalState_Postfix))
+               prefix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.FarmHouse_resetLocalState_Prefix)),
+               postfix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.FarmHouse_resetLocalState_Postfix))
             );
 
             harmony.Patch(
                original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.CanPlaceThisFurnitureHere)),
-               prefix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.CanPlaceThisFurnitureHere_Prefix))
+               prefix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.GameLocation_CanPlaceThisFurnitureHere_Prefix))
             );
-        }
-
-        private void GameLoop_ReturnedToTitle(object sender, StardewModdingAPI.Events.ReturnedToTitleEventArgs e)
-        {
-            Helper.Events.GameLoop.UpdateTicked -= GameLoop_UpdateTicked;
-        }
-
-        public static Floor GetFloor(string name)
-        {
-            int floorNo = int.Parse(name[name.Length - 1].ToString());
-            return floorsList[GetPossibleFloors()[floorNo]];
         }
 
         public static List<string> GetPossibleFloors()
         {
-            return config.FloorNames.Where(s => floorsList.ContainsKey(s)).ToList();
+            return CachedConfigFloors.Where(s => floorsDict.ContainsKey(s)).ToList();
         }
 
-        public void GameLoop_DayStarted(object sender, StardewModdingAPI.Events.DayStartedEventArgs e)
+        private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
-            Helper.Events.GameLoop.UpdateTicked += GameLoop_UpdateTicked;
-        }
-        private void GameLoop_DayEnding(object sender, StardewModdingAPI.Events.DayEndingEventArgs e)
-        {
-            Helper.Events.GameLoop.UpdateTicked -= GameLoop_UpdateTicked;
-        }
+            foreach (IContentPack contentPack in SHelper.ContentPacks.GetOwned())
+            { 
+                FloorsData floorsData = contentPack.ReadJsonFile<FloorsData>("content.json");
+                if (floorsData is null)
+                    continue;
 
-        private void GameLoop_UpdateTicked(object sender, StardewModdingAPI.Events.UpdateTickedEventArgs e)
-        {
-            if (!floorsList.Any() || Game1.player == null || Utility.getHomeOfFarmer(Game1.player) == null)
-                return;
-
-            var warps = Utility.getHomeOfFarmer(Game1.player).warps;
-            if (warps.Where(w => w.TargetName == "MultipleFloors0").Any())
-            {
-                return;
-            }
-            Monitor.Log("Doesn't have warp");
-
-            Vector2 stairs = floorsList[GetPossibleFloors()[0]].stairsStart;
-            int x = (int)stairs.X;
-            int y = (int)stairs.Y;
-
-            Warp warp = new Warp(config.MainFloorStairsX + 1, config.MainFloorStairsY + 3, "MultipleFloors0", x + 1, y + 2, true, false);
-            Utility.getHomeOfFarmer(Game1.player).warps.Add(warp);
-
-            Warp warp2 = new Warp(config.MainFloorStairsX + 2, config.MainFloorStairsY + 3, "MultipleFloors0", x + 2, y + 2, true, false);
-            Utility.getHomeOfFarmer(Game1.player).warps.Add(warp2);
-        }
-
-        private void GameLoop_OneSecondUpdateTicked(object sender, StardewModdingAPI.Events.OneSecondUpdateTickedEventArgs e)
-        {
-            Helper.Events.GameLoop.OneSecondUpdateTicked -= GameLoop_OneSecondUpdateTicked;
-        }
-
-        private void GameLoop_GameLaunched(object sender, StardewModdingAPI.Events.GameLaunchedEventArgs e)
-        {
-            foreach (IContentPack contentPack in Helper.ContentPacks.GetOwned())
-            {
-
-                FloorsData floorsData = contentPack.ReadJsonFile<FloorsData>("content.json") ?? new FloorsData();
                 foreach (Floor floor in floorsData.floors)
                 {
                     try
                     {
-                        for(int i = 0; i < config.FloorNames.Count; i++)
+                        for(int i = 0; i < CachedConfigFloors.Length; i++)
                         {
-                            if (floor.name == config.FloorNames[i])
+                            if (floor.name.ToLower() == CachedConfigFloors[i].ToLower())
                             {
-                                Monitor.Log($"Setting floor {i} map to {floor.name}.");
-                                floorMaps[i] = contentPack.LoadAsset<Map>(floor.mapPath);
+                                SMonitor.Log($"Setting floor {i} map to {floor.name}.");
+                                floorMaps[i] = contentPack.ModContent.Load<Map>(floor.mapPath);
                             }
                         }
-                        floorsList.Add(floor.name, floor);
+                        floorsDict.Add(floor.name, floor);
                     }
                     catch(Exception ex)
                     {
-                        Monitor.Log($"Exception getting map at {floor.mapPath} for {floor.name} in content pack {contentPack.Manifest.Name}:\n{ex}", LogLevel.Error);
+                        SMonitor.Log($"Exception getting map at {floor.mapPath} for {floor.name} in content pack {contentPack.Manifest.Name}:\n{ex}", LogLevel.Error);
                     }
                 }
             }
-            Monitor.Log($"Loaded {floorsList.Count} floors.");
+            SMonitor.Log($"Loaded {floorsDict.Count} floors.");
+            SMonitor.Log($"The installed floors are: {floorsDict.Join(kvp => kvp.Key)}", LogLevel.Debug);
+            SMonitor.Log($"The active floors are: {GetPossibleFloors().Join()}", LogLevel.Debug);
+
+
+            var configMenu = SHelper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            if (configMenu is null)
+                return;
+
+            // register mod
+            configMenu.Register(
+                mod: ModManifest,
+                reset: () => Config = new ModConfig(),
+                save: () => SHelper.WriteConfig(Config)
+            );
+
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_EnableMod"),
+                getValue: () => Config.EnableMod,
+                setValue: value => Config.EnableMod = value
+            );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_StairsX"),
+                tooltip: () => SHelper.Translation.Get("GMCM_Stairs_Description"),
+                getValue: () => Config.MainFloorStairsX,
+                setValue: value => Config.MainFloorStairsX = value
+            );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_StairsY"),
+                tooltip: () => SHelper.Translation.Get("GMCM_Stairs_Description"),
+                getValue: () => Config.MainFloorStairsY,
+                setValue: value => Config.MainFloorStairsY = value
+            );
+
+            configMenu.AddTextOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_FloorNames"),
+                tooltip: () => SHelper.Translation.Get("GMCM_FloorNames_Description", new {allOptions = floorsDict.Join(kvp => kvp.Key)}),
+                getValue: () => Config.FloorNames,
+                setValue: value => Config.FloorNames = value
+            );
+
+            configMenu.AddParagraph(
+                mod: ModManifest,
+                text: () => SHelper.Translation.Get("GMCM_ActiveFloors", new {activeFloors = GetPossibleFloors().Join()})
+            );
         }
 
-        private void GameLoop_SaveLoaded(object sender, StardewModdingAPI.Events.SaveLoadedEventArgs e)
+        private void GameLoop_ReturnedToTitle(object sender, ReturnedToTitleEventArgs args)
         {
+            // So that the stair locations are updated on save reload.
+            // We don't do this whenever the config is changed because that has the side effect of removing the cellar stairs and spouse rooms.
+            SHelper.GameContent.InvalidateCache("Maps/FarmHouse2");
+            SHelper.GameContent.InvalidateCache("Maps/FarmHouse2_marriage");
 
+            // So that its warp is updated
+            SHelper.GameContent.InvalidateCache("Maps/MultipleFloorsMap0");
         }
 
-
-
-
-        /// <summary>Get whether this instance can load the initial version of the given asset.</summary>
-        /// <param name="asset">Basic metadata about the asset being loaded.</param>
-        public bool CanLoad<T>(IAssetInfo asset)
+        private void Content_AssetRequested(object sender, AssetRequestedEventArgs args)
         {
-            if (!config.EnableMod)
-                return false;
-
-            if (asset.AssetName.Contains("MultipleFloorsMap"))
+            if (args.NameWithoutLocale.StartsWith("Maps/MultipleFloorsMap"))
             {
-                Monitor.Log($"can load floor {asset.AssetName[asset.AssetName.Length - 1]} map");
-                return true;
-            }
+                int floorNo = int.Parse(args.NameWithoutLocale.ToString()[^1].ToString());
 
-            return false;
-        }
-
-        /// <summary>Load a matched asset.</summary>
-        /// <param name="asset">Basic metadata about the asset being loaded.</param>
-        public T Load<T>(IAssetInfo asset)
-        {
-            if (asset.AssetName.Contains("MultipleFloorsMap"))
-            {
-                int floorNo = int.Parse(asset.AssetName[asset.AssetName.Length - 1].ToString());
-                Monitor.Log($"Loading floor {asset.AssetName[asset.AssetName.Length - 1]} map");
+                SMonitor.Log($"Loading floor {floorNo} map");
                 Map map = floorMaps[floorNo];
 
-                AddStairs(ref map, floorNo);
-                return (T)(object) map;
+                AddStairs(map, floorNo);
+                AddWarps(map, floorNo);
+                args.LoadFrom(() => map, AssetLoadPriority.Medium);
             }
 
-            throw new InvalidOperationException($"Unexpected asset '{asset.AssetName}'.");
-        }
-
-
-        private void AddStairs(ref Map map, int floorNo)
-        {
-            try
+            else if (args.NameWithoutLocale.IsEquivalentTo("Maps/FarmHouse2") || args.NameWithoutLocale.IsEquivalentTo("Maps/FarmHouse2_marriage"))
             {
-                TileSheet indoor = map.TileSheets.First(s => s.Id == "indoor");
-                TileSheet untitled = map.TileSheets.First(s => s.Id == "untitled tile sheet");
-                Vector2 stairs = floorsList[GetPossibleFloors()[floorNo]].stairsStart;
-                int x = (int)stairs.X;
-                int y = (int)stairs.Y;
-                // left 
-                map.GetLayer("Buildings").Tiles[x + 1, y + 1] = null;
-                map.GetLayer("Buildings").Tiles[x + 2, y + 1] = null;
+                SMonitor.Log("Editing asset" + args.Name);
 
-                map.GetLayer("Front").Tiles[x + 1, y] = null;
-                map.GetLayer("Front").Tiles[x + 2, y] = null;
-                map.GetLayer("Front").Tiles[x + 1, y + 1] = null;
-                map.GetLayer("Front").Tiles[x + 2, y + 1] = null;
-                map.GetLayer("Front").Tiles[x, y] = new StaticTile(map.GetLayer("Buildings"), indoor, BlendMode.Alpha, 162);
-                map.GetLayer("Front").Tiles[x + 3, y] = new StaticTile(map.GetLayer("Buildings"), indoor, BlendMode.Alpha, 163);
-
-                map.GetLayer("Buildings").Tiles[x, y + 1] = new StaticTile(map.GetLayer("Buildings"), indoor, BlendMode.Alpha, 64);
-                map.GetLayer("Front").Tiles[x, y + 1] = new StaticTile(map.GetLayer("Front"), indoor, BlendMode.Alpha, 64);
-
-                map.GetLayer("Buildings").Tiles[x, y + 2] = new StaticTile(map.GetLayer("Buildings"), indoor, BlendMode.Alpha, 96);
-
-                map.GetLayer("Front").Tiles[x + 1, y + 2] = new StaticTile(map.GetLayer("Front"), indoor, BlendMode.Alpha, 165);
-                map.GetLayer("Front").Tiles[x + 2, y + 2] = new StaticTile(map.GetLayer("Front"), indoor, BlendMode.Alpha, 165);
-
-                map.GetLayer("Back").Tiles[x + 1, y + 1] = new StaticTile(map.GetLayer("Back"), indoor, BlendMode.Alpha, 1043);
-                map.GetLayer("Back").Tiles[x + 2, y + 1] = new StaticTile(map.GetLayer("Back"), indoor, BlendMode.Alpha, 1043);
-                map.GetLayer("Back").Tiles[x + 1, y + 2] = new StaticTile(map.GetLayer("Back"), indoor, BlendMode.Alpha, 1075);
-                map.GetLayer("Back").Tiles[x + 2, y + 2] = new StaticTile(map.GetLayer("Back"), indoor, BlendMode.Alpha, 1075);
-
-                map.GetLayer("Back").Tiles[x + 1, y + 1].Properties["NoFurniture"] = "t";
-                map.GetLayer("Back").Tiles[x + 2, y + 1].Properties["NoFurniture"] = "t";
-                map.GetLayer("Back").Tiles[x + 1, y + 1].Properties["NPCBarrier"] = "t";
-                map.GetLayer("Back").Tiles[x + 2, y + 1].Properties["NPCBarrier"] = "t";
-
-                map.GetLayer("Back").Tiles[x + 1, y + 2].Properties["NoFurniture"] = "t";
-                map.GetLayer("Back").Tiles[x + 2, y + 2].Properties["NoFurniture"] = "t";
-
-                map.GetLayer("Buildings").Tiles[x + 3, y + 1] = new StaticTile(map.GetLayer("Buildings"), indoor, BlendMode.Alpha, 68);
-                map.GetLayer("Front").Tiles[x + 3, y + 1] = new StaticTile(map.GetLayer("Front"), indoor, BlendMode.Alpha, 68);
-                map.GetLayer("Buildings").Tiles[x + 3, y + 2] = new StaticTile(map.GetLayer("Buildings"), indoor, BlendMode.Alpha, 130);
-
-                map.GetLayer("Front").Tiles[x + 1, y + 3] = new StaticTile(map.GetLayer("Front"), indoor, BlendMode.Alpha, 0);
-                map.GetLayer("Front").Tiles[x + 2, y + 3] = new StaticTile(map.GetLayer("Front"), indoor, BlendMode.Alpha, 0);
-
-
-                if (floorNo < GetPossibleFloors().Count - 1)
-                {
-                    Monitor.Log($"adding upstairs for floor {floorNo} / {GetPossibleFloors().Count}");
-
-                    // right 
-
-                    map.GetLayer("Buildings").Tiles[x + 4, y + 1] = null;
-                    map.GetLayer("Buildings").Tiles[x + 5, y + 1] = null;
-
-                    map.GetLayer("Front").Tiles[x + 4, y] = null;
-                    map.GetLayer("Front").Tiles[x + 5, y] = null;
-                    map.GetLayer("Front").Tiles[x + 4, y + 1] = null;
-                    map.GetLayer("Front").Tiles[x + 5, y + 1] = null;
-
-                    map.GetLayer("Front").Tiles[x + 3, y] = new StaticTile(map.GetLayer("Buildings"), indoor, BlendMode.Alpha, 100);
-                    map.GetLayer("Front").Tiles[x + 6, y] = new StaticTile(map.GetLayer("Buildings"), indoor, BlendMode.Alpha, 163);
-
-
-                    map.GetLayer("Buildings").Tiles[x + 3, y + 1] = new StaticTile(map.GetLayer("Buildings"), indoor, BlendMode.Alpha, 132);
-                    map.GetLayer("Front").Tiles[x + 3, y + 1] = new StaticTile(map.GetLayer("Front"), indoor, BlendMode.Alpha, 132);
-
-                    map.GetLayer("Buildings").Tiles[x + 3, y + 2] = new StaticTile(map.GetLayer("Buildings"), indoor, BlendMode.Alpha, 164);
-
-                    map.GetLayer("Front").Tiles[x + 4, y + 2] = new StaticTile(map.GetLayer("Front"), indoor, BlendMode.Alpha, 165);
-                    map.GetLayer("Front").Tiles[x + 5, y + 2] = new StaticTile(map.GetLayer("Front"), indoor, BlendMode.Alpha, 165);
-
-
-                    map.GetLayer("Back").Tiles[x + 4, y + 1] = new StaticTile(map.GetLayer("Back"), untitled, BlendMode.Alpha, 181);
-                    map.GetLayer("Back").Tiles[x + 5, y + 1] = new StaticTile(map.GetLayer("Back"), untitled, BlendMode.Alpha, 181);
-                    map.GetLayer("Back").Tiles[x + 4, y + 2] = new StaticTile(map.GetLayer("Back"), untitled, BlendMode.Alpha, 181);
-                    map.GetLayer("Back").Tiles[x + 5, y + 2] = new StaticTile(map.GetLayer("Back"), untitled, BlendMode.Alpha, 181);
-
-                    map.GetLayer("Back").Tiles[x + 4, y + 1].Properties["@Flip"] = 2;
-                    map.GetLayer("Back").Tiles[x + 5, y + 1].Properties["@Flip"] = 2;
-                    map.GetLayer("Back").Tiles[x + 4, y + 2].Properties["@Flip"] = 2;
-                    map.GetLayer("Back").Tiles[x + 5, y + 2].Properties["@Flip"] = 2;
-
-                    map.GetLayer("Back").Tiles[x + 4, y + 1].Properties["NoFurniture"] = "t";
-                    map.GetLayer("Back").Tiles[x + 5, y + 1].Properties["NoFurniture"] = "t";
-                    map.GetLayer("Back").Tiles[x + 4, y + 1].Properties["NPCBarrier"] = "t";
-                    map.GetLayer("Back").Tiles[x + 5, y + 1].Properties["NPCBarrier"] = "t";
-                    map.GetLayer("Back").Tiles[x + 4, y + 2].Properties["NoFurniture"] = "t";
-                    map.GetLayer("Back").Tiles[x + 5, y + 2].Properties["NoFurniture"] = "t";
-
-                    map.GetLayer("Buildings").Tiles[x + 6, y + 1] = new StaticTile(map.GetLayer("Buildings"), indoor, BlendMode.Alpha, 68);
-                    map.GetLayer("Front").Tiles[x + 6, y + 1] = new StaticTile(map.GetLayer("Front"), indoor, BlendMode.Alpha, 68);
-                    map.GetLayer("Buildings").Tiles[x + 6, y + 2] = new StaticTile(map.GetLayer("Buildings"), indoor, BlendMode.Alpha, 130);
-
-                    map.GetLayer("Front").Tiles[x + 4, y + 3] = new StaticTile(map.GetLayer("Front"), indoor, BlendMode.Alpha, 0);
-                    map.GetLayer("Front").Tiles[x + 5, y + 3] = new StaticTile(map.GetLayer("Front"), indoor, BlendMode.Alpha, 0);
-
-                    map.GetLayer("Buildings").Tiles[x + 4, y + 1] = null;
-                    map.GetLayer("Buildings").Tiles[x + 5, y + 1] = null;
-                }
-            }
-            catch (Exception ex)
-            {
-                Monitor.Log($"Exception adding stair tiles.\n{ex}", LogLevel.Error);
-            }
-        }
-
-        /// <summary>Get whether this instance can edit the given asset.</summary>
-        /// <param name="asset">Basic metadata about the asset being loaded.</param>
-        public bool CanEdit<T>(IAssetInfo asset)
-        {
-            if (!config.EnableMod)
-                return false;
-
-            if (asset.AssetNameEquals("Maps/FarmHouse2") || asset.AssetNameEquals("Maps/FarmHouse2_marriage"))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        /// <summary>Edit a matched asset.</summary>
-        /// <param name="asset">A helper which encapsulates metadata about an asset and enables changes to it.</param>
-        public void Edit<T>(IAssetData asset)
-        {
-            Monitor.Log("Editing asset" + asset.AssetName);
-
-            if (asset.AssetNameEquals("Maps/FarmHouse2") || asset.AssetNameEquals("Maps/FarmHouse2_marriage"))
-            {
                 try
                 {
-                    var mapData = asset.AsMap();
+                    args.Edit(asset =>
+                    {
+                        var mapData = asset.AsMap();
 
-                    TileSheet indoor = mapData.Data.TileSheets.First(s => s.Id == "indoor");
-                    TileSheet untitled = mapData.Data.TileSheets.First(s => s.Id == "untitled tile sheet");
+                        int x = Config.MainFloorStairsX;
+                        int y = Config.MainFloorStairsY;
 
-                    int x = config.MainFloorStairsX;
-                    int y = config.MainFloorStairsY;
+                        Layer front = mapData.Data.GetLayer("Front");
+                        Layer buildings = mapData.Data.GetLayer("Buildings");
+                        Layer back = mapData.Data.GetLayer("Back");
 
-                    mapData.Data.GetLayer("Front").Tiles[x,y].TileIndex = 162;
-                    mapData.Data.GetLayer("Front").Tiles[x + 1,y] = null;
-                    mapData.Data.GetLayer("Front").Tiles[x + 2,y] = null;
-                    mapData.Data.GetLayer("Front").Tiles[x + 1,y + 1] = null;
-                    mapData.Data.GetLayer("Front").Tiles[x + 2,y + 1] = null;
-                    mapData.Data.GetLayer("Front").Tiles[x + 1,y + 2] = null;
-                    mapData.Data.GetLayer("Front").Tiles[x + 2,y + 2] = null;
-                    mapData.Data.GetLayer("Buildings").Tiles[x + 1,y + 1] = null;
-                    mapData.Data.GetLayer("Buildings").Tiles[x + 2,y + 1] = null;
-                    mapData.Data.GetLayer("Buildings").Tiles[x + 1,y + 2] = null;
-                    mapData.Data.GetLayer("Buildings").Tiles[x + 2,y + 2] = null;
-                    mapData.Data.GetLayer("Back").Tiles[x + 1,y + 1] = null;
-                    mapData.Data.GetLayer("Back").Tiles[x + 2,y + 1] = null;
-                    mapData.Data.GetLayer("Back").Tiles[x + 1,y + 2] = null;
-                    mapData.Data.GetLayer("Back").Tiles[x + 2,y + 2] = null;
+                        if(front.LayerWidth <= x + 4 || buildings.LayerWidth <= x + 4 || back.LayerWidth <= x + 4)
+                        {
+                            SMonitor.Log($"The config option \"MainFloorStairsX\" is too large! It must be at most {back.LayerWidth - 5}", LogLevel.Error);
+                            return;
+                        }
 
-                    mapData.Data.GetLayer("Buildings").Tiles[x + 3,y].TileIndex = 68;
-                    mapData.Data.GetLayer("Front").Tiles[x + 3,y].TileIndex = 68;
-                    
-                    mapData.Data.GetLayer("Buildings").Tiles[x,y + 1] = new StaticTile(mapData.Data.GetLayer("Buildings"), indoor, BlendMode.Alpha, 64);
-                    mapData.Data.GetLayer("Front").Tiles[x, y + 1] = new StaticTile(mapData.Data.GetLayer("Front"), indoor, BlendMode.Alpha, 64);
+                        if (front.LayerHeight <= y + 3 || buildings.LayerHeight <= y + 3 || back.LayerHeight <= y + 3)
+                        {
+                            SMonitor.Log($"The config option \"MainFloorStairsY\" is too large! It must be at most {back.LayerHeight - 4}", LogLevel.Error);
+                            return;
+                        }
 
-                    mapData.Data.GetLayer("Buildings").Tiles[x, y + 2] = new StaticTile(mapData.Data.GetLayer("Buildings"), indoor, BlendMode.Alpha, 96);
+                        Map stairs = SHelper.GameContent.Load<Map>(BaseStairsUpName);
 
-                    mapData.Data.GetLayer("Front").Tiles[x + 1, y + 2] = new StaticTile(mapData.Data.GetLayer("Front"), indoor, BlendMode.Alpha, 165);
-                    mapData.Data.GetLayer("Front").Tiles[x + 2, y + 2] = new StaticTile(mapData.Data.GetLayer("Front"), indoor, BlendMode.Alpha, 165);
+                        if (Game1.player?.HouseUpgradeLevel < 3)
+                        {
+                            try
+                            {
+                                // Front1 has tiles that merge the cellar and upper floor stairs
+                                stairs.RemoveLayer(stairs.GetLayer("Front1"));
+                            }
+                            catch { }
+                        }
 
+                        mapData.PatchMap(stairs, null, new Rectangle(x, y, 5, 4), PatchMapMode.Replace);
 
-                    mapData.Data.GetLayer("Back").Tiles[x + 1, y + 1] = new StaticTile(mapData.Data.GetLayer("Back"), untitled, BlendMode.Alpha, 181);
-                    mapData.Data.GetLayer("Back").Tiles[x + 2, y + 1] = new StaticTile(mapData.Data.GetLayer("Back"), untitled, BlendMode.Alpha, 181);
-                    mapData.Data.GetLayer("Back").Tiles[x + 1,y + 1].Properties["NoFurniture"] = "t";
-                    mapData.Data.GetLayer("Back").Tiles[x + 2,y + 1].Properties["NoFurniture"] = "t";
-                    mapData.Data.GetLayer("Back").Tiles[x + 1,y + 1].Properties["NPCBarrier"] = "t";
-                    mapData.Data.GetLayer("Back").Tiles[x + 2,y + 1].Properties["NPCBarrier"] = "t";
+                        if (!TryGetFloor(0, out Floor floor0))
+                            return;
 
-                    mapData.Data.GetLayer("Back").Tiles[x + 1, y + 2] = new StaticTile(mapData.Data.GetLayer("Back"), untitled, BlendMode.Alpha, 181);
-                    mapData.Data.GetLayer("Back").Tiles[x + 2, y + 2] = new StaticTile(mapData.Data.GetLayer("Back"), untitled, BlendMode.Alpha, 181);
-                    mapData.Data.GetLayer("Back").Tiles[x + 1,y + 2].Properties["NoFurniture"] = "t";
-                    mapData.Data.GetLayer("Back").Tiles[x + 2,y + 2].Properties["NoFurniture"] = "t";
+                        Point nextFloorStairsPoint = floor0.stairsStart.ToPoint();
+                        Utilities.AddWarp(mapData.Data, "MultipleFloors0", Config.MainFloorStairsX + 1, Config.MainFloorStairsY + 3, nextFloorStairsPoint.X + 1, nextFloorStairsPoint.Y + 2);
+                        Utilities.AddWarp(mapData.Data, "MultipleFloors0", Config.MainFloorStairsX + 2, Config.MainFloorStairsY + 3, nextFloorStairsPoint.X + 2, nextFloorStairsPoint.Y + 2);
 
-                    mapData.Data.GetLayer("Buildings").Tiles[x + 3, y + 1] = new StaticTile(mapData.Data.GetLayer("Buildings"), indoor, BlendMode.Alpha, 68);
-                    mapData.Data.GetLayer("Front").Tiles[x + 3, y + 1] = new StaticTile(mapData.Data.GetLayer("Front"), indoor, BlendMode.Alpha, 68);
-                    mapData.Data.GetLayer("Buildings").Tiles[x + 3, y + 2] = new StaticTile(mapData.Data.GetLayer("Buildings"), indoor, BlendMode.Alpha, 130);
-
-                    mapData.Data.GetLayer("Front").Tiles[x + 1, y + 3] = new StaticTile(mapData.Data.GetLayer("Front"), indoor, BlendMode.Alpha, 0);
-                    mapData.Data.GetLayer("Front").Tiles[x + 2, y + 3] = new StaticTile(mapData.Data.GetLayer("Front"), indoor, BlendMode.Alpha, 0);
-
-                    mapData.Data.GetLayer("Buildings").Tiles[x + 1,y + 1] = null;
-                    mapData.Data.GetLayer("Buildings").Tiles[x + 2,y + 1] = null;
-
+                        SMonitor.Log(mapData.Data.Properties["Warp"]);
+                    });
                 }
                 catch (Exception ex)
                 {
-                    Monitor.Log($"Exception adding stair tiles.\n{ex}", LogLevel.Error);
+                    SMonitor.Log($"Exception adding stair tiles.\n{ex}", LogLevel.Error);
                 }
-                return;
             }
+            else if(args.NameWithoutLocale.IsEquivalentTo(StairsUpName))
+            {
+                args.LoadFrom(() => SHelper.ModContent.Load<Map>("assets/Maps/StairsUp.tmx"), AssetLoadPriority.Medium);
+            }
+            else if (args.NameWithoutLocale.IsEquivalentTo(StairsDownName))
+            {
+                args.LoadFrom(() => SHelper.ModContent.Load<Map>("assets/Maps/StairsDown.tmx"), AssetLoadPriority.Medium);
+            }
+            else if (args.NameWithoutLocale.IsEquivalentTo(BaseStairsUpName))
+            {
+                args.LoadFrom(() => SHelper.ModContent.Load<Map>("assets/Maps/BaseStairsUp.tmx"), AssetLoadPriority.Medium);
+            }
+        }
+
+        private static void AddStairs(Map map, int floorNumber)
+        {
+            Map stairsUp = SHelper.GameContent.Load<Map>(StairsUpName);
+            Map stairsDown = SHelper.GameContent.Load<Map>(StairsDownName);
+
+            if (!TryGetFloor(floorNumber, out Floor floor))
+                return;
+
+            Vector2 stairs = floor.stairsStart;
+            int x = (int)stairs.X;
+            int y = (int)stairs.Y;
+
+            IAssetDataForMap helper = SHelper.ModContent.GetPatchHelper(map).AsMap();
+
+            // The patch will remove the flooring tiles, so we cache them and then re-add them after the patch
+            Tile[] floorTiles = new Tile[4];
+            for(int i = 0; i < 4; i++)
+            {
+                floorTiles[i] = map.GetLayer("Back").Tiles[x+i, y];
+            }
+
+            helper.PatchMap(stairsDown, null, new Rectangle(x, y, 4, 4), PatchMapMode.ReplaceByLayer);
+
+            for (int i = 0; i < 4; i++)
+            {
+                map.GetLayer("Back").Tiles[x + i, y] = floorTiles[i];
+            }
+
+            if (floorNumber >= NumberOfFloors - 1)
+                return;
+
+            for (int i = 0; i < 4; i++)
+            {
+                floorTiles[i] = map.GetLayer("Back").Tiles[x + i + 3, y];
+            }
+
+            helper.PatchMap(stairsUp, null, new Rectangle(x + 3, y, 4, 4), PatchMapMode.ReplaceByLayer);
+
+            for (int i = 0; i < 4; i++)
+            {
+                map.GetLayer("Back").Tiles[x + i + 3, y] = floorTiles[i];
+            }
+        }
+
+        private static void AddWarps(Map map, int floorNumber)
+        {
+            if (!TryGetFloor(floorNumber, out Floor floor))
+                return;
+
+            Utilities.ClearWarps(map);
+
+            Vector2 stairs = floor.stairsStart;
+            int x = (int)stairs.X;
+            int y = (int)stairs.Y;
+
+            if (floorNumber == 0)
+            {
+                Utilities.AddWarp(map, "FarmHouse", x + 1, y + 3, Config.MainFloorStairsX + 1, Config.MainFloorStairsY + 2);
+                Utilities.AddWarp(map, "FarmHouse", x + 2, y + 3, Config.MainFloorStairsX + 2, Config.MainFloorStairsY + 2);
+            }
+            else if(TryGetFloor(floorNumber - 1, out Floor downFloor))
+            {
+                Point downStairSpot = downFloor.stairsStart.ToPoint();
+
+                Utilities.AddWarp(map, $"MultipleFloors{floorNumber - 1}", x + 1, y + 3, downStairSpot.X + 4, downStairSpot.Y + 2);
+                Utilities.AddWarp(map, $"MultipleFloors{floorNumber - 1}", x + 2, y + 3, downStairSpot.X + 5, downStairSpot.Y + 2);
+            }
+
+            if (!TryGetFloor(floorNumber + 1, out Floor upFloor))
+                return;
+
+            Point upStairSpot = upFloor.stairsStart.ToPoint();
+
+            Utilities.AddWarp(map, $"MultipleFloors{floorNumber + 1}", x + 4, y + 3, upStairSpot.X + 1, upStairSpot.Y + 2);
+            Utilities.AddWarp(map, $"MultipleFloors{floorNumber + 1}", x + 5, y + 3, upStairSpot.X + 2, upStairSpot.Y + 2);
+        }
+
+        private static bool TryGetFloor(int floorIndex, [NotNullWhen(true)] out Floor floor)
+        {
+            if(floorIndex < 0 || floorIndex >= NumberOfFloors)
+            {
+                floor = null;
+                return false;
+            }
+
+            floor = floorsDict[GetPossibleFloors()[floorIndex]];
+            return floor is not null;
+        }
+
+        /// <summary>
+        /// Tries to get the floor with the given name. Can be in either the form "MultipleFloors{floorNum}" or "{Floor.name}"
+        /// </summary>
+        public static bool TryGetFloor(string name, [NotNullWhen(true)] out Floor floor)
+        {
+            // Try to get it in the form Floor.name
+            if(floorsDict.TryGetValue(name, out Floor floor1))
+            {
+                floor = floor1;
+                return floor is not null;
+            }
+
+            // Try to get it in the form MultipleFloors{floorNum}
+            if (!int.TryParse(name[^1].ToString(), System.Globalization.NumberStyles.None, null, out int floorNo))
+            {
+                floor = null;
+                return false;
+            }
+
+            if(!TryGetFloor(floorNo, out Floor floor2))
+            {
+                floor = null;
+                return false;
+            }
+
+            floor = floor2;
+            return floor is not null;
         }
     }
 }

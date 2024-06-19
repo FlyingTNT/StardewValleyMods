@@ -12,7 +12,7 @@
     "Directory": "_releases",
     "ModFolder": "MultipleFloorFarmhouse"
   },
-  "UpdateKeys": ["Nexus:8077"],
+  "UpdateKeys": [ "Nexus:25303" ],
   "Dependencies": [
       {
         "UniqueID": "Platonymous.ModUpdater",

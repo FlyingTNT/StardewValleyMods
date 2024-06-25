@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using StardewModdingAPI;
+using Common.Integrations;
 
 namespace CustomGiftLimits
 {

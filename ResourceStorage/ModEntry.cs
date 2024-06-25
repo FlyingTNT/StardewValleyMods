@@ -10,6 +10,7 @@ using StardewValley.Inventories;
 using StardewValley.Menus;
 using System;
 using System.Collections.Generic;
+using Common.Integrations;
 using Object = StardewValley.Object;
 
 namespace ResourceStorage

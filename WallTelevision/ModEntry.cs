@@ -1,13 +1,9 @@
 ﻿using HarmonyLib;
-using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
-using StardewValley.Locations;
-using StardewValley.Objects;
-using System.Collections.Generic;
-using Object = StardewValley.Object;
+using Common.Integrations;
 
 namespace WallTelevision
 {

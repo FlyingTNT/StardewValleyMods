@@ -1,17 +1,7 @@
 ﻿using HarmonyLib;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
-using StardewValley;
-using StardewValley.BellsAndWhistles;
-using StardewValley.Locations;
-using StardewValley.TerrainFeatures;
-using StardewValley.Tools;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
+using Common.Integrations;
 
 namespace SeedInfo
 {

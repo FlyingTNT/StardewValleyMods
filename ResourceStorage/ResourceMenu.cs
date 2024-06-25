@@ -1,4 +1,5 @@
-﻿using Microsoft.Xna.Framework;
+﻿using Common.Utilities;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using StardewModdingAPI;
@@ -8,7 +9,6 @@ using StardewValley.Menus;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
 using Object = StardewValley.Object;
 
 namespace ResourceStorage
@@ -21,7 +21,6 @@ namespace ResourceStorage
         public static ResourceMenu instance;
         public Dictionary<string, long> resources = new();
         public List<Object> resourceList = new();
-        //public List<ClickableComponent> allComponents = new();
         public Dictionary<int, ClickableTextureComponent> autoCCs = new();
         public Dictionary<int, ClickableTextureComponent> takeCCs = new();
         public ClickableTextureComponent upCC;
@@ -32,6 +31,31 @@ namespace ResourceStorage
         public Rectangle scrollBarRunner;
         public bool scrolling;
 
+        public ClickableTextureComponent SortButton;
+
+        /// <summary> Location of the organize button within LooseSprites/Cursors </summary>
+        public static readonly Rectangle buttonTextureSource = new Rectangle(162, 440, 16, 16);
+
+        public static int CurrentSort
+        {
+            get
+            {
+                return PerPlayerConfig.LoadConfigOption(Game1.player, "FlyingTNT.ResourceStorage/CurrentSort", defaultValue: 0);
+            }
+            set
+            {
+                PerPlayerConfig.SaveConfigOption(Game1.player, "FlyingTNT.ResourceStorage/CurrentSort", value);
+            }
+        }
+
+        const int AlphaUpSort = 0;
+        const int AlphaDownSort = 1;
+        const int CountUpSort = 2;
+        const int CountDownSort = 3;
+
+        public TextBox SearchBar;
+        string LastSearchedValue = "";
+
         public ResourceMenu() : base(Game1.uiViewport.Width / 2 - (windowWidth + borderWidth * 2) / 2, -borderWidth, windowWidth + borderWidth * 2, Game1.uiViewport.Height, false)
         {
             scrolled = 0;
@@ -41,6 +65,8 @@ namespace ResourceStorage
             exitFunction = emergencyShutDown;
 
             snapToDefaultClickableComponent();
+
+            SearchBar.Selected = !Game1.options.gamepadControls;
         }
 
         public void RepopulateComponentList()
@@ -50,9 +76,9 @@ namespace ResourceStorage
             foreach (var resource in resources)
             {
                 Object obj = new Object(ModEntry.DequalifyItemId(resource.Key), (int)resource.Value);
-                //obj.stack.Value = obj.ParentSheetIndex * 193;
                 resourceList.Add(obj);
             }
+            SortResourceList();
 
             int lineHeight = 64;
             linesPerPage = (Game1.uiViewport.Height + 72 - spaceToClearTopBorder * 2 - 108) / lineHeight;
@@ -88,6 +114,7 @@ namespace ResourceStorage
                     downNeighborID = baseID + 1000,
                     upNeighborID = baseID - 1000,
                     rightNeighborID = baseID + 1,
+                    leftNeighborID = -2,
                 };
                 takeCCs[i] = new ClickableTextureComponent("Take", new Rectangle(xPositionOnScreen + width - (spaceToClearSideBorder + borderWidth) - 36, yStart + 100, 48, 44), "", ModEntry.SHelper.Translation.Get("take"), Game1.mouseCursors, new Rectangle(365, 495, 12, 11), 4)
                 {
@@ -130,6 +157,19 @@ namespace ResourceStorage
                 scrollBar.bounds.Y = Math.Min(scrollBarRunner.Y + (int)Math.Round(interval * scrolled), scrollBarRunner.Bottom - scrollBar.bounds.Height);
 
             }
+            SortButton = new ClickableTextureComponent("Sort", new Rectangle(xPositionOnScreen - 48, yPositionOnScreen + 132, buttonTextureSource.Width * 4, buttonTextureSource.Height * 4), "", "", Game1.mouseCursors, buttonTextureSource, 4)
+            {
+                myID = -3,
+                rightNeighborID = 0,
+            };
+
+            SearchBar ??= new TextBox(Game1.content.Load<Texture2D>("LooseSprites\\textBox"), null, Game1.smallFont, Game1.textColor)
+            {
+                Text = "",
+            };
+            SearchBar.X = xPositionOnScreen + width / 2 - SearchBar.Width / 2;
+            SearchBar.Y = yPositionOnScreen + height;
+
             populateClickableComponentList();
         }
 
@@ -154,6 +194,8 @@ namespace ResourceStorage
             }
             upCC?.draw(b);
             downCC?.draw(b);
+            SortButton?.draw(b);
+            SearchBar?.Draw(b);
             if (scrollBar is not null)
             {
                 drawTextureBox(b, Game1.mouseCursors, new Rectangle(403, 383, 6, 6), this.scrollBarRunner.X, this.scrollBarRunner.Y, this.scrollBarRunner.Width, this.scrollBarRunner.Height, Color.White, 4f, true, -1f);
@@ -258,6 +300,15 @@ namespace ResourceStorage
                 scrolling = true;
                 return;
             }
+            if(SortButton?.containsPoint(x, y) == true)
+            {
+                CurrentSort++;
+                CurrentSort %= 4;
+                RepopulateComponentList();
+
+                return;
+            }
+            SearchBar?.Update();
         }
 
 
@@ -294,12 +345,22 @@ namespace ResourceStorage
 
         public override void receiveKeyPress(Keys key)
         {
+            if(key == Keys.Escape && SearchBar is not null)
+            {
+                SearchBar.Selected = false;
+            }
+
             if((Game1.options.doesInputListContain(Game1.options.menuButton, key) || SButtonExtensions.ToSButton(key) == ModEntry.Config.ResourcesKey) && readyToClose())
             {
                 exitThisMenu();
                 Game1.activeClickableMenu = ModEntry.gameMenu.Value;
                 return;
             }
+            if(SearchBar?.Text != LastSearchedValue)
+            {
+                RepopulateComponentList();
+            }
+
             base.receiveKeyPress(key);
         }
 
@@ -314,6 +375,10 @@ namespace ResourceStorage
             base.receiveGamePadButton(button);
         }
 
+        public override bool readyToClose()
+        {
+            return base.readyToClose() && (SearchBar?.Selected != true);
+        }
 
         public override void snapToDefaultClickableComponent()
         {
@@ -402,6 +467,11 @@ namespace ResourceStorage
                 hoverText = downCC.hoverText;
                 return;
             }
+            if(SortButton?.containsPoint(x, y) == true)
+            {
+                hoverText = GetSortText();
+                return;
+            }
         }
         public override void emergencyShutDown()
         {
@@ -439,5 +509,83 @@ namespace ResourceStorage
             RepopulateComponentList();
         }
 
+        public void SortResourceList()
+        {
+            if(resourceList is null)
+            {
+                return;
+            }
+
+            resourceList.Sort(GetSortComparison(CurrentSort));
+
+            if (SearchBar is null)
+                return;
+
+            LastSearchedValue = SearchBar.Text;
+            resourceList.RemoveAll(resource => (!resource?.DisplayName.ToLower().StartsWith(SearchBar.Text.ToLower())) ?? true);
+        }
+
+        private static Comparison<Object> GetSortComparison(int sortType)
+        {
+            switch(sortType)
+            {
+                case AlphaUpSort:
+                    return (Object a, Object b) =>
+                    {
+                        if (a is null && b is null)
+                            return 0;
+                        if (a is null)
+                            return 1;
+                        if (b is null)
+                            return -1;
+
+                        return a.DisplayName.CompareTo(b.DisplayName);
+                    };
+                case AlphaDownSort:
+                    return (Object a, Object b) =>
+                    {
+                        if (a is null && b is null)
+                            return 0;
+                        if (a is null)
+                            return 1;
+                        if (b is null)
+                            return -1;
+
+                        return -a.DisplayName.CompareTo(b.DisplayName);
+                    };
+                case CountUpSort:
+                    return (Object a, Object b) =>
+                    {
+                        if (a is null && b is null)
+                            return 0;
+                        if (a is null)
+                            return 1;
+                        if (b is null)
+                            return -1;
+
+                        return a.Stack.CompareTo(b.Stack);
+                    };
+                case CountDownSort:
+                    return (Object a, Object b) =>
+                    {
+                        if (a is null && b is null)
+                            return 0;
+                        if (a is null)
+                            return 1;
+                        if (b is null)
+                            return -1;
+
+                        return -a.Stack.CompareTo(b.Stack);
+                    };
+                default:
+                    ModEntry.SMonitor.Log($"Unknown sort number: {sortType}");
+                    return GetSortComparison(AlphaUpSort);
+            }
+        }
+
+        private static string GetSortText()
+        {
+            return ModEntry.SHelper.Translation.Get($"sort-{CurrentSort}");
+        }
     }
 }

@@ -15,5 +15,9 @@
   "take": "Take",
   "added-x-y": "Added {0} {1} to storage",
   "removed-x-y": "Took {0} {1} from storage",
-  "resources": "Resources"
+  "resources": "Resources",
+  "sort-0": "Name (Asc)",
+  "sort-1": "Name (Desc)",
+  "sort-2": "Amount (Asc)",
+  "sort-3": "Amount (Desc)"
 }

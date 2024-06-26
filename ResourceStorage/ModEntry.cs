@@ -102,13 +102,6 @@ namespace ResourceStorage
             );
             #endregion
 
-            #region OBJECT_PATCHES
-            harmony.Patch(
-                original: AccessTools.Method(typeof(Object), nameof(Object.ConsumeInventoryItem), new Type[] { typeof(Farmer), typeof(Item), typeof(int) }),
-                prefix: new HarmonyMethod(typeof(ModEntry), nameof(Object_ConsumeInventoryItem_Prefix))
-            );
-            #endregion
-
             #region CRAFTING_RECIPE_PATCHES
             harmony.Patch(
                 original: AccessTools.Method(typeof(CraftingRecipe), nameof(CraftingRecipe.ConsumeAdditionalIngredients)),

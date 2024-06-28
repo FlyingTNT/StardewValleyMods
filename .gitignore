@@ -338,3 +338,5 @@ ASALocalRun/
 
 # BeatPulse healthcheck temp database
 healthchecksdb
+LongerSeasons/_newDayAfterFade.txt
+PacifistValley/Properties/AssemblyInfo.cs

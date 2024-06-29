@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using Common.Utilities;
+using Newtonsoft.Json;
 using ResourceStorage.BetterCrafting;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
@@ -6,10 +7,6 @@ using StardewModdingAPI.Utilities;
 using StardewValley;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ResourceStorage
 {
@@ -24,7 +21,7 @@ namespace ResourceStorage
         public static readonly PerScreen<bool> UseSharedResources = new PerScreen<bool>();
 
         /// <summary> The key for UseSharedResources in the players' mod data </summary>
-        const string useSharedResourcesKey = "use-shared-resources";
+        const string useSharedResourcesKey = "FlyingTNT.ResourceStorage/use-shared-resources";
 
         /// <summary> The key of the resource dictionary in the save data </summary>
         const string saveDataKey = "shared-resource-dictionary";
@@ -67,16 +64,7 @@ namespace ResourceStorage
         /// </summary>
         public static void InitializeShouldUseSharedResources()
         {
-            if (Game1.player.modData.TryGetValue(useSharedResourcesKey, out var str))
-            {
-                SMonitor.Log($"Found should use shared resources ({str})!");
-                UseSharedResources.Value = str == JsonConvert.True;
-            }
-            else
-            {
-                SMonitor.Log("No mod data found; defaulting shared resources to false.");
-                UseSharedResources.Value = false;
-            }
+            UseSharedResources.Value = PerPlayerConfig.LoadConfigOption(Game1.player, useSharedResourcesKey, defaultValue: false);
         }
 
         /// <summary>
@@ -91,11 +79,11 @@ namespace ResourceStorage
                 return;
             }
 
-            // If the player is the host, read the dictionry from the save data.
-            if (SHelper.Data.ReadSaveData<Dictionary<string, long>>(saveDataKey) is Dictionary<string, long> dictionry)
+            // If the player is the host, read the dictionary from the save data.
+            if (PerSaveConfig.TryLoadConfigOption(SHelper, saveDataKey, out Dictionary<string, long> dictionary))
             {
                 SMonitor.Log("Loaded Dictionary!");
-                sharedResourceDictionary.Value = dictionry;
+                sharedResourceDictionary.Value = dictionary;
             }
             else
             {
@@ -110,7 +98,7 @@ namespace ResourceStorage
                 return;
 
             SMonitor.Log("Saving the shared resource dictionary.");
-            SHelper.Data.WriteSaveData(saveDataKey, sharedResourceDictionary.Value);
+            PerSaveConfig.SaveConfigOption(SHelper, saveDataKey, sharedResourceDictionary.Value);
         }
 
         public static void Multiplayer_ModMessageRecieved(object sender, ModMessageReceivedEventArgs args)
@@ -339,7 +327,7 @@ namespace ResourceStorage
             }
 
             // Try to get the value from the farmer's mod data. If there is no mod data, returns false.
-            return farmer.modData.TryGetValue(useSharedResourcesKey, out var str) && str == JsonConvert.True;
+            return PerPlayerConfig.LoadConfigOption(farmer, useSharedResourcesKey, defaultValue: false);
         }
 
         /// <summary>
@@ -380,7 +368,7 @@ namespace ResourceStorage
 
         /// <summary>
         /// Method for changing the player's ShouldUseShared in the config.
-        /// Chnages it to the given value, moves the player's resources to the shared dictionary if necessary, and saves the new config to the player's mod data.
+        /// Changes it to the given value, moves the player's resources to the shared dictionary if necessary, and saves the new config to the player's mod data.
         /// </summary>
         /// <param name="newValue"></param>
         public static void ChangeShouldUseShared(bool newValue)
@@ -391,7 +379,7 @@ namespace ResourceStorage
                 MoveIndividualResourcesToSharedDictionary();
             }
 
-            Game1.player.modData[useSharedResourcesKey] = newValue ? JsonConvert.True : JsonConvert.False;
+            PerPlayerConfig.SaveConfigOption(Game1.player, useSharedResourcesKey, newValue);
             UseSharedResources.Value = newValue;
         }
 

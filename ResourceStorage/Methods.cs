@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common.Utilities;
+using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 using ResourceStorage.BetterCrafting;
@@ -322,7 +323,7 @@ namespace ResourceStorage
             if (resourceDict.TryGetValue(farmer.UniqueMultiplayerID, out var dict))
             {
                 SMonitor.Log($"Saving resource dictionary for {farmer.Name}");
-                farmer.modData[dictKey] = JsonConvert.SerializeObject(dict);
+                PerPlayerConfig.SaveConfigOption(farmer, dictKey, dict);
             }
         }
     }

@@ -227,6 +227,7 @@ namespace ResourceStorage
                     setValue: value => SharedResourceManager.ChangeShouldUseShared(value)
                 );
 
+                // KEYBINDS
                 configMenu.AddKeybind(
                     mod: ModManifest,
                     name: () => SHelper.Translation.Get("GMCM_Option_ResourcesKey_Name"),
@@ -261,7 +262,6 @@ namespace ResourceStorage
                     setValue: value => Config.ModKey2Amount = value
                 );
 
-
                 configMenu.AddKeybind(
                     mod: ModManifest,
                     name: () => SHelper.Translation.Get("GMCM_Option_ModKey3_Name"),
@@ -275,6 +275,7 @@ namespace ResourceStorage
                     setValue: value => Config.ModKey3Amount = value
                 );
 
+                // ICON POSITIONS
                 configMenu.AddNumberOption(
                     mod: ModManifest,
                     name: () => SHelper.Translation.Get("GMCM_Option_IconOffsetX_Name"),
@@ -289,6 +290,33 @@ namespace ResourceStorage
                     setValue: value => Config.IconOffsetY = value
                 );
 
+                configMenu.AddNumberOption(
+                    mod: ModManifest,
+                    name: () => SHelper.Translation.Get("GMCM_Option_SearchBarOffsetX_Name"),
+                    getValue: () => Config.SearchBarOffsetX,
+                    setValue: value => Config.SearchBarOffsetX = value
+                );
+
+                configMenu.AddNumberOption(
+                    mod: ModManifest,
+                    name: () => SHelper.Translation.Get("GMCM_Option_SearchBarOffsetY_Name"),
+                    getValue: () => Config.SearchBarOffsetY,
+                    setValue: value => Config.SearchBarOffsetY = value
+                );
+
+                configMenu.AddNumberOption(
+                    mod: ModManifest,
+                    name: () => SHelper.Translation.Get("GMCM_Option_SortButtonOffsetX_Name"),
+                    getValue: () => Config.SortButtonOffsetX,
+                    setValue: value => Config.SortButtonOffsetX = value
+                );
+
+                configMenu.AddNumberOption(
+                    mod: ModManifest,
+                    name: () => SHelper.Translation.Get("GMCM_Option_SortButtonOffsetY_Name"),
+                    getValue: () => Config.SortButtonOffsetY,
+                    setValue: value => Config.SortButtonOffsetY = value
+                );
             }
         }
     }

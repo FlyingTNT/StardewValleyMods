@@ -16,6 +16,10 @@ namespace ResourceStorage
 {
     public class ResourceMenu : IClickableMenu
     {
+        private static IModHelper SHelper => ModEntry.SHelper;
+        private static IMonitor SMonitor => ModEntry.SMonitor;
+        private static ModConfig Config => ModEntry.Config;
+
         public static int scrolled;
         public static int linesPerPage = 17;
         public static int windowWidth = 64 * 24;
@@ -110,7 +114,7 @@ namespace ResourceStorage
                     rightNeighborID = baseID + 2,
                 });
                 */
-                autoCCs[i] = new ClickableTextureComponent("Auto", new Rectangle(xStart, yStart + 104, 36, 36), "", ModEntry.SHelper.Translation.Get("auto"), Game1.mouseCursors, new Rectangle(ModEntry.CanAutoStore(resourceList[i]) ? 236 : 227, 425, 9, 9), 4)
+                autoCCs[i] = new ClickableTextureComponent("Auto", new Rectangle(xStart, yStart + 104, 36, 36), "", SHelper.Translation.Get("auto"), Game1.mouseCursors, new Rectangle(ModEntry.CanAutoStore(resourceList[i]) ? 236 : 227, 425, 9, 9), 4)
                 {
                     myID = baseID,
                     downNeighborID = baseID + 1000,
@@ -118,7 +122,7 @@ namespace ResourceStorage
                     rightNeighborID = baseID + 1,
                     leftNeighborID = -2,
                 };
-                takeCCs[i] = new ClickableTextureComponent("Take", new Rectangle(xPositionOnScreen + width - (spaceToClearSideBorder + borderWidth) - 36, yStart + 100, 48, 44), "", ModEntry.SHelper.Translation.Get("take"), Game1.mouseCursors, new Rectangle(365, 495, 12, 11), 4)
+                takeCCs[i] = new ClickableTextureComponent("Take", new Rectangle(xPositionOnScreen + width - (spaceToClearSideBorder + borderWidth) - 36, yStart + 100, 48, 44), "", SHelper.Translation.Get("take"), Game1.mouseCursors, new Rectangle(365, 495, 12, 11), 4)
                 {
                     myID = baseID + 1,
                     downNeighborID = baseID + 1000,
@@ -130,7 +134,7 @@ namespace ResourceStorage
 
             if (scrolled > 0)
             {
-                upCC = new ClickableTextureComponent("Up", new Rectangle(xPositionOnScreen + width + 40, yPositionOnScreen + 84, 40, 44), "", ModEntry.SHelper.Translation.Get("up"), Game1.mouseCursors, new Rectangle(76, 72, 40, 44), 1)
+                upCC = new ClickableTextureComponent("Up", new Rectangle(xPositionOnScreen + width + 40, yPositionOnScreen + 84, 40, 44), "", SHelper.Translation.Get("up"), Game1.mouseCursors, new Rectangle(76, 72, 40, 44), 1)
                 {
                     myID = -1,
                     leftNeighborID = 0,
@@ -142,7 +146,7 @@ namespace ResourceStorage
                 upCC = null;
             if (count + scrolled < resourceList.Count)
             {
-                downCC = new ClickableTextureComponent("Down", new Rectangle(xPositionOnScreen + width + 40, yPositionOnScreen + height - 64, 40, 44), "", ModEntry.SHelper.Translation.Get("down"), Game1.mouseCursors, new Rectangle(12, 76, 40, 44), 1)
+                downCC = new ClickableTextureComponent("Down", new Rectangle(xPositionOnScreen + width + 40, yPositionOnScreen + height - 64, 40, 44), "", SHelper.Translation.Get("down"), Game1.mouseCursors, new Rectangle(12, 76, 40, 44), 1)
                 {
                     myID = -2,
                     leftNeighborID = 0,
@@ -159,7 +163,7 @@ namespace ResourceStorage
                 scrollBar.bounds.Y = Math.Min(scrollBarRunner.Y + (int)Math.Round(interval * scrolled), scrollBarRunner.Bottom - scrollBar.bounds.Height);
 
             }
-            SortButton = new ClickableTextureComponent("Sort", new Rectangle(xPositionOnScreen - 48, yPositionOnScreen + 132, buttonTextureSource.Width * 4, buttonTextureSource.Height * 4), "", "", Game1.mouseCursors, buttonTextureSource, 4)
+            SortButton = new ClickableTextureComponent("Sort", new Rectangle(xPositionOnScreen - 54 + Config.SortButtonOffsetX, yPositionOnScreen + 108 + Config.SortButtonOffsetY, buttonTextureSource.Width * 4, buttonTextureSource.Height * 4), "", "", Game1.mouseCursors, buttonTextureSource, 4)
             {
                 myID = -3,
                 rightNeighborID = 0,
@@ -169,8 +173,8 @@ namespace ResourceStorage
             {
                 Text = "",
             };
-            SearchBar.X = xPositionOnScreen + width / 2 - SearchBar.Width / 2;
-            SearchBar.Y = yPositionOnScreen + height;
+            SearchBar.X = xPositionOnScreen + width / 2 - SearchBar.Width / 2 + Config.SearchBarOffsetX;
+            SearchBar.Y = yPositionOnScreen + height + Config.SearchBarOffsetY;
 
             populateClickableComponentList();
             resourceListDirty.Value = false;
@@ -184,11 +188,10 @@ namespace ResourceStorage
                 RepopulateComponentList();
             }
 
-            if (ModEntry.gameMenu.Value is not null)
-                ModEntry.gameMenu.Value.draw(b);
+            ModEntry.gameMenu.Value?.draw(b);
 
             Game1.drawDialogueBox(xPositionOnScreen, yPositionOnScreen, width, height, false, true, null, false, true);
-            SpriteText.drawStringHorizontallyCenteredAt(b, ModEntry.SHelper.Translation.Get("resources"), Game1.uiViewport.Width / 2, yPositionOnScreen + spaceToClearTopBorder + borderWidth / 2);
+            SpriteText.drawStringHorizontallyCenteredAt(b, SHelper.Translation.Get("resources"), Game1.uiViewport.Width / 2, yPositionOnScreen + spaceToClearTopBorder + borderWidth / 2);
             b.Draw(Game1.menuTexture, new Rectangle(xPositionOnScreen + 32, yPositionOnScreen + borderWidth + spaceToClearTopBorder + 48, width - 64, 16), new Rectangle(40, 16, 1, 16), Color.White);
             int count = 0;
             for (int i = scrolled; i < Math.Min(linesPerPage + scrolled, resourceList.Count); i++)
@@ -224,14 +227,14 @@ namespace ResourceStorage
             {
                 if (autoCCs[i].containsPoint(x, y))
                 {
-                    List<string> list = ModEntry.Config.AutoStore.Split(',').ToList();
+                    List<string> list = Config.AutoStore.Split(',').ToList();
 
                     if (ModEntry.CanAutoStore(resourceList[i]))
                     {
-                        ModEntry.SMonitor.Log($"Removing {resourceList[i].DisplayName} from autostore list");
+                        SMonitor.Log($"Removing {resourceList[i].DisplayName} from autostore list");
                         Game1.playSound("drumkit6");
 
-                        for (int j = list.Count-1; j > 0; j--)
+                        for (int j = list.Count-1; j >= 0; j--)
                         {
                             if (list[j].Trim().ToLower() == resourceList[i].Name.ToLower())
                             {
@@ -242,31 +245,31 @@ namespace ResourceStorage
                     }
                     else
                     {
-                        ModEntry.SMonitor.Log($"Adding {resourceList[i].DisplayName} to autostore list");
+                        SMonitor.Log($"Adding {resourceList[i].DisplayName} to autostore list");
                         Game1.playSound("drumkit6");
 
                         list.Add(resourceList[i].Name);
                     }
-                    ModEntry.Config.AutoStore = string.Join(",", list);
-                    ModEntry.SMonitor.Log($"New autostore list: {ModEntry.Config.AutoStore}");
-                    ModEntry.SHelper.WriteConfig(ModEntry.Config);
+                    Config.AutoStore = string.Join(",", list);
+                    SMonitor.Log($"New autostore list: {Config.AutoStore}");
+                    SHelper.WriteConfig(ModEntry.Config);
                     RepopulateComponentList();
                     return;
                 }
                 if (takeCCs[i].containsPoint(x, y))
                 {
                     int stack = 1;
-                    if (ModEntry.SHelper.Input.IsDown(ModEntry.Config.ModKey1))
+                    if (SHelper.Input.IsDown(Config.ModKey1))
                     {
-                        stack = Math.Min(Math.Min(resourceList[i].Stack, resourceList[i].maximumStackSize()), ModEntry.Config.ModKey1Amount);
+                        stack = Math.Min(Math.Min(resourceList[i].Stack, resourceList[i].maximumStackSize()), Config.ModKey1Amount);
                     }
-                    else if (ModEntry.SHelper.Input.IsDown(ModEntry.Config.ModKey2))
+                    else if (SHelper.Input.IsDown(Config.ModKey2))
                     {
-                        stack = Math.Min(Math.Min(resourceList[i].Stack, resourceList[i].maximumStackSize()), ModEntry.Config.ModKey2Amount);
+                        stack = Math.Min(Math.Min(resourceList[i].Stack, resourceList[i].maximumStackSize()), Config.ModKey2Amount);
                     }
-                    else if (ModEntry.SHelper.Input.IsDown(ModEntry.Config.ModKey3))
+                    else if (SHelper.Input.IsDown(Config.ModKey3))
                     {
-                        stack = Math.Min(Math.Min(resourceList[i].Stack, resourceList[i].maximumStackSize()), ModEntry.Config.ModKey3Amount);
+                        stack = Math.Min(Math.Min(resourceList[i].Stack, resourceList[i].maximumStackSize()), Config.ModKey3Amount);
                     }
 
                     Object obj = ItemRegistry.Create<Object>(resourceList[i].QualifiedItemId, stack);
@@ -359,7 +362,7 @@ namespace ResourceStorage
                 SearchBar.Selected = false;
             }
 
-            if((Game1.options.doesInputListContain(Game1.options.menuButton, key) || SButtonExtensions.ToSButton(key) == ModEntry.Config.ResourcesKey) && readyToClose())
+            if((Game1.options.doesInputListContain(Game1.options.menuButton, key) || SButtonExtensions.ToSButton(key) == Config.ResourcesKey) && readyToClose())
             {
                 exitThisMenu();
                 Game1.activeClickableMenu = ModEntry.gameMenu.Value;
@@ -375,7 +378,7 @@ namespace ResourceStorage
 
         public override void receiveGamePadButton(Buttons button)
         {
-            if (SButtonExtensions.ToSButton(button) == ModEntry.Config.ResourcesKey && readyToClose())
+            if (SButtonExtensions.ToSButton(button) == Config.ResourcesKey && readyToClose())
             {
                 exitThisMenu();
                 Game1.activeClickableMenu = ModEntry.gameMenu.Value;
@@ -587,14 +590,14 @@ namespace ResourceStorage
                         return -a.Stack.CompareTo(b.Stack);
                     };
                 default:
-                    ModEntry.SMonitor.Log($"Unknown sort number: {sortType}");
+                    SMonitor.Log($"Unknown sort number: {sortType}");
                     return GetSortComparison(AlphaUpSort);
             }
         }
 
         private static string GetSortText()
         {
-            return ModEntry.SHelper.Translation.Get($"sort-{CurrentSort}");
+            return SHelper.Translation.Get($"sort-{CurrentSort}");
         }
     }
 }

@@ -1,0 +1,12 @@
+{
+  // GMCM
+  "GMCM_Option_ModEnabled_Name": "Habilitar mod",
+  "GMCM_Option_OrdinaryGiftsPerDay_Name": "Estranho(a) / Dia",
+  "GMCM_Option_OrdinaryGiftsPerWeek_Name": "Estranho(a) / Semana",
+  "GMCM_Option_FriendGiftsPerDay_Name": "Amigo(a) / Dia",
+  "GMCM_Option_FriendGiftsPerWeek_Name": "Amigo(a) / Semana",
+  "GMCM_Option_DatingGiftsPerDay_Name": "Namorado(a) / Dia",
+  "GMCM_Option_DatingGiftsPerWeek_Name": "Namorado(a) / Semana",
+  "GMCM_Option_SpouseGiftsPerDay_Name": "Cônjuge / Dia",
+  "GMCM_Option_SpouseGiftsPerWeek_Name": "Cônjuge / Semana"
+}

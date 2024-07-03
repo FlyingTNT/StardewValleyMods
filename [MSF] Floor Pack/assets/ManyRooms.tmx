@@ -2,6 +2,7 @@
 <map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" compressionlevel="0" width="43" height="36" tilewidth="16" tileheight="16" infinite="0" nextlayerid="7" nextobjectid="16">
  <properties>
   <property name="DayTiles_asdf" value="Buildings 3 1 15 Buildings 3 2 27 Back 3 4 51 Back 3 5 63"/>
+  <property name="IsFarm" type="bool" value="true"/>
   <property name="NightTiles_asdf" value="Buildings 3 1 144 Buildings 3 2 156 Back 3 4 53 Back 3 5 65"/>
   <property name="ViewportFollowPlayer" type="bool" value="true"/>
   <property name="asdf" type="bool" value="false"/>

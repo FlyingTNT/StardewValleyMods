@@ -192,6 +192,10 @@ namespace Swim
             {
                 e.LoadFrom(() => {return Game1.content.Load<Texture2D>("Portraits\\Gil");}, AssetLoadPriority.Low);
             }
+            else if (e.NameWithoutLocale.IsEquivalentTo("Mods/FlyingTNT.Swim/i18n"))
+            {
+                e.LoadFrom(() => SwimUtils.Geti18nDict(), AssetLoadPriority.Medium);
+            }
             else
             {
                 AnimationManager.EditAssets(sender, e);

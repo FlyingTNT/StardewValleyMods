@@ -409,7 +409,7 @@ namespace Swim
 
                             if (ModEntry.marinerQuestionsWrongToday.Value)
                             {
-                                string preface = SHelper.Translation.Get("SwimMod_Mariner_Wrong_Today");
+                                SwimDialog.TryGetTranslation("SwimMod_Mariner_Wrong_Today", out string preface);
                                 Game1.drawObjectDialogue(string.Format(preface, playerTerm));
                             }
                             else
@@ -419,7 +419,8 @@ namespace Swim
                                 new Response("SwimMod_Mariner_Questions_Yes", Game1.content.LoadString("Strings\\Lexicon:QuestionDialogue_Yes")),
                                 new Response("SwimMod_Mariner_Questions_No", Game1.content.LoadString("Strings\\Lexicon:QuestionDialogue_No"))
                                 };
-                                __instance.createQuestionDialogue(Game1.parseText(String.Format(SHelper.Translation.Get(Game1.player.mailReceived.Contains("SwimMod_Mariner_Already") ? "SwimMod_Mariner_Questions_Old" : "SwimMod_Mariner_Questions").ToString(), playerTerm)), answers, "SwimMod_Mariner_Questions");
+                                SwimDialog.TryGetTranslation(Game1.player.mailReceived.Contains("SwimMod_Mariner_Already") ? "SwimMod_Mariner_Questions_Old" : "SwimMod_Mariner_Questions", out string preface);
+                                __instance.createQuestionDialogue(Game1.parseText(string.Format(preface, playerTerm)), answers, "SwimMod_Mariner_Questions");
                             }
                         }
                     }

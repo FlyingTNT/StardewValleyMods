@@ -603,5 +603,19 @@ namespace Swim
                 }
             }
         }
+
+        public static Dictionary<string, string> Geti18nDict()
+        {
+            IEnumerable<Translation> translations = SHelper.Translation.GetTranslations();
+
+            Dictionary<string, string> i18nDict = new Dictionary<string, string>();
+
+            foreach(Translation translation in translations)
+            {
+                i18nDict.Add(translation.Key, translation);
+            }
+
+            return i18nDict;
+        }
     }
 }

@@ -1,10 +1,10 @@
 {
     "Name": "Swim Items",
     "Author": "aedenthorn",
-    "Version": "1.0.0",
+    "Version": "1.0.1",
     "Description": "Adds swim mod's scuba gear.",
     "UniqueID": "FlyingTNT.SwimItems",
-    "UpdateKeys": [],
+    "UpdateKeys": [ "Nexus:23169@Swim Items" ],
     "ContentPackFor": {
         "UniqueID": "Pathoschild.ContentPatcher"
     }

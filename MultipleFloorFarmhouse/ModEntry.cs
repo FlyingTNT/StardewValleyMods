@@ -55,6 +55,7 @@ namespace MultiStoryFarmhouse
 
             Helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
             Helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
+            Helper.Events.GameLoop.OneSecondUpdateTicked += GameLoop_OneSecondUpdateTicked;
             Helper.Events.Content.AssetRequested += Content_AssetRequested;
 
             var harmony = new Harmony(ModManifest.UniqueID);
@@ -182,6 +183,51 @@ namespace MultiStoryFarmhouse
                 mod: ModManifest,
                 text: () => SHelper.Translation.Get("GMCM_ActiveFloors", new {activeFloors = GetPossibleFloors().Join()})
             );
+        }
+
+        /// <summary>
+        /// Tries to re-add the warps to the farmhouse because they get removed for some players???
+        /// </summary>
+        private void GameLoop_OneSecondUpdateTicked(object sender, OneSecondUpdateTickedEventArgs args)
+        {
+            if (!Context.IsWorldReady || !floorsDict.Any() || Game1.player is null)
+                return;
+
+            FarmHouse playerHome;
+
+            try
+            {
+                playerHome = Utility.getHomeOfFarmer(Game1.player);
+            }
+            catch
+            {
+                // If the farmhouse isn't loaded yet or something
+                return;
+            }
+
+            if (playerHome is null)
+                return;
+
+            var warps = playerHome.warps;
+            if (warps.Where(w => w.TargetName == "MultipleFloors0").Any())
+            {
+                return;
+            }
+
+            SMonitor.Log("Doesn't have warp");
+
+            if (!TryGetFloor(0, out Floor floor0))
+                return;
+
+            Vector2 stairs = floor0.stairsStart;
+            int x = (int)stairs.X;
+            int y = (int)stairs.Y;
+
+            Warp warp = new Warp(Config.MainFloorStairsX + 1, Config.MainFloorStairsY + 3, "MultipleFloors0", x + 1, y + 2, true, false);
+            warps.Add(warp);
+
+            Warp warp2 = new Warp(Config.MainFloorStairsX + 2, Config.MainFloorStairsY + 3, "MultipleFloors0", x + 2, y + 2, true, false);
+            warps.Add(warp2);
         }
 
         private void GameLoop_ReturnedToTitle(object sender, ReturnedToTitleEventArgs args)

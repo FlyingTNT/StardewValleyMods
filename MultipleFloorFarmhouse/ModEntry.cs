@@ -25,7 +25,7 @@ namespace MultiStoryFarmhouse
         public const string StairsDownName = "Maps/MultipleFloorFarmhouseStairsDown";
 
         public static IMonitor SMonitor;
-        private static IModHelper SHelper;
+        public static IModHelper SHelper;
 
         /// <summary> A dictionary of all of the Floors in all of the installed content packs, even if they aren't in use.</summary>
         private static readonly Dictionary<string, Floor> floorsDict = new();
@@ -83,6 +83,11 @@ namespace MultiStoryFarmhouse
             harmony.Patch(
                original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.CanPlaceThisFurnitureHere)),
                prefix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.GameLocation_CanPlaceThisFurnitureHere_Prefix))
+            );
+
+            harmony.Patch(
+               original: AccessTools.Method(typeof(GameLocation), "_updateAmbientLighting"),
+               prefix: new HarmonyMethod(typeof(CodePatches), nameof(CodePatches.GameLocation__updateAmbientLighting_Prefix))
             );
         }
 

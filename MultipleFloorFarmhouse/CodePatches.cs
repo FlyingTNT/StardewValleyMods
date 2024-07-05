@@ -1,4 +1,5 @@
 ﻿using Microsoft.Xna.Framework;
+using Netcode;
 using StardewValley;
 using StardewValley.Locations;
 using StardewValley.Objects;
@@ -97,6 +98,56 @@ namespace MultiStoryFarmhouse
 
             __result = true;
             return false;
+        }
+
+        /// <summary>
+        /// Makes the ambient lighting in the extra floors the same as the FarmHouse. This method is just copied from the FarmHouse class.
+        /// </summary>
+        public static bool GameLocation__updateAmbientLighting_Prefix(GameLocation __instance)
+        {
+            try
+            {
+                if (!__instance.Name.StartsWith("MultipleFloors"))
+                {
+                    return true;
+                }
+
+                float lightLevel = ModEntry.SHelper.Reflection.GetField<NetFloat>(__instance, "lightLevel").GetValue().Value;
+
+                Color rainLightingColor;
+                Color nightLightingColor;
+
+                if (Utility.getHomeOfFarmer(Game1.player) is FarmHouse farmHouse)
+                {
+                    rainLightingColor = ModEntry.SHelper.Reflection.GetField<Color>(farmHouse, "rainLightingColor").GetValue();
+                    nightLightingColor = ModEntry.SHelper.Reflection.GetField<Color>(farmHouse, "nightLightingColor").GetValue();
+                }
+                else
+                {
+                    // This is just how they're defined in the FarmHouse class. We only try to get them with reflection in case a mod changes them or something.
+                    nightLightingColor = new Color(180, 180, 0);
+                    rainLightingColor = new Color(90, 90, 0);
+                }
+
+                if (Game1.isStartingToGetDarkOut(__instance) || lightLevel > 0f)
+                {
+                    int time = Game1.timeOfDay + Game1.gameTimeInterval / (Game1.realMilliSecondsPerGameMinute + __instance.ExtraMillisecondsPerInGameMinute);
+                    float lerp = 1f - Utility.Clamp((float)Utility.CalculateMinutesBetweenTimes(time, Game1.getTrulyDarkTime(__instance)) / 120f, 0f, 1f);
+                    Game1.ambientLight = new Color((byte)Utility.Lerp(Game1.isRaining ? rainLightingColor.R : 0, nightLightingColor.R, lerp), (byte)Utility.Lerp(Game1.isRaining ? rainLightingColor.G : 0, nightLightingColor.G, lerp), (byte)Utility.Lerp(0f, nightLightingColor.B, lerp));
+                }
+                else
+                {
+                    Game1.ambientLight = (Game1.isRaining ? rainLightingColor : Color.White);
+                }
+
+                // Prevent the base method from running
+                return false;
+            }
+            catch (Exception ex)
+            {
+                ModEntry.SMonitor.Log($"Failed in {nameof(GameLocation__updateAmbientLighting_Prefix)} {ex}", StardewModdingAPI.LogLevel.Error);
+                return true;
+            }
         }
     }
 }

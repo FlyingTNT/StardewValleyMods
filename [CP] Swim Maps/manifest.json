@@ -4,7 +4,7 @@
     "Version": "1.0.1",
     "Description": "Adds underwater maps.",
     "UniqueID": "FlyingTNT.SwimDiveMaps",
-    "UpdateKeys": [ "Nexus:23169@Dive Maps" ],
+    "UpdateKeys": [ "Nexus:23169@DiveMaps" ],
     "MinimumApiVersion": "4.0.0",
     "ContentPackFor": {
        "UniqueID": "Pathoschild.ContentPatcher"

@@ -4,7 +4,7 @@
     "Version": "1.0.1",
     "Description": "Adds swim mod's scuba gear.",
     "UniqueID": "FlyingTNT.SwimItems",
-    "UpdateKeys": [ "Nexus:23169@Swim Items" ],
+    "UpdateKeys": [ "Nexus:23169@SwimItems" ],
     "ContentPackFor": {
         "UniqueID": "Pathoschild.ContentPatcher"
     }

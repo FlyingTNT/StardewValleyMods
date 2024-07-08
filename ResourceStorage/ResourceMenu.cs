@@ -120,13 +120,13 @@ namespace ResourceStorage
                     downNeighborID = baseID + 1000,
                     upNeighborID = baseID - 1000,
                     rightNeighborID = baseID + 1,
-                    leftNeighborID = -2,
+                    leftNeighborID = -3,
                 };
                 takeCCs[i] = new ClickableTextureComponent("Take", new Rectangle(xPositionOnScreen + width - (spaceToClearSideBorder + borderWidth) - 36, yStart + 100, 48, 44), "", SHelper.Translation.Get("take"), Game1.mouseCursors, new Rectangle(365, 495, 12, 11), 4)
                 {
                     myID = baseID + 1,
-                    downNeighborID = baseID + 1000,
-                    upNeighborID = baseID - 1000,
+                    downNeighborID = baseID + 1000 + 1,
+                    upNeighborID = baseID - 1000 + 1,
                     leftNeighborID = baseID,
                 };
                 count++;
@@ -227,18 +227,16 @@ namespace ResourceStorage
             {
                 if (autoCCs[i].containsPoint(x, y))
                 {
-                    List<string> list = Config.AutoStore.Split(',').ToList();
-
                     if (ModEntry.CanAutoStore(resourceList[i]))
                     {
                         SMonitor.Log($"Removing {resourceList[i].DisplayName} from autostore list");
                         Game1.playSound("drumkit6");
 
-                        for (int j = list.Count-1; j >= 0; j--)
+                        for (int j = ModEntry.AutoStore.Count-1; j >= 0; j--)
                         {
-                            if (list[j].Trim().ToLower() == resourceList[i].Name.ToLower())
+                            if (ModEntry.AutoStore[j].Trim().ToLower() == resourceList[i].Name.ToLower())
                             {
-                                list.RemoveAt(j);
+                                ModEntry.AutoStore.RemoveAt(j);
                                 break;
                             }
                         }
@@ -248,11 +246,17 @@ namespace ResourceStorage
                         SMonitor.Log($"Adding {resourceList[i].DisplayName} to autostore list");
                         Game1.playSound("drumkit6");
 
-                        list.Add(resourceList[i].Name);
+                        ModEntry.AutoStore.Add(resourceList[i].Name);
                     }
-                    Config.AutoStore = string.Join(",", list);
-                    SMonitor.Log($"New autostore list: {Config.AutoStore}");
-                    SHelper.WriteConfig(ModEntry.Config);
+
+                    string newConfig = string.Join(',', ModEntry.AutoStore);
+                    SMonitor.Log($"New autostore list: {newConfig}");
+                    PerPlayerConfig.SaveConfigOption(Game1.player, ModEntry.autoStoreKey, newConfig);
+                    if(Context.IsMainPlayer)
+                    {
+                        Config.AutoStore = newConfig;
+                        SHelper.WriteConfig(Config);
+                    }
                     RepopulateComponentList();
                     return;
                 }

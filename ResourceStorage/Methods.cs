@@ -78,7 +78,7 @@ namespace ResourceStorage
 
             if(allowShared && SharedResourceManager.ShouldUseSharedResources(instance))
             {
-                SMonitor.Log("Using the shared dictionary!");
+                //SMonitor.Log("Using the shared dictionary!");
                 return SharedResourceManager.GetDictionary();
             }
 
@@ -183,7 +183,7 @@ namespace ResourceStorage
             ParsedItemData data = ItemRegistry.GetDataOrErrorItem(id);
             string name = data.InternalName.ToLower();
                 
-            foreach (var str in Config.AutoStore.Split(','))
+            foreach (string str in AutoStore)
             {
                 if(str.Trim().ToLower() == name && data.Category != Object.litterCategory)
                 {

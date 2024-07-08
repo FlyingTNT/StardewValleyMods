@@ -11,7 +11,8 @@ using StardewValley.Menus;
 using System;
 using System.Collections.Generic;
 using Common.Integrations;
-using Object = StardewValley.Object;
+using Common.Utilities;
+using System.Linq;
 
 namespace ResourceStorage
 {
@@ -27,10 +28,13 @@ namespace ResourceStorage
         public static Dictionary<long, Dictionary<string, long>> resourceDict = new();
 
         public const string sharedDictionaryKey = "FlyingTNT.ResourceStorage/sharedDictionary";
+        public const string autoStoreKey = "FlyingTNT.ResourceStorage/autoStore";
 
         public static PerScreen<GameMenu> gameMenu = new PerScreen<GameMenu>();
         public static PerScreen<ClickableTextureComponent> resourceButton = new PerScreen<ClickableTextureComponent>();
-        private Harmony harmony;
+
+        private static readonly PerScreen<List<string>> cachedAutoStore = new PerScreen<List<string>>(() => new());
+        public static List<string> AutoStore => cachedAutoStore.Value;
 
 
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
@@ -51,7 +55,7 @@ namespace ResourceStorage
 
             SharedResourceManager.Initialize(Monitor, helper, Config, ModManifest);
 
-            harmony = new Harmony(ModManifest.UniqueID);
+            Harmony harmony = new Harmony(ModManifest.UniqueID);
 
             #region INVENTORY_PATCHES
             harmony.Patch(
@@ -170,12 +174,16 @@ namespace ResourceStorage
         public void GameLoop_Saving(object sender, SavingEventArgs e)
         {
             SaveResourceDictionary(Game1.player);
+
+            // We always save it after we edit AutoStore, so it shouldn't be necessary to save it here, but I'm doing it just to be safe.
+            PerPlayerConfig.SaveConfigOption(Game1.player, autoStoreKey, string.Join(',', AutoStore));
         }
 
         public void GameLoop_SaveLoaded(object sender, SaveLoadedEventArgs e)
         {
             SMonitor.Log("Removing this player's dictionary.");
             resourceDict.Remove(Game1.player.UniqueMultiplayerID);
+            cachedAutoStore.Value = PerPlayerConfig.LoadConfigOption(Game1.player, autoStoreKey, defaultValue: Config.AutoStore).Split(',').ToList();
         }
 
         public void GameLoop_ReturnedToTitle(object sender, ReturnedToTitleEventArgs e)

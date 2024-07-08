@@ -45,15 +45,17 @@ namespace MultiStoryFarmhouse
         public override void Entry(IModHelper helper)
         {
             Config = Helper.ReadConfig<ModConfig>();
+            SMonitor = Monitor;
+            SHelper = helper;
+
+            // This happens before the EnableMod check so that the config options are always added to GMCM
+            Helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
 
             if (!Config.EnableMod)
                 return;
 
-            SMonitor = Monitor;
-            SHelper = helper;
             CachedConfigFloors = Config.FloorNames.Split(',', StringSplitOptions.TrimEntries);
 
-            Helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
             Helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
             Helper.Events.GameLoop.OneSecondUpdateTicked += GameLoop_OneSecondUpdateTicked;
             Helper.Events.Content.AssetRequested += Content_AssetRequested;
@@ -94,11 +96,17 @@ namespace MultiStoryFarmhouse
 
         public static List<string> GetPossibleFloors()
         {
-            return CachedConfigFloors.Where(s => floorsDict.ContainsKey(s)).ToList();
+            return CachedConfigFloors?.Where(s => floorsDict.ContainsKey(s)).ToList() ?? new();
         }
 
         private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
+            // Setup GMCM no matter what so that the mod can be re-enabled if it is disabled
+            SetupGMCM();
+
+            if (!Config.EnableMod)
+                return;
+
             foreach (IContentPack contentPack in SHelper.ContentPacks.GetOwned())
             { 
                 FloorsData floorsData = contentPack.ReadJsonFile<FloorsData>("content.json");
@@ -127,9 +135,11 @@ namespace MultiStoryFarmhouse
             }
             SMonitor.Log($"Loaded {floorsDict.Count} floors.");
             SMonitor.Log($"The installed floors are: {floorsDict.Join(kvp => kvp.Key)}", LogLevel.Debug);
-            SMonitor.Log($"The active floors are: {GetPossibleFloors().Join()}", LogLevel.Debug);
+            SMonitor.Log($"The active floors are: {GetPossibleFloors()?.Join()}", LogLevel.Debug);
+        }
 
-
+        private void SetupGMCM()
+        {
             var configMenu = SHelper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
             if (configMenu is null)
                 return;
@@ -174,14 +184,14 @@ namespace MultiStoryFarmhouse
             configMenu.AddTextOption(
                 mod: ModManifest,
                 name: () => SHelper.Translation.Get("GMCM_FloorNames"),
-                tooltip: () => SHelper.Translation.Get("GMCM_FloorNames_Description", new {allOptions = floorsDict.Join(kvp => kvp.Key)}),
+                tooltip: () => SHelper.Translation.Get("GMCM_FloorNames_Description", new { allOptions = floorsDict.Join(kvp => kvp.Key) }),
                 getValue: () => Config.FloorNames,
                 setValue: value => Config.FloorNames = value
             );
 
             configMenu.AddParagraph(
                 mod: ModManifest,
-                text: () => SHelper.Translation.Get("GMCM_ActiveFloors", new {activeFloors = GetPossibleFloors().Join()})
+                text: () => SHelper.Translation.Get("GMCM_ActiveFloors", new { activeFloors = GetPossibleFloors().Join() })
             );
         }
 

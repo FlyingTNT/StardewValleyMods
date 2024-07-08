@@ -1239,7 +1239,7 @@ public interface IBetterCraftingMenu
 /// Better Crafting menu is opened, and serves to allow other mods to add
 /// or remove specific containers from a menu.
 /// </summary>
-public interface IPopulateContainersEvent
+public interface IPopulateContainersEvent : ISimplePopulateContainersEvent
 {
 
     /// <summary>
@@ -1247,6 +1247,14 @@ public interface IPopulateContainersEvent
     /// </summary>
     IBetterCraftingMenu Menu { get; }
 
+}
+
+/// <summary>
+/// A simplified interface for the PopulateContainers event that allows
+/// you to remove the IBetterCraftingMenu interface.
+/// </summary>
+public interface ISimplePopulateContainersEvent
+{
     /// <summary>
     /// A list of all the containers this menu should draw items from.
     /// </summary>
@@ -1257,7 +1265,6 @@ public interface IPopulateContainersEvent
     /// own container discovery logic, if you so desire.
     /// </summary>
     bool DisableDiscovery { get; set; }
-
 }
 
 /// <summary>
@@ -1293,79 +1300,30 @@ public enum SeasoningMode
     InventoryOnly
 }
 
-public interface IBetterCraftingConfig
-{
-
-    bool ShowSourceModInTooltip { get; }
-
-    bool UseFullHeight { get; }
-
-    bool ReplaceCooking { get; }
-
-    bool ReplaceCrafting { get; }
-
-    bool UseCategories { get; }
-
-    bool LowQualityFirst { get; }
-
-    MaxQuality MaxQuality { get; }
-
-    bool UseUniformGrid { get; }
-
-    bool SortBigLast { get; }
-
-    bool HideUnknown { get; }
-
-    SeasoningMode UseSeasoning { get; }
-
-    bool UseDiscovery { get; }
-
-    int MaxInventories { get; }
-
-    int MaxDistance { get; }
-
-    int MaxCheckedTiles { get; }
-
-    int MaxWorkbenchGap { get; }
-
-    int NearbyRadius { get; }
-
-    bool UseDiagonalConnections { get; }
-
-    bool EnableCookoutWorkbench { get; }
-
-    bool EnableCookoutLongevity { get; }
-
-    bool EnableCookoutExpensive { get; }
-
-    bool UseTransfer { get; }
-
-}
-
-
 public interface IBetterCrafting
 {
-    #region GUI
-    /// <summary>
-    /// Return the Better Crafting menu's type. In case you want to do
-    /// spooky stuff to it, I guess.
-    /// </summary>
-    /// <returns>The BetterCraftingMenu type.</returns>
-    Type GetMenuType();
-
-    /// <summary>
-    /// Get the currently open Better Crafting menu. This may be <c>null</c> if
-    /// the menu is still opening.
-    /// </summary>
-    IBetterCraftingMenu? GetActiveMenu();
-    #endregion
 
     #region Events
+
     /// <summary>
     /// This event is fired whenever a new Better Crafting menu is opened,
     /// allowing other mods to manipulate the list of containers.
     /// </summary>
     event Action<IPopulateContainersEvent>? MenuPopulateContainers;
+
+    /// <summary>
+    /// This event is fired whenever a new Better Crafting menu is opened,
+    /// allowing other mods to manipulate the list of containers. This
+    /// version of the event doesn't include a reference to the menu, which
+    /// makes it possible to reduce the amount of the API file you're
+    /// using by quite a bit.
+    /// </summary>
+    event Action<ISimplePopulateContainersEvent>? MenuSimplePopulateContainers;
+
+    /// <summary>
+    /// This event is fired whenever a Better Crafting menu is closed.
+    /// </summary>
+    event Action<IClickableMenu>? MenuClosing;
 
     /// <summary>
     /// This event is fired whenever a player crafts an item using
@@ -1400,6 +1358,14 @@ public interface IBetterCrafting
     /// </summary>
     /// <param name="type"></param>
     void UnregisterInventoryProvider(Type type);
+
+    /// <summary>
+    /// Get an inventory provider for the provided thing. If there are no
+    /// inventory providers capable of handling the thing, returns
+    /// <c>null</c> instead.
+    /// </summary>
+    /// <param name="thing">The instance to get an inventory provider for.</param>
+    IInventoryProvider? GetProvider(object thing);
 
     #endregion
 

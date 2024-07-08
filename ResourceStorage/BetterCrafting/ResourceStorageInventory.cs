@@ -342,8 +342,7 @@ namespace ResourceStorage.BetterCrafting
         /// <summary>
         /// Takes all changes to the items in this inventory and sends them on to the resource storage.
         /// </summary>
-        /// <param name="afterRecipe"></param>
-        public void SquareWithFarmerResources(IRecipe afterRecipe = null)
+        public void SquareWithFarmerResources()
         {
             try
             {

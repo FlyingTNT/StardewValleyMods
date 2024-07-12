@@ -30,8 +30,7 @@ namespace MultiStoryFarmhouse
         /// <summary> A dictionary of all of the Floors in all of the installed content packs, even if they aren't in use.</summary>
         private static readonly Dictionary<string, Floor> floorsDict = new();
 
-        /// <summary> A floorNumber => Map dictionary of the floors currently in use. </summary>
-        private static readonly Dictionary<int, Map> floorMaps = new();
+        private static readonly Dictionary<string, IContentPack> floorContentPacks = new();
 
         /// <summary> The floors enabled in the config when the game was initially loaded. </summary>
         private static string[] CachedConfigFloors;
@@ -59,6 +58,7 @@ namespace MultiStoryFarmhouse
             Helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
             Helper.Events.GameLoop.OneSecondUpdateTicked += GameLoop_OneSecondUpdateTicked;
             Helper.Events.Content.AssetRequested += Content_AssetRequested;
+            Helper.Events.Content.AssetsInvalidated += Content_AssetsInvalidated;
 
             var harmony = new Harmony(ModManifest.UniqueID);
 
@@ -117,12 +117,13 @@ namespace MultiStoryFarmhouse
                 {
                     try
                     {
+                        floorContentPacks[floor.name] = contentPack;
+
                         for(int i = 0; i < CachedConfigFloors.Length; i++)
                         {
                             if (floor.name.ToLower() == CachedConfigFloors[i].ToLower())
                             {
                                 SMonitor.Log($"Setting floor {i} map to {floor.name}.");
-                                floorMaps[i] = contentPack.ModContent.Load<Map>(floor.mapPath);
                             }
                         }
                         floorsDict.Add(floor.name, floor);
@@ -257,14 +258,19 @@ namespace MultiStoryFarmhouse
             {
                 int floorNo = int.Parse(args.NameWithoutLocale.ToString()[^1].ToString());
 
+                if(!TryGetFloor(floorNo, out Floor floor))
+                {
+                    SMonitor.Log($"Could not load map {args.NameWithoutLocale}: Failed to get floor {floorNo}", LogLevel.Error);
+                    return;
+                }
+
                 SMonitor.Log($"Loading floor {floorNo} map");
-                Map map = floorMaps[floorNo];
+                Map map = SHelper.GameContent.Load<Map>("Maps/MultipleFloorFarmhouseFloors/" + floor.name);
 
                 AddStairs(map, floorNo);
                 AddWarps(map, floorNo);
                 args.LoadFrom(() => map, AssetLoadPriority.Medium);
             }
-
             else if (args.NameWithoutLocale.IsEquivalentTo("Maps/FarmHouse2") || args.NameWithoutLocale.IsEquivalentTo("Maps/FarmHouse2_marriage"))
             {
                 SMonitor.Log("Editing asset" + args.Name);
@@ -330,6 +336,53 @@ namespace MultiStoryFarmhouse
             else if (args.NameWithoutLocale.IsEquivalentTo(StairsUpInlineName))
             {
                 args.LoadFrom(() => SHelper.ModContent.Load<Map>("assets/Maps/StairsUpInline.tmx"), AssetLoadPriority.Medium);
+            }
+            else if(args.NameWithoutLocale.StartsWith("Maps/MultipleFloorFarmhouseFloors/"))
+            {
+                string[] split = args.NameWithoutLocale.ToString().Split('/');
+                if(split.Length < 2)
+                {
+                    split = args.NameWithoutLocale.ToString().Split('\\');
+                }
+
+                if(split.Length < 3)
+                {
+                    SMonitor.Log($"Error getting map for {args.NameWithoutLocale}: invalid format!", LogLevel.Error);
+                    return;
+                }
+
+                string floorName = split[2];
+                if(!floorsDict.TryGetValue(floorName, out Floor floor))
+                {
+                    SMonitor.Log($"Error getting map for {args.NameWithoutLocale}: couldn't find content pack!", LogLevel.Error);
+                    return;
+                }
+
+                if (!floorContentPacks.TryGetValue(floorName, out IContentPack contentPack))
+                {
+                    SMonitor.Log($"Error getting map for {args.NameWithoutLocale}: couldn't find content pack!", LogLevel.Error);
+                    return;
+                }
+
+                try
+                {
+                    args.LoadFrom(() => contentPack.ModContent.Load<Map>(floor.mapPath), AssetLoadPriority.Medium);
+                }
+                catch (Exception ex) 
+                {
+                    SMonitor.Log($"Loading getting map for {args.NameWithoutLocale}: {ex}", LogLevel.Error);
+                }
+            }
+        }
+
+        private void Content_AssetsInvalidated(object sender, AssetsInvalidatedEventArgs args)
+        {
+            foreach(var asset in args.Names)
+            {
+                if(asset.BaseName.StartsWith("Maps/MultipleFloorsMap") && TryGetFloor(asset.BaseName, out Floor invalidated))
+                {
+                    SHelper.GameContent.InvalidateCache("Maps/MultipleFloorFarmhouseFloors/" + invalidated.name);
+                }
             }
         }
 

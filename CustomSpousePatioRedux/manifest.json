@@ -1,7 +1,7 @@
 ﻿{
   "Name": "Custom Spouse Patio Redux",
-  "Author": "aedenthorn",
-  "Version": "0.3.6",
+  "Author": "aedenthorn, 'FlyingTNT",
+  "Version": "0.3.6-unofficial.2-FlyingTNT",
   "Description": "Lets you create custom spouse patios.",
   "UniqueID": "aedenthorn.CustomSpousePatioRedux",
   "EntryDll": "CustomSpousePatioRedux.dll",

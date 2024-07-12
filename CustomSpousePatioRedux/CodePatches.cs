@@ -14,23 +14,24 @@ namespace CustomSpousePatioRedux
 {
     public partial class ModEntry
     {
-
-
         public static bool Farm_CacheOffBasePatioArea_Prefix(Farm __instance)
         {
             if (!Config.EnableMod)
                 return true;
 
             try {
-                baseSpouseAreaTiles = new Dictionary<string, Dictionary<string, Dictionary<Point, Tile>>>();
+                baseSpouseAreaTiles.Clear();
                 CacheOffBasePatioArea("default", __instance, __instance.GetSpouseOutdoorAreaCorner());
 
-                if (outdoorAreas == null || outdoorAreas.dict.Count == 0)
+                if (OutdoorAreas.Count == 0)
                     return false;
 
-                foreach(var data in outdoorAreas.dict)
+                foreach(var data in OutdoorAreas)
                 {
-                    CacheOffBasePatioArea(data.Key);
+                    if(!TryCacheOffBasePatioArea(data.Key))
+                    {
+                        SMonitor.Log($"Failed to cache patio for {data.Key} in {data.Value.location}");
+                    }
                 }
 
                 return false;
@@ -45,7 +46,7 @@ namespace CustomSpousePatioRedux
 
         public static bool Farm_ReapplyBasePatioArea_Prefix()
         {
-            if (!Config.EnableMod || outdoorAreas == null || outdoorAreas.dict.Count == 0)
+            if (!Config.EnableMod || OutdoorAreas.Count == 0)
                 return true;
             if (addingExtraAreas)
                 return false;
@@ -72,8 +73,8 @@ namespace CustomSpousePatioRedux
                 else if (i < codes.Count - 15 && codes[i].opcode == OpCodes.Call && codes[i].operand is MethodInfo && (MethodInfo)codes[i].operand == AccessTools.Method(typeof(GameLocation), nameof(GameLocation.ApplyMapOverride), new System.Type[] {typeof(string), typeof(string), typeof(Rectangle?), typeof(Rectangle?) }))
                 {
                     SMonitor.Log("Overriding GameLocation.ApplyMapOverride");
-                    codes[i - 15].opcode = OpCodes.Ldarg_1;
-                    codes[i].operand = AccessTools.Method(typeof(ModEntry), nameof(ModEntry.ApplyMapOverride));
+                    codes[i - 15].opcode = OpCodes.Ldarg_1; // Replace the Farm instance with the name of the spouse
+                    codes[i].operand = AccessTools.Method(typeof(ModEntry), nameof(ModEntry.ApplyMapOverride)); // All args are same except it isn't an instance method and the first arg is the spouse name
                 }
             }
 
@@ -86,13 +87,13 @@ namespace CustomSpousePatioRedux
         {
             try
             {
-                if (!Config.EnableMod || outdoorAreas == null || outdoorAreas.dict.Count == 0 || spouseName == "" || spouseName == null)
+                if (!Config.EnableMod || OutdoorAreas.Count == 0 || spouseName == "" || spouseName == null)
                     return;
                 spousePositions[spouseName] = __instance.spousePatioSpot;
                 if (addingExtraAreas)
                     return;
                 addingExtraAreas = true;
-                foreach (var name in outdoorAreas.dict.Keys)
+                foreach (var name in OutdoorAreas.Keys)
                 {
                     if (name != spouseName)
                         __instance.addSpouseOutdoorArea(name);
@@ -108,7 +109,7 @@ namespace CustomSpousePatioRedux
         
         public static bool NPC_setUpForOutdoorPatioActivity_Prefix(NPC __instance)
         {
-            if (!Config.EnableMod || outdoorAreas == null || outdoorAreas.dict.Count == 0 || !outdoorAreas.dict.ContainsKey(__instance.Name))
+            if (!Config.EnableMod || OutdoorAreas.Count == 0 || !OutdoorAreas.ContainsKey(__instance.Name))
             {
                 if(Game1.shortDayNameFromDayOfSeason(Game1.dayOfMonth).Equals("Sat") && Game1.MasterPlayer.spouse != __instance.Name)
                 {
@@ -121,15 +122,15 @@ namespace CustomSpousePatioRedux
             try
             {
                 Vector2 patio_location = __instance.GetSpousePatioPosition();
-                if (NPC.checkTileOccupancyForSpouse(Game1.getLocationFromName(outdoorAreas.dict[__instance.Name].location), patio_location, ""))
+                if (NPC.checkTileOccupancyForSpouse(Game1.getLocationFromName(OutdoorAreas[__instance.Name].location), patio_location, ""))
                 {
                     return false;
                 }
-                Game1.warpCharacter(__instance, outdoorAreas.dict[__instance.Name].location, patio_location);
+                Game1.warpCharacter(__instance, OutdoorAreas[__instance.Name].location, patio_location);
                 __instance.popOffAnyNonEssentialItems();
                 __instance.currentMarriageDialogue.Clear();
                 __instance.addMarriageDialogue("MarriageDialogue", "patio_" + __instance.Name, false);
-                __instance.followSchedule = false;
+                __instance.followSchedule = false; // Not in default method
                 __instance.setTilePosition((int)patio_location.X, (int)patio_location.Y);
                 __instance.shouldPlaySpousePatioAnimation.Value = true;
 
@@ -151,7 +152,7 @@ namespace CustomSpousePatioRedux
 
             try
             {
-                if (outdoorAreas == null || outdoorAreas.dict.Count == 0 || !spousePositions.ContainsKey(__instance.Name))
+                if (OutdoorAreas.Count == 0 || !spousePositions.ContainsKey(__instance.Name))
                 {
                     return true;
                 }
@@ -163,6 +164,43 @@ namespace CustomSpousePatioRedux
             {
                 SMonitor.Log($"Failed in {nameof(NPC_GetSpousePatioPosition_Prefix)}:\n{ex}", LogLevel.Error);
                 return true; // run original logic
+            }
+        }
+
+        /// <summary>
+        /// This ensures that if a map asset is invalidated, the patios will be re-added when it is reloaded.
+        /// This method is called in the map asset invalidaion pipeline (specifically, when propagating core assets, and all maps seem to be core assets).
+        /// </summary>
+        private static void GameLocation_MakeMapModifications_Postifx(GameLocation __instance, HashSet<string> ____appliedMapOverrides)
+        {
+            // The farm already reloads the patios automatically
+            if (!Config.EnableMod || __instance is Farm) 
+            {
+                return;
+            }
+
+            List<string> patiosToReapply = new();
+
+            foreach(var kvp in OutdoorAreas)
+            {
+                // If the instance is not the patio's location, or the instance already has this spouse's patio applied, continue
+                if (kvp.Value.location != __instance.Name || ____appliedMapOverrides.Contains($"{kvp.Key}_spouse_patio"))
+                    continue;
+
+                if(!TryCacheOffBasePatioArea(kvp.Key))
+                {
+                    SMonitor.Log($"Failed to cache tiles for {kvp.Key} in MakeMapModifications!");
+                    continue;
+                }
+
+                patiosToReapply.Add(kvp.Key);
+            }
+
+            // We cache all of the tiles and then reapply just in case there is some overlap or something.
+            foreach(string spouse in patiosToReapply)
+            {
+                SMonitor.Log($"Reapplying map overrides for {spouse}");
+                PlaceSpousePatio(spouse);
             }
         }
     }

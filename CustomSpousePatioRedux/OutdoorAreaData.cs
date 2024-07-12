@@ -7,6 +7,7 @@ namespace CustomSpousePatioRedux
     public class OutdoorAreaData
     {
         /// <summary>
+        /// LEGACY; Will automatically be migrated to the dict
         /// Spouse name -> Top-left corner
         /// </summary>
         public Dictionary<string, Vector2> areas;

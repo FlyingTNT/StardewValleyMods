@@ -1,6 +1,7 @@
 {
-  "GMCM_Option_ModEnabled_Name": "Mod activ�",
-  "GMCM_Option_AutoUse_Name": "Peut d�penser les ressources",
+  "GMCM_Option_ModEnabled_Name": "Mod activé",
+  "GMCM_Option_AutoUse_Name": "Peut dépenser les ressources",
+  "GMCM_UseSharedResources_Name": "Partage des ressources en multijoueur",
   "GMCM_Option_ShowMessage_Name": "Montrer un message",
   "GMCM_Option_ResourcesKey_Name": "Raccourci Ressources",
   "GMCM_Option_ModKey1_Name": "Raccourci Mod Prendre 1",
@@ -9,11 +10,19 @@
   "GMCM_Option_ModKey1Amount_Name": "Montant - Raccourci Mod 1",
   "GMCM_Option_ModKey2Amount_Name": "Montant - Raccourci Mod 2",
   "GMCM_Option_ModKey3Amount_Name": "Montant - Raccourci Mod 3",
-  "GMCM_Option_IconOffsetX_Name": "D�calage X de l�icone",
-  "GMCM_Option_IconOffsetY_Name": "D�calage Y de l�icone",
+  "GMCM_Option_IconOffsetX_Name": "Décalage X de l’icône",
+  "GMCM_Option_IconOffsetY_Name": "Décalage Y de l’icône",
+  "GMCM_Option_SearchBarOffsetX_Name": "Décalage X de la barre de recherche",
+  "GMCM_Option_SearchBarOffsetY_Name": "Décalage Y de la barre de recherche",
+  "GMCM_Option_SortButtonOffsetX_Name": "Décalage X du bouton de tri",
+  "GMCM_Option_SortButtonOffsetY_Name": "Décalage Y du bouton de tri",
   "auto": "Auto Stocker",
   "take": "Prendre",
   "added-x-y": "Ajout de {0} {1} au stockage.",
   "removed-x-y": "Retrait de {0} {1} du stockage.",
-  "resources": "Ressources"
+  "resources": "Ressources",
+  "sort-0": "Nom (ascendant)",
+  "sort-1": "Nom (descendant)",
+  "sort-2": "Montant (croissant)",
+  "sort-3": "Montant (descendant)"
 }

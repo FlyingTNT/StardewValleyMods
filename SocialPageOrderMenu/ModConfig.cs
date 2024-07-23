@@ -17,5 +17,6 @@ namespace SocialPageOrderRedux
         public int DropdownOffsetY { get; set; } = 0;
         public int FilterOffsetX { get; set; } = 0;
         public int FilterOffsetY { get; set; } = 0;
+        public bool SearchBarAutoFocus { get; set; } = true;
     }
 }

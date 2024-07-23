@@ -85,7 +85,7 @@ namespace SocialPageOrderRedux
 
             helper.Events.Input.ButtonsChanged += Input_ButtonsChanged;
             helper.Events.Display.MenuChanged += Display_MenuChanged;
-            helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
+            helper.Events.Content.LocaleChanged += Content_LocaleChanged;
 
             var harmony = new Harmony(ModManifest.UniqueID);
             harmony.PatchAll();
@@ -144,28 +144,28 @@ namespace SocialPageOrderRedux
 
             configMenu.AddBoolOption(
                 mod: ModManifest,
-                name: () => "Mod Enabled?",
+                name: () => SHelper.Translation.Get("GMCM-EnableMod"),
                 getValue: () => Config.EnableMod,
                 setValue: value => Config.EnableMod = value
             );
 
             configMenu.AddKeybindList(
                 mod: ModManifest,
-                name: () => "Prev Sort Key",
+                name: () => SHelper.Translation.Get("GMCM-PreviousSortKey"),
                 getValue: () => Config.prevButton,
                 setValue: value => Config.prevButton = value
             );
 
             configMenu.AddKeybindList(
                 mod: ModManifest,
-                name: () => "Next Sort Key",
+                name: () => SHelper.Translation.Get("GMCM-NextSortKey"),
                 getValue: () => Config.nextButton,
                 setValue: value => Config.nextButton = value
             );
 
             configMenu.AddBoolOption(
                 mod: ModManifest,
-                name: () => "Use Filter",
+                name: () => SHelper.Translation.Get("GMCM-UseFilter"),
                 getValue: () => Config.UseFilter,
                 setValue: (value) => { Config.UseFilter = value;
                                        InitElements();}
@@ -173,7 +173,7 @@ namespace SocialPageOrderRedux
             
             configMenu.AddBoolOption(
                 mod: ModManifest,
-                name: () => "Use Button",
+                name: () => SHelper.Translation.Get("GMCM-UseButton"),
                 getValue: () => Config.UseButton,
                 setValue: (value) => { Config.UseButton = value;
                                        InitElements();}
@@ -181,50 +181,57 @@ namespace SocialPageOrderRedux
 
             configMenu.AddBoolOption(
                 mod: ModManifest,
-                name: () => "Use Dropdown",
+                name: () => SHelper.Translation.Get("GMCM-UseDropdown"),
                 getValue: () => Config.UseDropdown,
                 setValue: (value) => { Config.UseDropdown = value;
                                        InitElements();}
             );
 
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM-AutoFocusSearch"),
+                getValue: () => Config.SearchBarAutoFocus,
+                setValue: value => Config.SearchBarAutoFocus = value
+            );
+
             configMenu.AddNumberOption(
                mod: ModManifest,
-               name: () => "Button X Offset",
+               name: () => SHelper.Translation.Get("GMCM-ButtonOffsetX"),
                getValue: () => Config.ButtonOffsetX,
                setValue: value => Config.ButtonOffsetX = value
            );
 
             configMenu.AddNumberOption(
                 mod: ModManifest,
-                name: () => "Button Y Offset",
+                name: () => SHelper.Translation.Get("GMCM-ButtonOffsetY"),
                 getValue: () => Config.ButtonOffsetY,
                 setValue: value => Config.ButtonOffsetY = value
             );
 
             configMenu.AddNumberOption(
                 mod: ModManifest,
-                name: () => "Dropdown X Offset",
+                name: () => SHelper.Translation.Get("GMCM-DropdownOffsetX"),
                 getValue: () => Config.DropdownOffsetX,
                 setValue: value => Config.DropdownOffsetX = value
             );
             
             configMenu.AddNumberOption(
                 mod: ModManifest,
-                name: () => "Dropdown Y Offset",
+                name: () => SHelper.Translation.Get("GMCM-DropdownOffsetY"),
                 getValue: () => Config.DropdownOffsetY,
                 setValue: value => Config.DropdownOffsetY = value
             );
             
             configMenu.AddNumberOption(
                 mod: ModManifest,
-                name: () => "Filter X Offset",
+                name: () => SHelper.Translation.Get("GMCM-FilterOffsetX"),
                 getValue: () => Config.FilterOffsetX,
                 setValue: value => Config.FilterOffsetX = value
             );
             
             configMenu.AddNumberOption(
                 mod: ModManifest,
-                name: () => "Filter Y Offset",
+                name: () => SHelper.Translation.Get("GMCM-FilterOffsetY"),
                 getValue: () => Config.FilterOffsetY,
                 setValue: value => Config.FilterOffsetY = value
             );
@@ -280,11 +287,21 @@ namespace SocialPageOrderRedux
             }
         }
 
-        public static void GameLoop_ReturnedToTitle(object sender, ReturnedToTitleEventArgs args)
+        public static void Content_LocaleChanged(object sender, LocaleChangedEventArgs args)
         {
-            // Null the dropdown. This forces a reload next time the dropdown is loaded. This is necessary in case the player changes their language - the dropdown
-            // sets the text for its options when it is created, so if the player changes the language the options won't be updated unless we reload the dropdown.
-            dropDown.Value = null;
+            if (dropDown.Value is null)
+                return;
+
+            dropDown.Value.dropDownDisplayOptions.Clear();
+            dropDown.Value.dropDownOptions.Clear();
+
+            for (int i = 0; i < 4; i++)
+            {
+                dropDown.Value.dropDownDisplayOptions.Add(SHelper.Translation.Get($"sort-{i}"));
+                dropDown.Value.dropDownOptions.Add(SHelper.Translation.Get($"sort-{i}"));
+            }
+
+            dropDown.Value.RecalculateBounds();
         }
 
         public static void SocialPage_Constructor_Postfix(SocialPage __instance)
@@ -498,7 +515,7 @@ namespace SocialPageOrderRedux
             }
 
             if (Config.UseFilter && filterField.Value is not null && !Game1.options.gamepadControls)
-                filterField.Value.Selected = __instance.currentTab == GameMenu.socialTab;
+                filterField.Value.Selected = Config.SearchBarAutoFocus && (__instance.currentTab == GameMenu.socialTab);
         }
 
         public static void ResortSocialList(SocialEntry slotToSelect = null)

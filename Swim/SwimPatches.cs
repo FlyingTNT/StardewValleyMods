@@ -341,39 +341,6 @@ namespace Swim
             }
         }
 
-        public static void GameLocation_performTouchAction_Prefix(string fullActionString)
-        {
-            try
-            {
-                string[] text = fullActionString.Split(new char[]
-                {
-                    ' '
-                });
-                GameLocation_performTouchAction_PrefixArray(text);
-            }
-            catch (Exception ex)
-            {
-                SMonitor.Log($"Failed in {nameof(GameLocation_performTouchAction_Prefix)}:\n{ex}", LogLevel.Error);
-            }
-        }
-        public static void GameLocation_performTouchAction_PrefixArray(string[] action)
-        {
-            try
-            {
-                string text = action[0];
-                if (text == "PoolEntrance")
-                {
-                    if (!Game1.player.swimming.Value)
-                    {
-                        Config.ReadyToSwim = false;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                SMonitor.Log($"Failed in {nameof(GameLocation_performTouchAction_PrefixArray)}:\n{ex}", LogLevel.Error);
-            }
-        }
         public static void GameLocation_performTouchAction_Postfix(string fullActionString)
         {
             try

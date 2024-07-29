@@ -155,16 +155,6 @@ namespace Swim
             );
 
             harmony.Patch(
-               original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.performTouchAction), new Type[] {typeof(string), typeof(Vector2)}),
-               prefix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.GameLocation_performTouchAction_Prefix))
-            );
-
-            harmony.Patch(
-               original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.performTouchAction), new Type[] { typeof(string[]), typeof(Vector2) }),
-               prefix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.GameLocation_performTouchAction_PrefixArray))
-            );
-
-            harmony.Patch(
                original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.checkAction)),
                prefix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.GameLocation_checkAction_Prefix))
             );

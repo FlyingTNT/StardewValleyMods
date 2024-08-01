@@ -178,12 +178,6 @@ namespace Swim
             {
                 __state = __instance.bathingClothes.Value;
 
-                if(__instance.swimming.Value)
-                {
-                    __instance.bathingClothes.Value = true;
-                    return;
-                }
-
                 if (__instance.bathingClothes.Value && Config.AllowRunningWhileInSwimsuit)
                 {
                     __instance.bathingClothes.Value = false;

@@ -20,7 +20,7 @@ namespace FreeLove
         }
         public void SetLastPregnantSpouse(string name)
         {
-            ModEntry.lastPregnantSpouse = Game1.getCharacterFromName(name);
+            ModEntry.LastPregnantSpouse = Game1.getCharacterFromName(name);
         }
     }
 }

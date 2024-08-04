@@ -7,72 +7,69 @@ namespace FreeLove
 {
     public partial class ModEntry
     {
-        public static IKissingAPI kissingAPI;
-        public static IBedTweaksAPI bedTweaksAPI;
-        public static IChildrenTweaksAPI childrenAPI;
-        public static ICustomSpouseRoomsAPI customSpouseRoomsAPI;
-        public static IPlannedParenthoodAPI plannedParenthoodAPI;
-        public static IContentPatcherAPI contentPatcherAPI;
+        public static IKissingAPI KissingAPI { get; private set; }
+        public static IBedTweaksAPI BedTweaksAPI { get; private set; }
+        public static IChildrenTweaksAPI ChildrenAPI { get; private set; }
+        public static ICustomSpouseRoomsAPI CustomSpouseRoomsAPI { get; private set; }
+        public static IPlannedParenthoodAPI PlannedParenthoodAPI { get; private set; }
+        public static IContentPatcherAPI ContentPatcherAPI { get; private set; }
 
-        public static void LoadModApis()
+        public void LoadModApis()
         {
-            kissingAPI = SHelper.ModRegistry.GetApi<IKissingAPI>("aedenthorn.HugsAndKisses");
-            bedTweaksAPI = SHelper.ModRegistry.GetApi<IBedTweaksAPI>("aedenthorn.BedTweaks");
-            childrenAPI = SHelper.ModRegistry.GetApi<IChildrenTweaksAPI>("aedenthorn.ChildrenTweaks");
-            customSpouseRoomsAPI = SHelper.ModRegistry.GetApi<ICustomSpouseRoomsAPI>("aedenthorn.CustomSpouseRooms");
-            plannedParenthoodAPI = SHelper.ModRegistry.GetApi<IPlannedParenthoodAPI>("aedenthorn.PlannedParenthood");
+            KissingAPI = SHelper.ModRegistry.GetApi<IKissingAPI>("aedenthorn.HugsAndKisses");
+            BedTweaksAPI = SHelper.ModRegistry.GetApi<IBedTweaksAPI>("aedenthorn.BedTweaks");
+            ChildrenAPI = SHelper.ModRegistry.GetApi<IChildrenTweaksAPI>("aedenthorn.ChildrenTweaks");
+            CustomSpouseRoomsAPI = SHelper.ModRegistry.GetApi<ICustomSpouseRoomsAPI>("aedenthorn.CustomSpouseRooms");
+            PlannedParenthoodAPI = SHelper.ModRegistry.GetApi<IPlannedParenthoodAPI>("aedenthorn.PlannedParenthood");
 
-            if (kissingAPI != null)
+            if (KissingAPI != null)
             {
                 SMonitor.Log("Kissing API loaded");
             }
-            if (bedTweaksAPI != null)
+            if (BedTweaksAPI != null)
             {
                 SMonitor.Log("BedTweaks API loaded");
             }
-            if (childrenAPI != null)
+            if (ChildrenAPI != null)
             {
                 SMonitor.Log("ChildrenTweaks API loaded");
             }
-            if (customSpouseRoomsAPI != null)
+            if (CustomSpouseRoomsAPI != null)
             {
                 SMonitor.Log("CustomSpouseRooms API loaded");
             }
-            if (plannedParenthoodAPI != null)
+            if (PlannedParenthoodAPI != null)
             {
                 SMonitor.Log("PlannedParenthood API loaded");
             }
-            contentPatcherAPI = SHelper.ModRegistry.GetApi<IContentPatcherAPI>("Pathoschild.ContentPatcher");
-            if(contentPatcherAPI is not null)
+            ContentPatcherAPI = SHelper.ModRegistry.GetApi<IContentPatcherAPI>("Pathoschild.ContentPatcher");
+            ContentPatcherAPI?.RegisterToken(ModManifest, "PlayerSpouses", () =>
             {
-                contentPatcherAPI.RegisterToken(context.ModManifest, "PlayerSpouses", () =>
-                {
-                    Farmer player;
+                Farmer player;
 
-                    if (Context.IsWorldReady)
-                        player = Game1.player;
-                    else if (SaveGame.loaded?.player != null)
-                        player = SaveGame.loaded.player;
-                    else
-                        return null;
+                if (Context.IsWorldReady)
+                    player = Game1.player;
+                else if (SaveGame.loaded?.player != null)
+                    player = SaveGame.loaded.player;
+                else
+                    return null;
 
-                    var spouses = GetSpouses(player, true).Keys.ToList();
-                    spouses.Sort(delegate (string a, string b) {
-                        player.friendshipData.TryGetValue(a, out Friendship af);
-                        player.friendshipData.TryGetValue(b, out Friendship bf);
-                        if (af == null && bf == null)
-                            return 0;
-                        if (af == null)
-                            return -1;
-                        if (bf == null)
-                            return 1;
-                        if (af.WeddingDate == bf.WeddingDate)
-                            return 0;
-                        return af.WeddingDate > bf.WeddingDate ? -1 : 1;
-                    });
-                    return spouses.ToArray();
+                var spouses = GetSpouses(player, true).Keys.ToList();
+                spouses.Sort(delegate (string a, string b) {
+                    player.friendshipData.TryGetValue(a, out Friendship af);
+                    player.friendshipData.TryGetValue(b, out Friendship bf);
+                    if (af == null && bf == null)
+                        return 0;
+                    if (af == null)
+                        return -1;
+                    if (bf == null)
+                        return 1;
+                    if (af.WeddingDate == bf.WeddingDate)
+                        return 0;
+                    return af.WeddingDate > bf.WeddingDate ? -1 : 1;
                 });
-            }
+                return spouses.ToArray();
+            });
         }
     }
 }

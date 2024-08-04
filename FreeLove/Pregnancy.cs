@@ -1,9 +1,10 @@
 ﻿using Microsoft.Xna.Framework;
-using StardewModdingAPI;
+using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.BellsAndWhistles;
 using StardewValley.Characters;
 using StardewValley.Events;
+using StardewValley.Extensions;
 using StardewValley.Locations;
 using StardewValley.Menus;
 using System;
@@ -41,45 +42,49 @@ namespace FreeLove
                 }
                 Farmer f = spouse.getSpouse();
 
-                Friendship friendship = f.friendshipData[spouse.Name];
+                if (!Game1.player.friendshipData.TryGetValue(spouse.Name, out Friendship friendship))
+                    continue;
 
                 if (friendship.DaysUntilBirthing <= 0 && friendship.NextBirthingDate != null)
                 {
-                    lastPregnantSpouse = null;
-                    lastBirthingSpouse = spouse;
+                    LastPregnantSpouse = null;
+                    LastBirthingSpouse = spouse;
                     __result = new BirthingEvent();
                     return false;
                 }
             }
 
-            if (plannedParenthoodAPI is not null && plannedParenthoodAPI.GetPartnerTonight() is not null)
+            if (PlannedParenthoodAPI is not null && PlannedParenthoodAPI.GetPartnerTonight() is not null)
             {
                 SMonitor.Log($"Handing farm sleep event off to Planned Parenthood");
                 return true;
             }
 
-            lastBirthingSpouse = null;
-            lastPregnantSpouse = null;
+            LastBirthingSpouse = null;
+            LastPregnantSpouse = null;
 
             foreach (NPC spouse in allSpouses)
             {
-                if (spouse == null)
-                    continue;
-                Farmer f = spouse.getSpouse();
-                if (!Config.RoommateRomance && f.friendshipData[spouse.Name].RoommateMarriage)
+                if (spouse is null)
                     continue;
 
-                int heartsWithSpouse = f.getFriendshipHeartLevelForNPC(spouse.Name);
-                Friendship friendship = f.friendshipData[spouse.Name];
-                List<Child> kids = f.getChildren();
-                int maxChildren = childrenAPI == null ? Config.MaxChildren : childrenAPI.GetMaxChildren();
-                FarmHouse fh = Utility.getHomeOfFarmer(f);
-                bool can = spouse.daysAfterLastBirth <= 0 && fh.cribStyle.Value > 0 && fh.upgradeLevel >= 2 && friendship.DaysUntilBirthing < 0 && heartsWithSpouse >= 10 && friendship.DaysMarried >= 7 && (kids.Count < maxChildren);
-                SMonitor.Log($"Checking ability to get pregnant: {spouse.Name} {can}:{(fh.cribStyle.Value > 0 ? $" no crib":"")}{(Utility.getHomeOfFarmer(f).upgradeLevel < 2 ? $" house level too low {Utility.getHomeOfFarmer(f).upgradeLevel}":"")}{(friendship.DaysMarried < 7 ? $", not married long enough {friendship.DaysMarried}":"")}{(friendship.DaysUntilBirthing >= 0 ? $", already pregnant (gives birth in: {friendship.DaysUntilBirthing})":"")}");
+                if (!Game1.player.friendshipData.TryGetValue(spouse.Name, out Friendship friendship) && friendship.IsMarried())
+                    continue;
+
+                if (!Config.RoommateRomance && Game1.player.friendshipData[spouse.Name].RoommateMarriage)
+                    continue;
+
+                int heartsWithSpouse = Game1.player.getFriendshipHeartLevelForNPC(spouse.Name);
+                List<Child> kids = Game1.player.getChildren();
+                int maxChildren = ChildrenAPI == null ? Config.MaxChildren : ChildrenAPI.GetMaxChildren();
+                FarmHouse fh = Utility.getHomeOfFarmer(Game1.player);
+                // Days after last birth starts at 5 when giving birth and then goes down by one each day after until -1. That check isn't in the normal method, but I'll leave it.
+                bool can = spouse.daysAfterLastBirth <= 0 && fh.cribStyle.Value > 0 && fh.upgradeLevel >= 2 && friendship.DaysUntilBirthing < 0 && heartsWithSpouse >= 10 && friendship.DaysMarried >= 7 && (kids.Count < maxChildren) && GameStateQuery.CheckConditions(spouse.GetData()?.SpouseWantsChildren);
+                SMonitor.Log($"Checking ability to get pregnant: {spouse.Name} {can}:{(fh.cribStyle.Value > 0 ? $" no crib":"")}{(Utility.getHomeOfFarmer(Game1.player).upgradeLevel < 2 ? $" house level too low {Utility.getHomeOfFarmer(Game1.player).upgradeLevel}":"")}{(friendship.DaysMarried < 7 ? $", not married long enough {friendship.DaysMarried}":"")}{(friendship.DaysUntilBirthing >= 0 ? $", already pregnant (gives birth in: {friendship.DaysUntilBirthing})":"")}");
                 if (can && Game1.player.currentLocation == Game1.getLocationFromName(Game1.player.homeLocation.Value) && myRand.NextDouble() <  0.05)
                 {
                     SMonitor.Log("Requesting a baby!");
-                    lastPregnantSpouse = spouse;
+                    LastPregnantSpouse = spouse;
                     __result = new QuestionEvent(1);
                     return false;
                 }
@@ -87,42 +92,62 @@ namespace FreeLove
             return true;
         }
 
-        public static NPC lastPregnantSpouse;
-        private static NPC lastBirthingSpouse;
+        private static readonly PerScreen<NPC> lastPregnantSpouse = new(() => null);
+        public static NPC LastPregnantSpouse { get => lastPregnantSpouse.Value; set => lastPregnantSpouse.Value = value; }
+
+        private static readonly PerScreen<NPC> lastBirthingSpouse = new(() => null);
+        private static NPC LastBirthingSpouse { get => lastBirthingSpouse.Value; set => lastBirthingSpouse.Value = value; }
 
         public static bool QuestionEvent_setUp_Prefix(int ___whichQuestion, ref bool __result)
         {
-            if(Config.EnableMod && ___whichQuestion == 1)
-            {
-                if (lastPregnantSpouse == null)
-                {
-                    __result = true;
-                    return false;
-                }
-                Response[] answers = new Response[]
-                {
-                    new Response("Yes", Game1.content.LoadString("Strings\\Events:HaveBabyAnswer_Yes")),
-                    new Response("Not", Game1.content.LoadString("Strings\\Events:HaveBabyAnswer_No"))
-                };
+            if(!Config.EnableMod || ___whichQuestion != 1)
+                return true;
 
-                if (!lastPregnantSpouse.isGaySpouse() || Config.GayPregnancies)
-                {
-                    Game1.currentLocation.createQuestionDialogue(Game1.content.LoadString("Strings\\Events:HavePlayerBabyQuestion", lastPregnantSpouse.Name), answers, new GameLocation.afterQuestionBehavior(answerPregnancyQuestion), lastPregnantSpouse);
-                }
-                else
-                {
-                    Game1.currentLocation.createQuestionDialogue(Game1.content.LoadString("Strings\\Events:HavePlayerBabyQuestion_Adoption", lastPregnantSpouse.Name), answers, new GameLocation.afterQuestionBehavior(answerPregnancyQuestion), lastPregnantSpouse);
-                }
-                Game1.messagePause = true;
-                __result = false;
+            if (LastPregnantSpouse is null)
+            {
+                SMonitor.Log("No LastPregnantSpouse in QuestionEvent.setUp");
+                __result = true;
                 return false;
             }
+
+            TempOfficialSpouse = LastPregnantSpouse;
+
             return true;
         }
 
-        public static bool BirthingEvent_tickUpdate_Prefix(GameTime time, BirthingEvent __instance, ref bool __result, ref int ___timer, string ___soundName, ref bool ___playedSound, string ___message, ref bool ___naming, bool ___getBabyName, bool ___isMale, string ___babyName)
+        public static void QuestionEvent_setUp_Postfix(int ___whichQuestion)
         {
-            if (!Config.EnableMod || !___getBabyName)
+            if (!Config.EnableMod || ___whichQuestion != 1)
+                return;
+
+            TempOfficialSpouse = null;
+        }
+
+        public static void QuestionEvent_answerPregnancyQuestion_Prefix()
+        {
+            if (!Config.EnableMod)
+                return;
+
+            TempOfficialSpouse = LastPregnantSpouse;
+        }
+
+        public static void QuestionEvent_answerPregnancyQuestion_Postfix()
+        {
+            if (!Config.EnableMod)
+                return;
+
+            TempOfficialSpouse = null;
+        }
+
+        /// <summary>
+        /// Unfortunately, I don't think I could turn this into a smaller prefix/postfix without a transpiler too, so I'm going to just leave it as-is
+        /// </summary>
+        public static bool BirthingEvent_tickUpdate_Prefix(GameTime time, BirthingEvent __instance, ref bool __result, ref int ___timer, ref bool ___naming, bool ___getBabyName, bool ___isMale, string ___babyName)
+        {
+            if (!Config.EnableMod)
+                return true;
+
+            if (!___getBabyName)
                 return true;
 
             Game1.player.CanMove = false;
@@ -131,126 +156,105 @@ namespace FreeLove
 
             if (!___naming)
             {
-                Game1.activeClickableMenu = new NamingMenu(new NamingMenu.doneNamingBehavior(__instance.returnBabyName), Game1.content.LoadString(___isMale ? "Strings\\Events:BabyNamingTitle_Male" : "Strings\\Events:BabyNamingTitle_Female"), "");
+                Game1.activeClickableMenu = new NamingMenu(__instance.returnBabyName, Game1.content.LoadString(___isMale ? "Strings\\Events:BabyNamingTitle_Male" : "Strings\\Events:BabyNamingTitle_Female"), "");
                 ___naming = true;
             }
-            if (___babyName != null && ___babyName != "" && ___babyName.Length > 0)
+            if (!string.IsNullOrEmpty(___babyName) && ___babyName.Length > 0)
             {
-                double chance = (lastBirthingSpouse.Name.Equals("Maru") || lastBirthingSpouse.Name.Equals("Krobus")) ? 0.5 : 0.0;
-                chance += (Game1.player.hasDarkSkin() ? 0.5 : 0.0);
-                bool isDarkSkinned = new Random((int)Game1.uniqueIDForThisGame + (int)Game1.stats.DaysPlayed).NextDouble() < chance;
+                NPC spouse = LastBirthingSpouse ?? Game1.player.getSpouse();
+                double chance = (spouse.hasDarkSkin() ? 0.5 : 0.0) + (Game1.player.hasDarkSkin() ? 0.5 : 0.0);
+                bool isDarkSkinned = Utility.CreateRandom(Game1.uniqueIDForThisGame, Game1.stats.DaysPlayed).NextBool(chance);
                 string newBabyName = ___babyName;
                 List<NPC> all_characters = Utility.getAllCharacters();
-                bool collision_found = false;
+                bool collision_found;
                 do
                 {
                     collision_found = false;
-                    using (List<NPC>.Enumerator enumerator = all_characters.GetEnumerator())
+                    if (Game1.characterData.ContainsKey(newBabyName))
                     {
-                        while (enumerator.MoveNext())
+                        newBabyName += " ";
+                        collision_found = true;
+                        continue;
+                    }
+                    foreach (NPC item in all_characters)
+                    {
+                        if (item.Name == newBabyName)
                         {
-                            if (enumerator.Current.Name.Equals(newBabyName))
-                            {
-                                newBabyName += " ";
-                                collision_found = true;
-                                break;
-                            }
+                            newBabyName += " ";
+                            collision_found = true;
+                            break;
                         }
                     }
                 }
                 while (collision_found);
-                Child baby = new Child(newBabyName, ___isMale, isDarkSkinned, Game1.player)
-                {
-                    Age = 0,
-                    Position = new Vector2(16f, 4f) * 64f + new Vector2(0f + myRand.Next(-64, 48), -24f + myRand.Next(-24, 24)),
-                };
-                baby.modData["aedenthorn.FreeLove/OtherParent"] = lastBirthingSpouse.Name;
+                Child baby = new Child(newBabyName, ___isMale, isDarkSkinned, Game1.player);
+                baby.Age = 0;
+                baby.Position = new Vector2(16f, 4f) * 64f + new Vector2(0f, -24f);
+
+                baby.modData["aedenthorn.FreeLove/OtherParent"] = spouse.Name;
 
                 Utility.getHomeOfFarmer(Game1.player).characters.Add(baby);
                 Game1.playSound("smallSelect");
-                Game1.getCharacterFromName(lastBirthingSpouse.Name).daysAfterLastBirth = 5;
-                Game1.player.friendshipData[lastBirthingSpouse.Name].NextBirthingDate = null;
-                if (Game1.player.getChildrenCount() == 2)
+                spouse.daysAfterLastBirth = 5;
+                Game1.player.friendshipData[spouse.Name].NextBirthingDate = null;
+                if (Game1.player.getChildrenCount() >= 2)
                 {
-                    Game1.getCharacterFromName(lastBirthingSpouse.Name).shouldSayMarriageDialogue.Value = true;
-                    Game1.getCharacterFromName(lastBirthingSpouse.Name).currentMarriageDialogue.Insert(0, new MarriageDialogueReference("Data\\ExtraDialogue", "NewChild_SecondChild" + myRand.Next(1, 3), true, new string[0]));
+                    spouse.shouldSayMarriageDialogue.Value = true;
+                    spouse.currentMarriageDialogue.Insert(0, new MarriageDialogueReference("Data\\ExtraDialogue", "NewChild_SecondChild" + Game1.random.Next(1, 3), true));
                     Game1.getSteamAchievement("Achievement_FullHouse");
                 }
-                else if (lastBirthingSpouse.isGaySpouse() && !Config.GayPregnancies)
+                else if (spouse.isAdoptionSpouse())
                 {
-                    Game1.getCharacterFromName(lastBirthingSpouse.Name).currentMarriageDialogue.Insert(0, new MarriageDialogueReference("Data\\ExtraDialogue", "NewChild_Adoption", true, new string[]
-                    {
-                        ___babyName
-                    }));
+                    spouse.currentMarriageDialogue.Insert(0, new MarriageDialogueReference("Data\\ExtraDialogue", "NewChild_Adoption", true, ___babyName));
                 }
                 else
                 {
-                    Game1.getCharacterFromName(lastBirthingSpouse.Name).currentMarriageDialogue.Insert(0, new MarriageDialogueReference("Data\\ExtraDialogue", "NewChild_FirstChild", true, new string[]
-                    {
-                        ___babyName
-                    }));
+                    spouse.currentMarriageDialogue.Insert(0, new MarriageDialogueReference("Data\\ExtraDialogue", "NewChild_FirstChild", true, ___babyName));
                 }
                 Game1.morningQueue.Enqueue(delegate
                 {
-                    mp.globalChatInfoMessage("Baby", new string[]
-                    {
-                        Lexicon.capitalize(Game1.player.Name),
-                        Game1.player.spouse,
-                        Lexicon.getGenderedChildTerm(___isMale),
-                        Lexicon.getPronoun(___isMale),
-                        baby.displayName
-                    });
+                    string text = Game1.getCharacterFromName(spouse?.Name)?.GetTokenizedDisplayName() ?? spouse?.Name ?? Game1.player.spouse;
+                    Game1.Multiplayer.globalChatInfoMessage("Baby", Lexicon.capitalize(Game1.player.Name), text, Lexicon.getTokenizedGenderedChildTerm(___isMale), Lexicon.getTokenizedPronoun(___isMale), baby.displayName);
                 });
                 if (Game1.keyboardDispatcher != null)
                 {
                     Game1.keyboardDispatcher.Subscriber = null;
                 }
-                Game1.player.Position = Utility.PointToVector2(Utility.getHomeOfFarmer(Game1.player).getBedSpot()) * 64f;
-                Game1.globalFadeToClear(null, 0.02f);
-                lastBirthingSpouse = null;
+                Game1.player.Position = Utility.PointToVector2(Utility.getHomeOfFarmer(Game1.player).GetPlayerBedSpot()) * 64f;
+                Game1.globalFadeToClear();
+
                 __result = true;
                 return false;
             }
+
             __result = false;
             return false;
         }
-        public static bool BirthingEvent_setUp_Prefix(ref bool ___isMale, ref string ___message, ref bool __result)
+        
+        public static bool BirthingEvent_setUp_Prefix()
         {
             if (!Config.EnableMod)
                 return true;
-            if(lastBirthingSpouse == null)
+
+            if(LastBirthingSpouse is null)
             {
-                __result = true;
+                SMonitor.Log("No LastBirthingSpouse in BirthingEvent.setUp");
                 return false;
             }
-            NPC spouse = lastBirthingSpouse;
-            Game1.player.CanMove = false;
-            ___isMale = myRand.NextDouble() > 0.5f;
-            if (spouse.isGaySpouse())
-            {
-                ___message = Game1.content.LoadString("Strings\\Events:BirthMessage_Adoption", Lexicon.getGenderedChildTerm(___isMale));
-            }
-            else if (spouse.Gender == 0)
-            {
-                ___message = Game1.content.LoadString("Strings\\Events:BirthMessage_PlayerMother", Lexicon.getGenderedChildTerm(___isMale));
-            }
-            else
-            {
-                ___message = Game1.content.LoadString("Strings\\Events:BirthMessage_SpouseMother", Lexicon.getGenderedChildTerm(___isMale), spouse.displayName);
-            }
-            __result = false;
-            return false;
+
+            TempOfficialSpouse = LastBirthingSpouse;
+
+            return true;
         }
 
-        public static void answerPregnancyQuestion(Farmer who, string answer)
+        public static void BirthingEvent_setUp_Postfix(ref bool ___isMale)
         {
-            if (answer == "Yes" && who is not null && lastPregnantSpouse is not null && who.friendshipData.ContainsKey(lastPregnantSpouse.Name))
-            {
-                WorldDate birthingDate = new WorldDate(Game1.Date);
-                birthingDate.TotalDays += 14;
-                who.friendshipData[lastPregnantSpouse.Name].NextBirthingDate = birthingDate;
-                lastPregnantSpouse.isGaySpouse();
-            }
+            if (!Config.EnableMod)
+                return;
+
+            TempOfficialSpouse = null;
+
+            ___isMale = myRand.NextBool();
         }
     }
 }

@@ -19,7 +19,7 @@ namespace FreeLove
         public int PercentChanceForSpouseInBed { get; set; } = 25;
         public int PercentChanceForSpouseInKitchen { get; set; } = 25;
         public int PercentChanceForSpouseAtPatio { get; set; } = 25;
-
+        public bool UseLegacySpousePlacement { get; set; } = false;
         //public bool RemoveSpouseOrdinaryDialogue { get; set; } = false;
     }
 }

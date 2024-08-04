@@ -13,14 +13,14 @@ namespace FreeLove
 {
     public static class UIPatches
     {
-        private static IMonitor Monitor;
-        private static IModHelper Helper;
+        private static IMonitor SMonitor;
+        private static IModHelper SHelper;
 
         // call this method from your Entry class
         public static void Initialize(IMonitor monitor, ModConfig config, IModHelper helper)
         {
-            Monitor = monitor;
-            Helper = helper;
+            SMonitor = monitor;
+            SHelper = helper;
         }
         public static void SocialPage_drawNPCSlot_prefix(SocialPage __instance, int i)
         {
@@ -38,51 +38,73 @@ namespace FreeLove
             }
             catch (Exception ex)
             {
-                Monitor.Log($"Failed in {nameof(SocialPage_drawNPCSlot_prefix)}:\n{ex}", LogLevel.Error);
+                SMonitor.Log($"Failed in {nameof(SocialPage_drawNPCSlot_prefix)}:\n{ex}", LogLevel.Error);
             }
         }
-        public static bool SocialPage_isMarriedToAnyone_Prefix(SocialPage.SocialEntry __instance, ref bool __result)
+
+        /// <summary>
+        /// The first time this method is called, it caches the result into ___CachedIsMarriedToAnyone.
+        /// Subsequent times, the cached value is used.
+        /// </summary>
+        public static void SocialPage_isMarriedToAnyone_Prefix(SocialPage.SocialEntry __instance, ref bool? ___CachedIsMarriedToAnyone)
         {
             try
             {
+                if (___CachedIsMarriedToAnyone.HasValue)
+                    return;
+
                 foreach (Farmer farmer in Game1.getAllFarmers())
                 {
-                    if (farmer.spouse == __instance.InternalName && farmer.friendshipData.TryGetValue(__instance.InternalName, out Friendship friendship) && friendship.IsMarried())
+                    if (ModEntry.GetSpouses(farmer, true).ContainsKey(__instance.DisplayName))
                     {
-                        __result = true;
+                        ___CachedIsMarriedToAnyone = true;
+                        return;
                     }
                 }
-                __result = false;
-                return false;
             }
             catch (Exception ex)
             {
-                Monitor.Log($"Failed in {nameof(SocialPage_isMarriedToAnyone_Prefix)}:\n{ex}", LogLevel.Error);
+                SMonitor.Log($"Failed in {nameof(SocialPage_isMarriedToAnyone_Prefix)}:\n{ex}", LogLevel.Error);
             }
-            return true;
         }
+
+        /// <summary>
+        /// In the SocialPage draw slot methods (drawNPCSlot and drawFarmerSlot), the game draws "(girlfriend)" under the names if they are dating the player *and* the player is not.
+        /// married. This transpiler applies to both methods and removes that call to Game1.player.IsMarriedOrRoommates(), instead replacing it with false, so it is 'if the character is
+        /// dating the player and not false'.
+        /// </summary>
         public static IEnumerable<CodeInstruction> SocialPage_drawSlot_transpiler(IEnumerable<CodeInstruction> instructions)
         {
+            SMonitor.Log("Transpiling SocialPage.draw_____Slot");
+
             List<CodeInstruction> codes = instructions.ToList();
-            if (Helper.ModRegistry.IsLoaded("SG.Partners"))
+            if (SHelper.ModRegistry.IsLoaded("SG.Partners"))
             {
-                Monitor.Log("Keep Your Partners mod is loaded, not patching social page.");
+                SMonitor.Log("Keep Your Partners mod is loaded, not patching social page.");
                 return codes.AsEnumerable();
             }
             try
             {
-                MethodInfo m_IsMarried = AccessTools.Method(typeof(Farmer), "isMarried", null, null);
-                int index = codes.FindIndex((CodeInstruction c) => c.operand != null && c.operand is MethodInfo && (MethodInfo)c.operand == m_IsMarried);
-                if(index > -1)
+                MethodInfo m_IsMarriedOrRoommates = AccessTools.Method(typeof(Farmer), nameof(Farmer.isMarriedOrRoommates));
+                MethodInfo m_Game1GetPlayer = AccessTools.PropertyGetter(typeof(Game1), nameof(Game1.player));
+
+                for (int i = 1; i < codes.Count; i++)
                 {
-                    codes[index - 1].opcode = OpCodes.Nop;
-                    codes[index].opcode = OpCodes.Nop;
-                    codes[index + 1].opcode = OpCodes.Nop;
+                    if (codes[i-1].opcode == OpCodes.Call && codes[i-1].operand is MethodInfo method1 && method1 == m_Game1GetPlayer && // Load Game1.player
+                        codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo method2 && method2 == m_IsMarriedOrRoommates) // Call .IsMarriedOrRoommates()
+                    {
+                        SMonitor.Log("Removing Game1.player.IsMarriedOrRoommates() call");
+
+                        (codes[i - 1].opcode, codes[i - 1].operand) = (OpCodes.Nop, null); // Do nothing
+                        (codes[i].opcode, codes[i].operand) = (OpCodes.Ldc_I4_0, null); // Load false onto the stack
+
+                        break;
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Monitor.Log($"Failed in {nameof(SocialPage_drawSlot_transpiler)}:\n{ex}", LogLevel.Error);
+                SMonitor.Log($"Failed in {nameof(SocialPage_drawSlot_transpiler)}:\n{ex}", LogLevel.Error);
             }
             return codes.AsEnumerable();
         }
@@ -134,7 +156,7 @@ namespace FreeLove
             }
             catch (Exception ex)
             {
-                Monitor.Log($"Failed in {nameof(DialogueBox_Prefix)}:\n{ex}", LogLevel.Error);
+                SMonitor.Log($"Failed in {nameof(DialogueBox_Prefix)}:\n{ex}", LogLevel.Error);
             }
         }
     }

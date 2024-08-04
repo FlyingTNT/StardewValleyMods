@@ -26,6 +26,10 @@ namespace FreeLove
             Config = config;
             Helper = helper;
         }
+
+        /// <summary>
+        /// As far as I can tell, literally all this does is make Krobus sleep in the bed with you (why?)
+        /// </summary>
         public static void FarmHouse_GetSpouseBed_Postfix(FarmHouse __instance, ref BedFurniture __result)
         {
             try
@@ -41,11 +45,14 @@ namespace FreeLove
             }
         }
         
+        /// <summary>
+        /// If the spouse is not in the bed, uses the default spot. If they are, uses their current position. Why??? Shouldn't it always just use the position in the bed where they sleep? 
+        /// </summary>
         public static bool FarmHouse_getSpouseBedSpot_Prefix(FarmHouse __instance, string spouseName, ref Point __result)
         {
             try
             {
-                if (spouseName == null || !Config.EnableMod)
+                if (spouseName is null || !Config.EnableMod)
                     return true;
                 var spouses = ModEntry.GetSpouses(__instance.owner, true);
                 
@@ -62,14 +69,26 @@ namespace FreeLove
             return true;
         }
 
-        public static void Beach_resetLocalState_Postfix(Beach __instance)
+        public static void FarmHouse_HasNPCSpouseOrRoommate_Postfix(FarmHouse __instance, string spouseName, ref bool __result)
+        {
+            if(__result)
+            {
+                return;
+            }
+
+            if(ModEntry.IsMarried(spouseName, __instance.owner))
+            {
+                __result = true;
+            }
+        }
+
+        public static void Beach_resetLocalState_Postfix(ref NPC ___oldMariner)
         {
             try
             {
-
                 if (ModEntry.Config.BuyPendantsAnytime)
                 {
-                    ModEntry.SHelper.Reflection.GetField<NPC>(__instance, "oldMariner").SetValue(new NPC(new AnimatedSprite("Characters\\Mariner", 0, 16, 32), new Vector2(80f, 5f) * 64f, 2, "Old Mariner", null));
+                    ___oldMariner = new NPC(new AnimatedSprite("Characters\\Mariner", 0, 16, 32), new Vector2(80f, 5f) * 64f, 2, "Old Mariner") {AllowDynamicAppearance = false};
                 }
             }
             catch (Exception ex)
@@ -160,19 +179,18 @@ namespace FreeLove
             }
         }
 
-        public static bool ManorHouse_performAction_Prefix(ManorHouse __instance, string action, Farmer who, ref bool __result)
+        public static bool ManorHouse_performAction_Prefix(ManorHouse __instance, string[] action, Farmer who, ref bool __result)
         {
             try
             {
+                if (!who.IsLocalPlayer)
+                    return true;
+
                 ModEntry.ResetSpouses(who);
                 Dictionary<string, NPC> spouses = ModEntry.GetSpouses(who, true);
                 if (action != null && who.IsLocalPlayer && !Game1.player.divorceTonight.Value && (Game1.player.isMarriedOrRoommates() || spouses.Count > 0))
                 {
-                    string a = action.Split(new char[]
-                    {
-                    ' '
-                    })[0];
-                    if (a == "DivorceBook")
+                    if (ArgUtility.Get(action, 0)  == "DivorceBook")
                     {
                         string str = Helper.Translation.Get("divorce_who");
                         List<Response> responses = new List<Response>();
@@ -210,6 +228,7 @@ namespace FreeLove
             if (!Config.EnableMod)
                 return true;
 
+            // IDK why there are two different questions with different inplementations for this, but whatever - it's in the source code
             if(questionAndAnswer == "mariner_Buy")
             {
                 if (Game1.player.Money < Config.PendantPrice)
@@ -219,18 +238,34 @@ namespace FreeLove
                 else
                 {
                     Game1.player.Money -= Config.PendantPrice;
-                    Game1.player.addItemByMenuIfNecessary(new Object("(O)460", 1, false, -1, 0)
-                    {
-                        specialItem = true
-                    }, null);
+                    Item mermaidPendant = ItemRegistry.Create("(O)460");
+                    mermaidPendant.specialItem = true;
+                    Game1.player.addItemByMenuIfNecessary(mermaidPendant);
                     if (Game1.activeClickableMenu == null)
                     {
-                        Game1.player.holdUpItemThenMessage(new Object("(O)460", 1, false, -1, 0), true);
+                        Game1.player.holdUpItemThenMessage(ItemRegistry.Create("(O)460"));
                     }
                 }
                 __result = true;
                 return false;
             }
+            else if(questionAndAnswer == "Mariner_Buy")
+            {
+                if (Game1.player.Money < Config.PendantPrice)
+                {
+                    Game1.drawObjectDialogue(Game1.content.LoadString("Strings\\UI:NotEnoughMoney1"));
+                }
+                else
+                {
+                    Game1.player.Money -= Config.PendantPrice;
+                    Object mermaidPendant = ItemRegistry.Create<Object>("(O)460");
+                    mermaidPendant.CanBeSetDown = false;
+                    Game1.player.grabObject(mermaidPendant);
+                }
+                __result = true;
+                return false;
+            }
+
             return true;
         }
     }

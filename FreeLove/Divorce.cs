@@ -55,13 +55,13 @@ namespace FreeLove
                     if (!Game1.player.isRoommate(spouse))
                     {
                         Game1.player.Money -= 50000;
-                        ModEntry.divorceHeartsLost = Config.PreventHostileDivorces ? 0 : -1;
+                        ModEntry.DivorceHeartsLost = Config.PreventHostileDivorces ? 0 : -1;
                     }
                     else
                     {
-                        ModEntry.divorceHeartsLost = 0;
+                        ModEntry.DivorceHeartsLost = 0;
                     }
-                    ModEntry.spouseToDivorce = spouse;
+                    ModEntry.SpouseToDivorce = spouse;
                     Game1.player.divorceTonight.Value = true;
                     string s = Game1.content.LoadString("Strings\\Locations:ManorHouse_DivorceBook_Filed_" + spouse, spouse);
                     if (s == "Strings\\Locations:ManorHouse_DivorceBook_Filed_" + spouse)
@@ -71,7 +71,7 @@ namespace FreeLove
                     Game1.drawObjectDialogue(s);
                     if (!Game1.player.isRoommate(spouse))
                     {
-                        ModEntry.mp.globalChatInfoMessage("Divorce", new string[]
+                        Game1.Multiplayer.globalChatInfoMessage("Divorce", new string[]
                         {
                             Game1.player.Name
                         });
@@ -86,7 +86,7 @@ namespace FreeLove
             else if (whichAnswer.StartsWith("divorce_complex_"))
             {
                 complexDivorceSpouse = whichAnswer.Replace("divorce_complex_", "");
-                ModEntry.divorceHeartsLost = 1;
+                ModEntry.DivorceHeartsLost = 1;
                 ShowNextDialogue("divorce_fault_", Game1.currentLocation);
             }
             else if (whichAnswer.StartsWith("divorce_fault_"))
@@ -97,7 +97,7 @@ namespace FreeLove
                 {
                     if (int.TryParse(r.Split('#')[r.Split('#').Length - 1], out int lost))
                     {
-                        ModEntry.divorceHeartsLost += lost;
+                        ModEntry.DivorceHeartsLost += lost;
                     }
                 }
                 string nextKey = $"divorce_{r.Split('#')[r.Split('#').Length - 2]}reason_";
@@ -117,7 +117,7 @@ namespace FreeLove
                 {
                     if (int.TryParse(r.Split('#')[r.Split('#').Length - 1], out int lost))
                     {
-                        ModEntry.divorceHeartsLost += lost;
+                        ModEntry.DivorceHeartsLost += lost;
                     }
                 }
 
@@ -126,13 +126,13 @@ namespace FreeLove
             else if (whichAnswer.StartsWith("divorce_method_"))
             {
                 Monitor.Log("divorce method");
-                ModEntry.spouseToDivorce = complexDivorceSpouse;
+                ModEntry.SpouseToDivorce = complexDivorceSpouse;
                 string r = Helper.Translation.Get(whichAnswer);
                 if (r != null)
                 {
                     if (int.TryParse(r.Split('#')[r.Split('#').Length - 1], out int lost))
                     {
-                        ModEntry.divorceHeartsLost += lost;
+                        ModEntry.DivorceHeartsLost += lost;
                     }
                 }
 
@@ -157,12 +157,12 @@ namespace FreeLove
                     Game1.drawObjectDialogue(s);
                     if (!Game1.player.isRoommate(complexDivorceSpouse))
                     {
-                        ModEntry.mp.globalChatInfoMessage("Divorce", new string[]
+                        Game1.Multiplayer.globalChatInfoMessage("Divorce", new string[]
                         {
-                                    Game1.player.Name
+                            Game1.player.Name
                         });
                     }
-                    Monitor.Log($"hearts lost {ModEntry.divorceHeartsLost}");
+                    Monitor.Log($"hearts lost {ModEntry.DivorceHeartsLost}");
                 }
                 else
                 {

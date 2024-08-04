@@ -65,6 +65,27 @@ namespace FreeLove
                 setValue: value => Config.RoommateRomance = value
             );
 
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => "Romance All Villagers",
+                getValue: () => Config.RomanceAllVillagers,
+                setValue: value =>
+                {
+                    if(value != Config.RomanceAllVillagers)
+                    {
+                        SHelper.GameContent.InvalidateCache("Data/EngagementDialogue");
+                    }
+                    Config.RomanceAllVillagers = value;
+                }
+            );
+
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => "Gay Pregnancies",
+                getValue: () => Config.GayPregnancies,
+                setValue: value => Config.GayPregnancies = value
+            );
+
             configMenu.AddNumberOption(
                 mod: ModManifest,
                 name: () => "Max children",
@@ -87,7 +108,14 @@ namespace FreeLove
                 mod: ModManifest,
                 name: () => "Pendant Price",
                 getValue: () => Config.PendantPrice,
-                setValue: value => Config.PendantPrice = value
+                setValue: value =>
+                {
+                    if (value != Config.PendantPrice)
+                    {
+                        SHelper.GameContent.InvalidateCache("Strings/Locations");
+                    }
+                    Config.PendantPrice = value;
+                }
             );
 
             configMenu.AddNumberOption(
@@ -120,7 +148,7 @@ namespace FreeLove
             LoadModApis();
         }
 
-        private void GameLoop_ReturnedToTitle(object sender, StardewModdingAPI.Events.ReturnedToTitleEventArgs e)
+        private void GameLoop_ReturnedToTitle(object sender, ReturnedToTitleEventArgs e)
         {
             currentSpouses.Clear();
             currentUnofficialSpouses.Clear();
@@ -137,16 +165,20 @@ namespace FreeLove
             ResetSpouses(Game1.player);
 
 
-            foreach (GameLocation location in Game1.locations)
+            if(Config.UseLegacySpousePlacement)
             {
-                if(ReferenceEquals(location.GetType(),typeof(FarmHouse)))
+                foreach (GameLocation location in Game1.locations)
                 {
-                    PlaceSpousesInFarmhouse(location as FarmHouse);
+                    if (ReferenceEquals(location.GetType(), typeof(FarmHouse)))
+                    {
+                        PlaceSpousesInFarmhouse(location as FarmHouse);
+                    }
                 }
             }
+
             if (Game1.IsMasterGame)
             {
-                Game1.getFarm().addSpouseOutdoorArea(Game1.player.spouse == null ? "" : Game1.player.spouse);
+                Game1.getFarm().addSpouseOutdoorArea(Game1.player.spouse ?? "");
                 farmHelperSpouse = GetRandomSpouse(Game1.MasterPlayer);
             }
             foreach(Farmer f in Game1.getAllFarmers())
@@ -159,7 +191,9 @@ namespace FreeLove
             }
         }
 
-
+        /// <summary>
+        /// Checks if the spouses are anywhere in the bed, and if they are, puts them in the correct spots and such
+        /// </summary>
         public static void GameLoop_OneSecondUpdateTicked(object sender, OneSecondUpdateTickedEventArgs e)
         {
             if (!Config.EnableMod)
@@ -167,84 +201,81 @@ namespace FreeLove
 
             foreach (GameLocation location in Game1.locations)
             {
+                if (location is not FarmHouse fh)
+                    continue;
 
-                if (location is FarmHouse)
+                if (fh.owner is null)
+                    continue;
+
+                List<string> allSpouses = GetSpouses(fh.owner, true).Keys.ToList();
+                List<string> bedSpouses = ReorderSpousesForSleeping(allSpouses.FindAll((s) => Config.RoommateRomance || !fh.owner.friendshipData[s].RoommateMarriage));
+
+                using(IEnumerator<NPC> characters = fh.characters.GetEnumerator())
                 {
-                    FarmHouse fh = location as FarmHouse;
-                    if (fh.owner == null)
-                        continue;
-
-                    List<string> allSpouses = GetSpouses(fh.owner, true).Keys.ToList();
-                    List<string> bedSpouses = ReorderSpousesForSleeping(allSpouses.FindAll((s) => Config.RoommateRomance || !fh.owner.friendshipData[s].RoommateMarriage));
-
-                    using(IEnumerator<NPC> characters = fh.characters.GetEnumerator())
+                    while (characters.MoveNext())
                     {
-                        while (characters.MoveNext())
+                        var character = characters.Current;
+                        if (!(character.currentLocation == fh))
                         {
-                            var character = characters.Current;
-                            if (!(character.currentLocation == fh))
-                            {
-                                character.farmerPassesThrough = false;
-                                character.HideShadow = false;
-                                character.isSleeping.Value = false;
-                                continue;
-                            }
+                            character.farmerPassesThrough = false;
+                            character.HideShadow = false;
+                            character.isSleeping.Value = false;
+                            continue;
+                        }
 
-                            if (allSpouses.Contains(character.Name))
-                            {
+                        if (!allSpouses.Contains(character.Name))
+                            continue;
 
-                                if (IsInBed(fh, character.GetBoundingBox()))
+                        if (IsInBed(fh, character.GetBoundingBox()))
+                        {
+                            character.farmerPassesThrough = true;
+
+                            if (!character.isMoving() && (KissingAPI is null || KissingAPI.LastKissed(character.Name) < 0 || KissingAPI.LastKissed(character.Name) > 2))
+                            {
+                                Vector2 bedPos = GetSpouseBedPosition(fh, character.Name);
+                                if (Game1.timeOfDay >= 2000 || Game1.timeOfDay <= 600)
                                 {
-                                    character.farmerPassesThrough = true;
+                                    character.position.Value = bedPos;
 
-                                    if (!character.isMoving() && (kissingAPI == null || kissingAPI.LastKissed(character.Name) < 0 || kissingAPI.LastKissed(character.Name) > 2))
+                                    if (Game1.timeOfDay >= 2200)
                                     {
-                                        Vector2 bedPos = GetSpouseBedPosition(fh, character.Name);
-                                        if (Game1.timeOfDay >= 2000 || Game1.timeOfDay <= 600)
+                                        character.ignoreScheduleToday = true;
+                                    }
+                                    if (!character.isSleeping.Value)
+                                    {
+                                        character.isSleeping.Value = true;
+
+                                    }
+                                    if (character.Sprite.CurrentAnimation is null)
+                                    {
+                                        if (!HasSleepingAnimation(character.Name))
                                         {
-                                            character.position.Value = bedPos;
-
-                                            if (Game1.timeOfDay >= 2200)
-                                            {
-                                                character.ignoreScheduleToday = true;
-                                            }
-                                            if (!character.isSleeping.Value)
-                                            {
-                                                character.isSleeping.Value = true;
-
-                                            }
-                                            if (character.Sprite.CurrentAnimation == null)
-                                            {
-                                                if (!HasSleepingAnimation(character.Name))
-                                                {
-                                                    character.Sprite.StopAnimation();
-                                                    character.faceDirection(0);
-                                                }
-                                                else
-                                                {
-                                                    character.playSleepingAnimation();
-                                                }
-                                            }
+                                            character.Sprite.StopAnimation();
+                                            character.faceDirection(0);
                                         }
                                         else
                                         {
-                                            character.faceDirection(3);
-                                            character.isSleeping.Value = false;
+                                            character.playSleepingAnimation();
                                         }
                                     }
-                                    else
-                                    {
-                                        character.isSleeping.Value = false;
-                                    }
-                                    character.HideShadow = true;
                                 }
-                                else if (Game1.timeOfDay < 2000 && Game1.timeOfDay > 600)
+                                else
                                 {
-                                    character.farmerPassesThrough = false;
-                                    character.HideShadow = false;
+                                    character.faceDirection(3);
                                     character.isSleeping.Value = false;
                                 }
                             }
+                            else
+                            {
+                                character.isSleeping.Value = false;
+                            }
+                            character.HideShadow = true;
+                        }
+                        else if (Game1.timeOfDay < 2000 && Game1.timeOfDay > 600)
+                        {
+                            character.farmerPassesThrough = false;
+                            character.HideShadow = false;
+                            character.isSleeping.Value = false;
                         }
                     }
                 }

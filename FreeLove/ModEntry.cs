@@ -1,9 +1,12 @@
 ﻿using HarmonyLib;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
+using StardewModdingAPI.Events;
+using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.Characters;
 using StardewValley.Events;
+using StardewValley.GameData.Characters;
 using StardewValley.GameData.Shops;
 using StardewValley.Locations;
 using StardewValley.Menus;
@@ -16,39 +19,62 @@ using xTile.Dimensions;
 
 namespace FreeLove
 {
+    // TODO:
+    // "I married Hailey and then married another player. Now I have a wedding twice everyday."
+
     /// <summary>The mod entry point.</summary>
     public partial class ModEntry : Mod
     {
+        public const int bedSleepOffset = 76;
 
-        public static IMonitor SMonitor;
-        public static IModHelper SHelper;
-        public static ModConfig Config;
-        public static ModEntry context;
-        public static Multiplayer mp;
-        public static Random myRand;
-        public static string farmHelperSpouse = null;
-        internal static NPC tempOfficialSpouse;
-        public static int bedSleepOffset = 76;
+        public static IMonitor SMonitor { get; private set; }
+        public static IModHelper SHelper { get; private set; }
+        public static ModConfig Config { get; private set; }
+        public static Random myRand { get; private set; }
+        public static string farmHelperSpouse { get; set; } = null;
 
-        public static string spouseToDivorce = null;
-        public static int divorceHeartsLost;
 
-        public static Dictionary<long, Dictionary<string, NPC>> currentSpouses = new Dictionary<long, Dictionary<string, NPC>>();
-        public static Dictionary<long, Dictionary<string, NPC>> currentUnofficialSpouses = new Dictionary<long, Dictionary<string, NPC>>();
+        private static readonly PerScreen<NPC> tempOfficialSpouse = new(() => null);
+        /// <summary> If set, this will be the name returned in Farmer.spouse</summary>
+        internal static NPC TempOfficialSpouse 
+        { 
+            get => tempOfficialSpouse.Value;
+
+            set => tempOfficialSpouse.Value = value;
+        }
+
+        private static readonly PerScreen<string> spouseToDivorce = new(() => null);
+        /// <summary> The spouse currently being divorced. </summary>
+        internal static string SpouseToDivorce
+        {
+            get => spouseToDivorce.Value;
+
+            set => spouseToDivorce.Value = value;
+        }
+
+        private static readonly PerScreen<int> divorceHeartsLost = new(() => 0);
+        /// <summary> The number of hearts that should be lost thru this divorce. </summary>
+        internal static int DivorceHeartsLost
+        {
+            get => divorceHeartsLost.Value;
+
+            set => divorceHeartsLost.Value = value;
+        }
+
+        public static readonly Dictionary<long, Dictionary<string, NPC>> currentSpouses = new();
+        public static readonly Dictionary<long, Dictionary<string, NPC>> currentUnofficialSpouses = new();
 
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
         {
             Config = Helper.ReadConfig<ModConfig>();
-            context = this;
             if (!Config.EnableMod)
                 return;
 
             SMonitor = Monitor;
             SHelper = helper;
 
-            mp = helper.Reflection.GetField<Multiplayer>(typeof(Game1), "multiplayer").GetValue();
             myRand = new Random();
 
             helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle; ;
@@ -58,6 +84,16 @@ namespace FreeLove
             helper.Events.GameLoop.OneSecondUpdateTicked += GameLoop_OneSecondUpdateTicked;
 
             helper.Events.Content.AssetRequested += Content_AssetRequested;
+
+#if DEBUG
+            helper.Events.Input.ButtonsChanged += (sender, args) =>
+            {
+                if(KeybindList.Parse("F").JustPressed())
+                {
+                    SMonitor.Log($"Valid: {CanNPCStandHere(null, Game1.player.currentLocation, Game1.player.Tile)}");
+                }
+            };
+#endif
 
             PathFindControllerPatches.Initialize(Monitor, Config, helper);
             Divorce.Initialize(Monitor, Config, helper);
@@ -75,6 +111,7 @@ namespace FreeLove
 
             harmony.Patch(
                original: AccessTools.Method(typeof(NPC), nameof(NPC.marriageDuties)),
+               prefix: new HarmonyMethod(typeof(NPCPatches), nameof(NPCPatches.NPC_marriageDuties_Prefix)),
                postfix: new HarmonyMethod(typeof(NPCPatches), nameof(NPCPatches.NPC_marriageDuties_Postfix))
             );
             
@@ -144,9 +181,14 @@ namespace FreeLove
             
             harmony.Patch(
                original: AccessTools.Method(typeof(NPC), nameof(NPC.checkAction)),
-               prefix: new HarmonyMethod(typeof(NPCPatches), nameof(NPCPatches.NPC_checkAction_Prefix))
+               prefix: new HarmonyMethod(typeof(NPCPatches), nameof(NPCPatches.NPC_checkAction_Prefix)),
+               postfix: new HarmonyMethod(typeof(NPCPatches), nameof(NPCPatches.NPC_checkAction_Postfix))
             );
 
+            harmony.Patch(
+               original: AccessTools.Method(typeof(NPC), nameof(NPC.isAdoptionSpouse)),
+               transpiler: new HarmonyMethod(typeof(NPCPatches), nameof(NPCPatches.NPC_isAdoptionSpouse_Transpiler))
+            );
 
             // Child patches
 
@@ -186,7 +228,12 @@ namespace FreeLove
                original: AccessTools.Method(typeof(FarmHouse), nameof(FarmHouse.getSpouseBedSpot)),
                prefix: new HarmonyMethod(typeof(LocationPatches), nameof(LocationPatches.FarmHouse_getSpouseBedSpot_Prefix))
             );
-            
+
+            harmony.Patch(
+               original: AccessTools.Method(typeof(FarmHouse), nameof(FarmHouse.HasNpcSpouseOrRoommate), new Type[] {typeof(string)}),
+               postfix: new HarmonyMethod(typeof(LocationPatches), nameof(LocationPatches.FarmHouse_HasNPCSpouseOrRoommate_Postfix))
+            );
+
             harmony.Patch(
                original: AccessTools.Method(typeof(Beach), nameof(Beach.checkAction)),
                prefix: new HarmonyMethod(typeof(LocationPatches), nameof(LocationPatches.Beach_checkAction_Prefix))
@@ -226,12 +273,20 @@ namespace FreeLove
             );
             harmony.Patch(
                original: AccessTools.Method(typeof(QuestionEvent), nameof(QuestionEvent.setUp)),
-               prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.QuestionEvent_setUp_Prefix))
+               prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.QuestionEvent_setUp_Prefix)),
+               postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.QuestionEvent_setUp_Postfix))
+            );
+
+            harmony.Patch(
+               original: AccessTools.Method(typeof(QuestionEvent), "answerPlayerPregnancyQuestion"),
+               prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.QuestionEvent_answerPregnancyQuestion_Prefix)),
+               postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.QuestionEvent_answerPregnancyQuestion_Postfix))
             );
 
             harmony.Patch(
                original: AccessTools.Method(typeof(BirthingEvent), nameof(BirthingEvent.setUp)),
-               prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.BirthingEvent_setUp_Prefix))
+               prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.BirthingEvent_setUp_Prefix)),
+               postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.BirthingEvent_setUp_Postfix))
             );
 
             harmony.Patch(
@@ -304,20 +359,21 @@ namespace FreeLove
 
             harmony.Patch(
                original: AccessTools.Method(typeof(Event), nameof(Event.answerDialogueQuestion)),
-               prefix: new HarmonyMethod(typeof(EventPatches), nameof(EventPatches.Event_answerDialogueQuestion_Prefix))
+               prefix: new HarmonyMethod(typeof(EventPatches), nameof(EventPatches.Event_answerDialogueQuestion_Prefix)),
+               postfix: new HarmonyMethod(typeof(EventPatches), nameof(EventPatches.Event_answerDialogueQuestion_Postfix))
             );
+
             harmony.Patch(
                original: AccessTools.Method(typeof(Event.DefaultCommands), nameof(Event.DefaultCommands.LoadActors)),
-               prefix: new HarmonyMethod(typeof(EventPatches), nameof(EventPatches.Event_command_loadActors_Prefix)),
-               postfix: new HarmonyMethod(typeof(EventPatches), nameof(EventPatches.Event_command_loadActors_Postfix))
+               transpiler: new HarmonyMethod(typeof(EventPatches), nameof(EventPatches.Event_DefaultCommands_LoadActors_Transpiler))
             );
 
 
             // Game1 patches
 
             harmony.Patch(
-               original: AccessTools.GetDeclaredMethods(typeof(Game1)).Where(m => m.Name == "getCharacterFromName" && m.ReturnType == typeof(NPC)).First(),
-               prefix: new HarmonyMethod(typeof(Game1Patches), nameof(Game1Patches.getCharacterFromName_Prefix))
+               original: AccessTools.Method(typeof(Event.DefaultCommands), nameof(Event.DefaultCommands.Dump)),
+               postfix: new HarmonyMethod(typeof(EventPatches), nameof(EventPatches.Event_DefaultCommands_Dump_Postfix))
             );
 
         }
@@ -327,7 +383,7 @@ namespace FreeLove
             return new FreeLoveAPI();
         }
 
-        private void Content_AssetRequested(object sender, StardewModdingAPI.Events.AssetRequestedEventArgs e)
+        private void Content_AssetRequested(object sender, AssetRequestedEventArgs e)
         {
             if (!Config.EnableMod)
                 return;
@@ -338,10 +394,10 @@ namespace FreeLove
                     var dict = data.AsDictionary<string, ShopData>();
                     try
                     {
-                        for(int i = 0; i < dict.Data["DesertTrade"].Items.Count; i++)
+                        for (int i = 0; i < dict.Data["DesertTrade"].Items.Count; i++)
                         {
-                            if (dict.Data["DesertTrade"].Items[i].ItemId == "(O)808")
-                                dict.Data["DesertTrade"].Items[i].Condition = "PLAYER_FARMHOUSE_UPGRADE Current 1, !PLAYER_HAS_ITEM Current 808";
+                            if (dict.Data["DesertTrade"].Items[i].ItemId == "(O)808") // Void ghost pendant (for asking Krobus to be roommate)
+                                dict.Data["DesertTrade"].Items[i].Condition = "PLAYER_FARMHOUSE_UPGRADE Current 1, !PLAYER_HAS_ITEM Current 808"; // Removes conditions for a number of hearts or the player not to be married
                         }
                     }
                     catch
@@ -350,7 +406,7 @@ namespace FreeLove
                     }
                 });
             }
-            else if (e.NameWithoutLocale.IsEquivalentTo("Data/Events/HaleyHouse"))
+            else if (e.NameWithoutLocale.IsEquivalentTo("Data/Events/HaleyHouse")) // Edit female group 10 heart event 
             {
                 e.Edit(delegate (IAssetData idata)
                 {
@@ -381,7 +437,7 @@ namespace FreeLove
                 });
 
             }
-            else if (e.NameWithoutLocale.IsEquivalentTo("Data/Events/Saloon"))
+            else if (e.NameWithoutLocale.IsEquivalentTo("Data/Events/Saloon")) // Edit male group 10 heart event 
             {
                 e.Edit(delegate (IAssetData idata)
                 {
@@ -408,6 +464,11 @@ namespace FreeLove
             {
                 e.Edit(delegate (IAssetData idata)
                 {
+                    // NPC.cs.3985 is where they are mad at you for giving someone else a gift
+                    // ResourceCollectionQuest.cs.13681 is "Wonderful!"
+                    // ResourceCollectionQuest.cs.13683 is "Thank You!"
+                    // Basically just changes it to "I heard you gave X a gift; Wonderful! Thank You!"
+
                     IDictionary<string, string> data = idata.AsDictionary<string, string>().Data;
                     data["NPC.cs.3985"] = Regex.Replace(data["NPC.cs.3985"], @"\.\.\.\$s.+", $"$n#$b#$c 0.5#{data["ResourceCollectionQuest.cs.13681"]}#{data["ResourceCollectionQuest.cs.13683"]}");
                     Monitor.Log($"NPC.cs.3985 is set to \"{data["NPC.cs.3985"]}\"");
@@ -416,6 +477,7 @@ namespace FreeLove
             }
             else if (e.NameWithoutLocale.IsEquivalentTo("Data/animationDescriptions"))
             {
+                // for all animation data that end with _Sleep, add the same data but lowercase too
                 e.Edit(delegate (IAssetData idata)
                 {
                     IDictionary<string, string> data = idata.AsDictionary<string, string>().Data;
@@ -435,11 +497,12 @@ namespace FreeLove
             {
                 if (!Config.RomanceAllVillagers)
                     return;
+                // Add engagement dialogue for all non-romanceable villagers.
                 e.Edit(delegate (IAssetData idata)
                 {
                     IDictionary<string, string> data = idata.AsDictionary<string, string>().Data;
                     Farmer f = Game1.player;
-                    if (f == null)
+                    if (f is null)
                     {
                         return;
                     }
@@ -456,13 +519,15 @@ namespace FreeLove
                     }
                 });
             }
-            else if (Config.RomanceAllVillagers && (e.NameWithoutLocale.BaseName.StartsWith("Characters/schedules/") || e.NameWithoutLocale.BaseName.StartsWith("Characters\\schedules\\")))
+            else if (Config.RomanceAllVillagers && (e.NameWithoutLocale.StartsWith("Characters/schedules/")))
             {
                 try
                 {
+                    // foreach item in the npc's schedule, if they don't have a marriage version of that item, add one
+                    // TODO: Figure out why? (at least for npcs that are already romanceable); I suspect that it is supposed to check !Game1.characterData[npc.Name].CanBeRomanced
                     string name = e.NameWithoutLocale.BaseName.Replace("Characters/schedules/", "").Replace("Characters\\schedules\\", "");
                     NPC npc = Game1.getCharacterFromName(name);
-                    if (npc != null && npc.Age < 2 && !(npc is Child))
+                    if (npc != null && npc.Age < 2 && npc is not Child)
                     {
                         
                         if (Game1.characterData[npc.Name].CanBeRomanced)
@@ -471,8 +536,7 @@ namespace FreeLove
                             e.Edit(delegate (IAssetData idata)
                             {
                                 IDictionary<string, string> data = idata.AsDictionary<string, string>().Data;
-                                List<string> keys = new List<string>(data.Keys);
-                                foreach (string key in keys)
+                                foreach (string key in data.Keys)
                                 {
                                     if (!data.ContainsKey($"marriage_{key}"))
                                         data[$"marriage_{key}"] = data[key];
@@ -489,11 +553,27 @@ namespace FreeLove
             }
             else if (e.NameWithoutLocale.IsEquivalentTo("Strings/Locations"))
             {
+                // Change the pendant price to the config value
                 e.Edit(delegate (IAssetData idata)
                 {
                     IDictionary<string, string> data = idata.AsDictionary<string, string>().Data;
-                    data["Beach_Mariner_PlayerBuyItem_AnswerYes"] = data["Beach_Mariner_PlayerBuyItem_AnswerYes"].Replace("5000", Config.PendantPrice + "");
+                    data["Beach_Mariner_PlayerBuyItem_AnswerYes"] = data["Beach_Mariner_PlayerBuyItem_AnswerYes"].Replace("5000", Config.PendantPrice.ToString());
                 });
+            }
+            else if (e.NameWithoutLocale.IsEquivalentTo("Data/Characters"))
+            {
+                e.Edit(asset =>
+                {
+                    var data = asset.AsDictionary<string, CharacterData>().Data;
+                    foreach(var kvp in data)
+                    {
+                        kvp.Value.SpouseGiftJealousy = "FALSE";
+                        if(Config.RomanceAllVillagers && kvp.Value.Age is NpcAge.Adult or NpcAge.Teen)
+                        {
+
+                        }
+                    }
+                }, AssetEditPriority.Late);
             }
         }
     }

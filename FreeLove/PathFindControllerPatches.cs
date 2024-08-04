@@ -21,16 +21,16 @@ namespace FreeLove
             Config = config;
             Helper = helper;
         }
-        public static void PathFindController_Prefix(Character c, GameLocation location, ref Point endPoint)
+        public static void PathFindController_Prefix(Character c, GameLocation location, ref Point endPoint, ref int finalFacingDirection)
         {
             try
             {
-                if (!Config.EnableMod || !(c is NPC) || !(c as NPC).isVillager() || !(c as NPC).isMarried() || !(location is FarmHouse) || endPoint == (location as FarmHouse).getEntryLocation())
+                if (!Config.EnableMod || c is not NPC npc || !npc.IsVillager || !npc.isMarried() || location is not FarmHouse house || endPoint == house.getEntryLocation())
                     return;
 
-                if (ModEntry.IsInBed(location as FarmHouse, new Rectangle(endPoint.X * 64, endPoint.Y * 64, 64, 64)))
+                if (ModEntry.IsInBed(house, new Rectangle(endPoint.X * 64, endPoint.Y * 64, 64, 64)))
                 {
-                    Point point = ModEntry.GetSpouseBedEndPoint(location as FarmHouse, c.Name);
+                    Point point = ModEntry.GetSpouseBedEndPoint(house, c.Name);
                     if(point.X < 0 || point.Y < 0)
                     {
                         Monitor.Log($"Error setting bed endpoint for {c.Name}", LogLevel.Warn);
@@ -43,10 +43,11 @@ namespace FreeLove
                 }
                 else if (IsColliding(c, location, endPoint))
                 {
-                    var point = (location as FarmHouse).getRandomOpenPointInHouse(Game1.random);
-                    if(point != Point.Zero)
+                    var pointDirection = ModEntry.GetRandomGoodSpotInFarmhouse(house);
+                    if(pointDirection.Spot != Vector2.Zero)
                     {
-                        endPoint = point;
+                        endPoint = pointDirection.Spot.ToPoint();
+                        finalFacingDirection = pointDirection.Direction;
                         Monitor.Log($"Moved {c.Name} endpoint to random point {endPoint}");
                     }
                 }
@@ -59,22 +60,20 @@ namespace FreeLove
 
         private static bool IsColliding(Character c, GameLocation location, Point endPoint)
         {
-           
             Monitor.Log($"Checking {c.Name} endpoint in farmhouse");
-            using (IEnumerator<Character> characters = location.characters.GetEnumerator())
+
+            foreach(Character character in location.characters)
             {
-                while (characters.MoveNext())
+                if (character != c)
                 {
-                    if(characters.Current != c)
+                    if (character.TilePoint == endPoint || (character is NPC && (character as NPC).controller?.endPoint == endPoint))
                     {
-                        if(characters.Current.TilePoint == endPoint || (characters.Current is NPC && (characters.Current as NPC).controller?.endPoint == endPoint))
-                        {
-                            Monitor.Log($"{c.Name} endpoint {endPoint} collides with {characters.Current.Name}");
-                            return true;
-                        }
+                        Monitor.Log($"{c.Name} endpoint {endPoint} collides with {character.Name}");
+                        return true;
                     }
                 }
             }
+
             return false;
         }
     }

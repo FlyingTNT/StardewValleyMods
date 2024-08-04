@@ -14,7 +14,7 @@ namespace LongerSeasons
         private static void Utility_getSeasonNameFromNumber_Postfix(ref string __result)
         {
             // Check IsWorldReady b/c the month is stored in the save file, and so we don't know it until the world is ready (basically save is loaded)
-            if(Config.MonthsPerSeason > 1 && Context.IsWorldReady)
+            if(Config.MonthsPerSpring > 1 && Config.MonthsPerSummer > 1 && Config.MonthsPerFall > 1 && Config.MonthsPerWinter > 1 && Context.IsWorldReady)
             {
                 __result += $" {CurrentSeasonMonth}";
             }

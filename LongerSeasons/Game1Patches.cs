@@ -88,7 +88,17 @@ namespace LongerSeasons
         /// <returns>True if the current season should be incremented; i.e. the current month is the last in the season.</returns>
         protected static bool IncrementSeasonMonth()
         {
-            bool shouldIncrementSeason = CurrentSeasonMonth >= Config.MonthsPerSeason;
+            bool shouldIncrementSeason;
+            if (Game1.season == Season.Spring) {
+                shouldIncrementSeason = CurrentSeasonMonth >= Config.MonthsPerSpring;
+            }
+            else if (Game1.season == Season.Summer) {
+                shouldIncrementSeason = CurrentSeasonMonth >= Config.MonthsPerSummer;
+            }
+            else if (Game1.season == Season.Fall) {
+                shouldIncrementSeason = CurrentSeasonMonth >= Config.MonthsPerFall;
+            }
+            else {shouldIncrementSeason = CurrentSeasonMonth >= Config.MonthsPerWinter;}
 
             CurrentSeasonMonth = shouldIncrementSeason ? 1 : CurrentSeasonMonth + 1;
 

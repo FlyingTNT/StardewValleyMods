@@ -40,6 +40,8 @@ namespace LongerSeasons
             }
         }
 
+        
+
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
@@ -213,9 +215,29 @@ namespace LongerSeasons
             );
             configMenu.AddNumberOption(
                 mod: ModManifest,
-                name: () => "Months per Season",
-                getValue: () => Config.MonthsPerSeason,
-                setValue: value => (Context.IsMainPlayer ? Config : LocalConfig).MonthsPerSeason = value
+                name: () => "Months per Spring",
+                getValue: () => Config.MonthsPerSpring,
+                setValue: value => (Context.IsMainPlayer ? Config : LocalConfig).MonthsPerSpring = value
+            );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => "Months per Summer",
+                getValue: () => Config.MonthsPerSummer,
+                setValue: value => (Context.IsMainPlayer ? Config : LocalConfig).MonthsPerSummer = value
+            );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => "Months per Fall",
+                getValue: () => Config.MonthsPerFall,
+                setValue: value => (Context.IsMainPlayer ? Config : LocalConfig).MonthsPerFall = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => "Months per Winter",
+                getValue: () => Config.MonthsPerWinter,
+                setValue: value => (Context.IsMainPlayer ? Config : LocalConfig).MonthsPerWinter = value
             );
         }
 

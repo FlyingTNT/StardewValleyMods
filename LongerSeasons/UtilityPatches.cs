@@ -11,10 +11,10 @@ namespace LongerSeasons
     public partial class ModEntry
     {
 
-        private static void Utility_getSeasonNameFromNumber_Postfix(ref string __result)
+        private static void Utility_getSeasonNameFromNumber_Postfix(int number, ref string __result)
         {
             // Check IsWorldReady b/c the month is stored in the save file, and so we don't know it until the world is ready (basically save is loaded)
-            if(Config.MonthsPerSeason > 1 && Context.IsWorldReady)
+            if(Context.IsWorldReady && Utilities.GetMonthsInSeason(number) > 1)
             {
                 __result += $" {CurrentSeasonMonth}";
             }

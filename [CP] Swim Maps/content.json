@@ -4,17 +4,17 @@
         {
             "Action": "Load",
             "Target": "Maps/UnderwaterMountain, Maps/UnderwaterBeach, Maps/CrystalCave, Maps/CrystalCaveDark",
-            "FromFile": "assets/{{TargetWithoutPath}}.tbin"
+            "FromFile": "assets/{{TargetWithoutPath}}.tmx"
         },
 		{
             "Action": "Load",
             "Target": "Maps/ScubaMaskCave",
-            "FromFile": "assets/Cave.tbin"
+            "FromFile": "assets/Cave.tmx"
         },
 		{
             "Action": "Load",
             "Target": "Maps/ScubaAbigailCave",
-            "FromFile": "assets/Abigail.tbin"
+            "FromFile": "assets/Abigail.tmx"
         },
 		{
 			"Action": "EditData",

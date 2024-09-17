@@ -30,13 +30,13 @@ namespace Swim
             if (whichAnswer == "SwimMod_Mariner_Questions_Yes")
             {
                 CreateMarinerQuestions();
-                string preface = SHelper.Translation.Get(Game1.player.mailReceived.Contains("SwimMod_Mariner_Already") ? "SwimMod_Mariner_Questions_Yes_Old" : "SwimMod_Mariner_Questions_Yes");
+                TryGetTranslation(Game1.player.mailReceived.Contains("SwimMod_Mariner_Already") ? "SwimMod_Mariner_Questions_Yes_Old" : "SwimMod_Mariner_Questions_Yes", out string preface);
                 Game1.player.mailReceived.Add("SwimMod_Mariner_Already");
                 ShowNextQuestion(preface, 0);
             }
             else if (whichAnswer == "SwimMod_Mariner_Questions_No")
             {
-                string preface = SHelper.Translation.Get(Game1.player.mailReceived.Contains("SwimMod_Mariner_Already") ? "SwimMod_Mariner_Questions_No_Old" : "SwimMod_Mariner_Questions_No");
+                TryGetTranslation(Game1.player.mailReceived.Contains("SwimMod_Mariner_Already") ? "SwimMod_Mariner_Questions_No_Old" : "SwimMod_Mariner_Questions_No", out string preface);
                 Game1.player.mailReceived.Add("SwimMod_Mariner_Already");
                 Game1.drawObjectDialogue(preface);
             }
@@ -48,15 +48,18 @@ namespace Swim
                 switch(keys[keys.Length-1])
                 {
                     case "Y":
-                        preface = string.Format(SHelper.Translation.Get($"SwimMod_Mariner_Answer_Y_{keys[keys.Length - 3]}"), playerTerm);
+                        TryGetTranslation($"SwimMod_Mariner_Answer_Y_{keys[keys.Length - 3]}", out string preface1);
+                        preface = string.Format(preface1, playerTerm);
                         break;
                     case "N":
-                        preface = string.Format(SHelper.Translation.Get("SwimMod_Mariner_Answer_N"), playerTerm);
+                        TryGetTranslation("SwimMod_Mariner_Answer_N", out string preface2);
+                        preface = string.Format(preface2, playerTerm);
                         Game1.drawObjectDialogue(preface);
                         ModEntry.marinerQuestionsWrongToday.Value = true;
                         return;
                     case "S":
-                        preface = string.Format(SHelper.Translation.Get("SwimMod_Mariner_Answer_S"), playerTerm);
+                        TryGetTranslation("SwimMod_Mariner_Answer_S", out string preface3);
+                        preface = string.Format(preface3, playerTerm);
                         Game1.drawObjectDialogue(preface);
                         ModEntry.marinerQuestionsWrongToday.Value = true;
                         return;
@@ -80,8 +83,7 @@ namespace Swim
                 int i = 1;
                 while (true)
                 {
-                    Translation r = SHelper.Translation.Get($"SwimMod_Mariner_Question_{i}");
-                    if (!r.HasValue())
+                    if (!TryGetTranslation($"SwimMod_Mariner_Question_{i}", out string _))
                         break;
                     marinerQuestions.Add(i++);
                 }
@@ -100,10 +102,9 @@ namespace Swim
         private static void ShowNextQuestion(string preface, int index)
         {
             int qi = marinerQuestions[index];
-            Translation s2 = SHelper.Translation.Get($"SwimMod_Mariner_Question_{qi}");
-            if (!s2.HasValue())
+            if (!TryGetTranslation($"SwimMod_Mariner_Question_{qi}", out string s2))
             {
-                SMonitor.Log("no dialogue: " + s2.ToString(), LogLevel.Error);
+                SMonitor.Log("no dialogue: " + s2, LogLevel.Error);
                 return;
             }
             //Monitor.Value.Log("has dialogue: " + s2.ToString());
@@ -111,10 +112,9 @@ namespace Swim
             int i = 1;
             while (true)
             {
-                Translation r = SHelper.Translation.Get($"SwimMod_Mariner_Question_{qi}_{i}");
-                if (!r.HasValue())
+                if (!TryGetTranslation($"SwimMod_Mariner_Question_{qi}_{i}", out string r))
                     break;
-                string str = r.ToString().Split('#')[0];
+                string str = r.Split('#')[0];
                 SMonitor.Log(str);
 
                 responses.Add(new Response($"SwimMod_Mariner_Question_{qi}_{index}_{r.ToString().Split('#')[1]}", str));
@@ -126,13 +126,35 @@ namespace Swim
         private static void CompleteEvent()
         {
             string playerTerm = Game1.content.LoadString("Strings\\Locations:Beach_Mariner_Player_" + (Game1.player.IsMale ? "Male" : "Female"));
-            string preface = SHelper.Translation.Get("SwimMod_Mariner_Completed");
+            TryGetTranslation("SwimMod_Mariner_Completed", out string preface);
             Game1.drawObjectDialogue(string.Format(preface, playerTerm));
             Game1.stopMusicTrack(StardewValley.GameData.MusicContext.Default);
             Game1.playSound("Cowboy_Secret");
             Game1.player.mailReceived.Add("SwimMod_Mariner_Completed");
             Game1.player.currentLocation.resetForPlayerEntry();
             SwimMaps.AddScubaChest(Game1.player.currentLocation, new Vector2(10,6), "ScubaTank");
+        }
+
+        internal static bool TryGetTranslation(string key, out string translation)
+        {
+            bool hasCPTranslation = GetTranslationDictionary().TryGetValue(key, out var translation1);
+
+            if (hasCPTranslation)
+            {
+                translation = translation1;
+                return true;
+            }
+
+            Translation translation2 = SHelper.Translation.Get(key);
+
+            translation = translation2;
+
+            return translation2.HasValue();
+        }
+
+        private static Dictionary<string, string> GetTranslationDictionary()
+        {
+            return Game1.content.Load<Dictionary<string, string>>("Mods/FlyingTNT.Swim/i18n");
         }
     }
 }

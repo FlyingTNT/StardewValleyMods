@@ -4,7 +4,6 @@ using Microsoft.Xna.Framework.Graphics;
 using StardewValley;
 using StardewValley.GameData.Crops;
 using StardewValley.GameData.Machines;
-using StardewValley.GameData.Objects;
 using StardewValley.ItemTypeDefinitions;
 using StardewValley.Menus;
 using StardewValley.Objects;
@@ -18,17 +17,16 @@ namespace SeedInfo
     {
         public static Season[] seasons = new Season[] {Season.Spring, Season.Summer, Season.Fall, Season.Winter};
 
-        public static ObjectDataDefinition preserveItemFactory = new ObjectDataDefinition();
+        public static readonly ObjectDataDefinition preserveItemFactory = new();
 
-        public static ObjectInfo GetCrop(Object seed, int quality)
+        public static ObjectInfo GetCrop(Item seed, int quality)
         {
             if (!tryGetCropData(seed.ItemId, out CropData data))
                 return null;
             try
             {
-                Object obj = ItemRegistry.Create<Object>("(O)" + data.HarvestItemId, 1, quality, false); //  Add unique identifier because it seems to prefer BigCraftables when casting to Object (and crops aren't BigCraftables)
-                //SMonitor.Log($"{seed.DisplayName}'s crop is {obj.DisplayName}.");
-                return new ObjectInfo(obj);
+                Item item = ItemRegistry.Create(data.HarvestItemId, 1, quality, false);
+                return new ObjectInfo(item);
             }
             catch
             {
@@ -36,36 +34,38 @@ namespace SeedInfo
             return null;
         }
 
-        public static ObjectInfo GetPickle(Object crop, int quality)
+        public static ObjectInfo GetPickle(Item crop, int quality)
         {
             if (crop is null)
                 return null;
-            Object obj;
+
             if (crop.Category == Object.flowersCategory)
             {
-                obj = preserveItemFactory.CreateFlavoredHoney(crop);
+                Object obj = preserveItemFactory.CreateFlavoredHoney(ItemRegistry.Create<Object>(crop.QualifiedItemId));
+                obj.Quality = quality;
+                return new ObjectInfo(obj);
             }
-            else if (crop.Category == Object.FruitsCategory)
-            {
-                obj = preserveItemFactory.CreateFlavoredJelly(crop);
-            }
-            else
-            {
-                obj = preserveItemFactory.CreateFlavoredPickle(crop);
-            }
-            obj.Quality = quality;
-            //SMonitor.Log($"{crop.DisplayName} pickles to {obj?.DisplayName}");
-            return new ObjectInfo(obj);
+
+            Item output = GetMachineOutput(crop, "(BC)15"); // (BC)15 is preserve jar
+
+            if (output is null)
+                return null;
+
+            output.Quality = quality;
+
+            SMonitor.Log($"{crop.DisplayName} jars to {output.DisplayName} with price {output.salePrice()}");
+
+            return new ObjectInfo(output);
         }
 
-        public static ObjectInfo GetKeg(Object crop, int quality)
+        public static ObjectInfo GetKeg(Item crop, int quality)
         {
             if (crop is null)
                 return null;
 
             if(crop.Category == Object.flowersCategory && Config.DisplayMead)
             {
-                Object pickle = GetPickle(crop, quality).obj;
+                Item pickle = GetPickle(crop, quality).obj;
                 if(pickle.ItemId == "340") // If it is honey
                 {
                     return GetKeg(pickle, quality);
@@ -77,64 +77,31 @@ namespace SeedInfo
             if (output is null)
                 return null;
 
-            Object outputObject = ItemRegistry.Create<Object>(output.QualifiedItemId, 1, quality);
+            output.Quality = quality;
 
-            if (outputObject.preserve.Value is Object.PreserveType type) // preserve.Value seems to never be set.
-            {
-                //SMonitor.Log($"Using the factory for {outputObject.DisplayName} with price {outputObject.salePrice()}");
-                outputObject = preserveItemFactory.CreateFlavoredItem(type, crop);
-                outputObject.Quality = quality;
-            }else if(outputObject.ItemId == "350") // Juice
-            {
-                //SMonitor.Log($"Using the factory for {outputObject.DisplayName} with price {outputObject.salePrice()}");
-                outputObject = preserveItemFactory.CreateFlavoredJuice(crop);
-                outputObject.Quality = quality;
-            }else if(outputObject.ItemId == "348") // Wine
-            {
-                //SMonitor.Log($"Using the factory for {outputObject.DisplayName} with price {outputObject.salePrice()}");
-                outputObject = preserveItemFactory.CreateFlavoredWine(crop);
-                outputObject.Quality = quality;
-            }
+            SMonitor.Log($"{crop.DisplayName} kegs to {output.DisplayName} with price {output.salePrice()}");
 
-            //SMonitor.Log($"{crop.DisplayName} kegs to {outputObject?.DisplayName} with price {outputObject.salePrice()}");
-
-            return new ObjectInfo(outputObject);
+            return new ObjectInfo(output);
         }
 
-        public static ObjectInfo GetDehydrator(Object crop, int quality)
+        public static ObjectInfo GetDehydrator(Item crop, int quality)
         {
             if (crop is null)
                 return null;
 
-            Item output = GetMachineOutput(crop, "(BC)Dehydrator"); // (BC)Dehydrator is keg
+            Item output = GetMachineOutput(crop, "(BC)Dehydrator"); // (BC)Dehydrator is dehydrator
 
             if (output is null)
                 return null;
 
-            Object outputObject = ItemRegistry.Create<Object>(output.QualifiedItemId, 1, quality);
+            output.Quality = quality;
 
-            if (outputObject.preserve.Value is Object.PreserveType type) // preserve.Value seems to never be set.
-            {
-                outputObject = preserveItemFactory.CreateFlavoredItem(type, crop);
-                outputObject.Quality = quality;
-            }
-            else if (outputObject.ItemId == "DriedFruit") // Dried fruit
-            {
-                outputObject = preserveItemFactory.CreateFlavoredDriedFruit(crop);
-                outputObject.Quality = quality;
-            }
-            else if (outputObject.ItemId == "DriedMushrooms") // Dried mushrooms
-            {
-                outputObject = preserveItemFactory.CreateFlavoredDriedMushroom(crop);
-                outputObject.Quality = quality;
-            }
+            SMonitor.Log($"{crop.DisplayName} dehydrates to {output.DisplayName} with price {output.salePrice()}");
 
-            SMonitor.Log($"{crop.DisplayName} dehydrates to {outputObject?.DisplayName} with price {outputObject.salePrice()}");
-
-            return new ObjectInfo(outputObject);
+            return new ObjectInfo(output);
         }
 
-        public static Item GetMachineOutput(Object input, string machineQualifiedId)
+        public static Item GetMachineOutput(Item input, string machineQualifiedId)
         {
             Dictionary<string, MachineData> machineData = DataLoader.Machines(Game1.content);
             if(!machineData.TryGetValue(machineQualifiedId, out MachineData data))
@@ -148,9 +115,9 @@ namespace SeedInfo
 
             MachineOutputRule rule;
 
-            if (!MachineDataUtility.TryGetMachineOutputRule(machine, data, MachineOutputTrigger.ItemPlacedInMachine, inputItem, Game1.player, Game1.getFarm(), out MachineOutputRule baseRule, out MachineOutputTriggerRule triggerRule, out MachineOutputRule ruleIgnoringCount, out MachineOutputTriggerRule triggerIgnoringCount))
+            if (!MachineDataUtility.TryGetMachineOutputRule(machine, data, MachineOutputTrigger.ItemPlacedInMachine, inputItem, Game1.player, Game1.getFarm(), out MachineOutputRule baseRule, out MachineOutputTriggerRule _, out MachineOutputRule ruleIgnoringCount, out MachineOutputTriggerRule triggerIgnoringCount))
             {
-                if(ruleIgnoringCount != null) // ruleIgnoringCount is a rule that would have applied except that there weren't enough items.
+                if(ruleIgnoringCount is not null) // ruleIgnoringCount is a rule that would have applied except that there weren't enough items.
                 {
                     inputItem.Stack = triggerIgnoringCount.RequiredCount;
                     rule = ruleIgnoringCount;
@@ -159,21 +126,22 @@ namespace SeedInfo
                 {
                     return null;
                 }
-            }else
+            }
+            else
             {
                 rule = baseRule;
             }
 
             MachineItemOutput mio = MachineDataUtility.GetOutputData(machine, data, rule, inputItem, Game1.player, Game1.getFarm());
 
-            if (mio == null)
+            if (mio is null)
                 return null;
 
             return MachineDataUtility.GetOutputItem(machine, mio, inputItem, Game1.player, true, out int? _);
         }
 
         // Returns "" if it needs no fertilizer and null if no fertilizer could save it.
-        public static string NeedFertilizer(Object seed)
+        public static string NeedFertilizer(Item seed)
         {
             if (!tryGetCropData(seed.ItemId, out CropData data))
                 return "0";
@@ -224,7 +192,7 @@ namespace SeedInfo
             {
                 if (shopMenu.currentItemIndex + i > shopMenu.forSale.Count - 1)
                     break;
-                if (shopMenu.forSale[shopMenu.currentItemIndex + i] != shopMenu.hoveredItem || shopMenu.forSale[shopMenu.currentItemIndex + i] is not Object || !shopDict.TryGetValue(((Object)shopMenu.forSale[shopMenu.currentItemIndex + i]).QualifiedItemId, out var info))
+                if (shopMenu.forSale[shopMenu.currentItemIndex + i] != shopMenu.hoveredItem || shopMenu.forSale[shopMenu.currentItemIndex + i] is not Item || !shopDict.TryGetValue(shopMenu.forSale[shopMenu.currentItemIndex + i].QualifiedItemId, out var info))
                     continue;
                 var mousePos = Game1.getMousePosition();
                 var pos = shopMenu.forSaleButtons[i].bounds.Location.ToVector2() + new Vector2(64, 64);

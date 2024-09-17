@@ -48,7 +48,7 @@ namespace Swim
             try
             {
                 SMonitor.Log($"exiting event");
-                if (__instance.exitLocation != null && __instance.exitLocation != null && __instance.exitLocation.Location.waterTiles != null && __instance.exitLocation.Location.waterTiles[(int)(Game1.player.positionBeforeEvent.X),(int)(Game1.player.positionBeforeEvent.Y)])
+                if (__instance.exitLocation != null && __instance.exitLocation.Location.waterTiles != null && __instance.exitLocation.Location.isTileOnMap(Game1.player.positionBeforeEvent) && __instance.exitLocation.Location.waterTiles[(int)(Game1.player.positionBeforeEvent.X),(int)(Game1.player.positionBeforeEvent.Y)])
                 {
                     SMonitor.Log($"swimming again");
                     ChangeAfterEvent();
@@ -68,11 +68,11 @@ namespace Swim
         }
 
 
-        public static void Farmer_updateCommon_Prefix(ref Farmer __instance)
+        public static void Farmer_updateCommon_Prefix(Farmer __instance)
         {
             try
             {
-                if (__instance.swimming.Value && (!Config.ReadyToSwim || Config.SwimRestoresVitals) && __instance.timerSinceLastMovement > 0 && !Game1.eventUp && (Game1.activeClickableMenu == null || Game1.IsMultiplayer) && !Game1.paused)
+                if (__instance.swimming.Value && (Config.SwimRestoresVitals || ModEntry.locationIsPool.Value) && __instance.timerSinceLastMovement > 0 && !Game1.eventUp && (Game1.activeClickableMenu == null || Game1.IsMultiplayer) && !Game1.paused)
                 {
                     if (__instance.timerSinceLastMovement > 800)
                     {
@@ -89,19 +89,18 @@ namespace Swim
                 SMonitor.Log($"Failed in {nameof(Farmer_updateCommon_Prefix)}:\n{ex}", LogLevel.Error);
             }
         }
-        public static void Farmer_updateCommon_Postfix(ref Farmer __instance)
+        public static void Farmer_updateCommon_Postfix(Farmer __instance)
         {
             try
             {
-                if (__instance.swimming.Value && (!Config.ReadyToSwim || Config.SwimRestoresVitals) && __instance.timerSinceLastMovement > 0 && !Game1.eventUp && (Game1.activeClickableMenu == null || Game1.IsMultiplayer) && !Game1.paused)
+                if (__instance.swimming.Value && (Config.SwimRestoresVitals || ModEntry.locationIsPool.Value) && __instance.timerSinceLastMovement > 0 && !Game1.eventUp && (Game1.activeClickableMenu == null || Game1.IsMultiplayer) && !Game1.paused)
                 {
                     if (__instance.swimTimer < 0)
                     {
                         __instance.swimTimer = 100;
-                        if (__instance.stamina < (float)__instance.maxStamina.Value)
+                        if (__instance.stamina < __instance.MaxStamina)
                         {
-                            float stamina = __instance.stamina;
-                            __instance.stamina = stamina + 1f;
+                            __instance.stamina++;
                         }
                         if (__instance.health < __instance.maxHealth)
                         {
@@ -115,9 +114,12 @@ namespace Swim
                 SMonitor.Log($"Failed in {nameof(Farmer_updateCommon_Postfix)}:\n{ex}", LogLevel.Error);
             }
         }
+
+        /// <summary>
+        /// Cuts the swim restoring health and stamina logic out of updateCommon (it is re-added it the above pre- and post- fixes).
+        /// </summary>
         public static IEnumerable<CodeInstruction> Farmer_updateCommon_Transpiler(IEnumerable<CodeInstruction> instructions)
         {
-
             var codes = new List<CodeInstruction>(instructions);
             try
             {
@@ -175,12 +177,6 @@ namespace Swim
             try
             {
                 __state = __instance.bathingClothes.Value;
-
-                if(__instance.swimming.Value)
-                {
-                    __instance.bathingClothes.Value = true;
-                    return;
-                }
 
                 if (__instance.bathingClothes.Value && Config.AllowRunningWhileInSwimsuit)
                 {
@@ -339,39 +335,6 @@ namespace Swim
             }
         }
 
-        public static void GameLocation_performTouchAction_Prefix(string fullActionString)
-        {
-            try
-            {
-                string[] text = fullActionString.Split(new char[]
-                {
-                    ' '
-                });
-                GameLocation_performTouchAction_PrefixArray(text);
-            }
-            catch (Exception ex)
-            {
-                SMonitor.Log($"Failed in {nameof(GameLocation_performTouchAction_Prefix)}:\n{ex}", LogLevel.Error);
-            }
-        }
-        public static void GameLocation_performTouchAction_PrefixArray(string[] action)
-        {
-            try
-            {
-                string text = action[0];
-                if (text == "PoolEntrance")
-                {
-                    if (!Game1.player.swimming.Value)
-                    {
-                        Config.ReadyToSwim = false;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                SMonitor.Log($"Failed in {nameof(GameLocation_performTouchAction_PrefixArray)}:\n{ex}", LogLevel.Error);
-            }
-        }
         public static void GameLocation_performTouchAction_Postfix(string fullActionString)
         {
             try
@@ -407,7 +370,7 @@ namespace Swim
 
                             if (ModEntry.marinerQuestionsWrongToday.Value)
                             {
-                                string preface = SHelper.Translation.Get("SwimMod_Mariner_Wrong_Today");
+                                SwimDialog.TryGetTranslation("SwimMod_Mariner_Wrong_Today", out string preface);
                                 Game1.drawObjectDialogue(string.Format(preface, playerTerm));
                             }
                             else
@@ -417,7 +380,8 @@ namespace Swim
                                 new Response("SwimMod_Mariner_Questions_Yes", Game1.content.LoadString("Strings\\Lexicon:QuestionDialogue_Yes")),
                                 new Response("SwimMod_Mariner_Questions_No", Game1.content.LoadString("Strings\\Lexicon:QuestionDialogue_No"))
                                 };
-                                __instance.createQuestionDialogue(Game1.parseText(String.Format(SHelper.Translation.Get(Game1.player.mailReceived.Contains("SwimMod_Mariner_Already") ? "SwimMod_Mariner_Questions_Old" : "SwimMod_Mariner_Questions").ToString(), playerTerm)), answers, "SwimMod_Mariner_Questions");
+                                SwimDialog.TryGetTranslation(Game1.player.mailReceived.Contains("SwimMod_Mariner_Already") ? "SwimMod_Mariner_Questions_Old" : "SwimMod_Mariner_Questions", out string preface);
+                                __instance.createQuestionDialogue(Game1.parseText(string.Format(preface, playerTerm)), answers, "SwimMod_Mariner_Questions");
                             }
                         }
                     }
@@ -432,7 +396,7 @@ namespace Swim
         {
             try
             {
-                if (__result == false || !isFarmer || character?.Equals(Game1.player) != true || !Game1.player.swimming.Value || ModEntry.isUnderwater.Value)
+                if (__result == false || !isFarmer || character?.Equals(Game1.player) != true || !Game1.player.swimming.Value || ModEntry.isUnderwater.Value || ModEntry.locationIsPool.Value)
                     return;
 
                 Vector2 next = SwimUtils.GetNextTile();

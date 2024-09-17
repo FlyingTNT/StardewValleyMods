@@ -130,20 +130,11 @@ namespace ResourceStorage
                 __result = true;
         }
 
-        // Watch for inlining
-        public static bool Object_ConsumeInventoryItem_Prefix(Farmer who, Item drop_in, ref int amount)
-        {
-            if (!Config.ModEnabled || !Config.AutoUse)
-                return true;
-
-            amount += (int)ModifyResourceLevel(who, drop_in.QualifiedItemId, -amount, auto: true);
-            return amount > 0;
-        }
-
         public static void CraftingRecipe_ConsumeAdditionalIngredientsPrefix(ref List<KeyValuePair<string, int>> additionalRecipeItems)
         {
             if (!Config.ModEnabled || !Config.AutoUse)
                 return;
+
             for (int i = 0; i < additionalRecipeItems.Count; i++)
             {
                 additionalRecipeItems[i] = new KeyValuePair<string, int>(additionalRecipeItems[i].Key, additionalRecipeItems[i].Value - ConsumeItemsForCrafting(Game1.player, additionalRecipeItems[i].Key, additionalRecipeItems[i].Value));
@@ -298,38 +289,6 @@ namespace ResourceStorage
                 SetupResourceButton(__instance);
 
             __instance.allClickableComponents.Add(resourceButton.Value);
-        }
-
-        public static void Leclair_Stardew_Common_InventoryHelper_CountItem_Postfix(Farmer who, Func<Item, bool> matcher, ref int __result)
-        {
-            if (!Config.ModEnabled)
-                return;
-            var resDict = GetFarmerResources(who);
-            foreach(var res in resDict)
-            {
-                Object obj = new Object(DequalifyItemId(res.Key), (int)res.Value);
-                if (matcher(obj))
-                {
-                    __result = (int.MaxValue - (int)res.Value < __result) ? int.MaxValue : (int)res.Value + __result;
-                    return;
-                }
-            }
-        }
-        public static void Leclair_Stardew_Common_InventoryHelper_ConsumeItem_Prefix(Func<Item, bool> matcher, IList<Item> items, ref int amount)
-        {
-            if (!Config.ModEnabled || items != Game1.player.Items)
-                return;
-
-            var resDict = GetFarmerResources(Game1.player);
-            foreach(var res in resDict)
-            {
-                Object obj = new Object(DequalifyItemId(res.Key), (int)res.Value);
-                if (matcher(obj))
-                {
-                    amount += (int)ModifyResourceLevel(Game1.player, res.Key, -amount, auto: true);
-                    return;
-                }
-            }
         }
     }
 }

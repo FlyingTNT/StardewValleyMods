@@ -1,21 +1,24 @@
 ﻿using HarmonyLib;
 using Microsoft.Xna.Framework.Graphics;
 using Newtonsoft.Json;
+using ResourceStorage.BetterCrafting;
 using StardewModdingAPI;
+using StardewModdingAPI.Events;
 using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.Inventories;
 using StardewValley.Menus;
 using System;
 using System.Collections.Generic;
-using Object = StardewValley.Object;
+using Common.Integrations;
+using Common.Utilities;
+using System.Linq;
 
 namespace ResourceStorage
 {
     /// <summary>The mod entry point.</summary>
     public partial class ModEntry : Mod
     {
-
         public static IMonitor SMonitor;
         public static IModHelper SHelper;
         public static ModConfig Config;
@@ -24,9 +27,14 @@ namespace ResourceStorage
         public static string dictKey = "aedenthorn.ResourceStorage/dictionary"; // Not updating to FlyingTNT.ResourceStorage for backwards compatibility
         public static Dictionary<long, Dictionary<string, long>> resourceDict = new();
 
+        public const string sharedDictionaryKey = "FlyingTNT.ResourceStorage/sharedDictionary";
+        public const string autoStoreKey = "FlyingTNT.ResourceStorage/autoStore";
+
         public static PerScreen<GameMenu> gameMenu = new PerScreen<GameMenu>();
         public static PerScreen<ClickableTextureComponent> resourceButton = new PerScreen<ClickableTextureComponent>();
-        private Harmony harmony;
+
+        private static readonly PerScreen<List<string>> cachedAutoStore = new PerScreen<List<string>>(() => new());
+        public static List<string> AutoStore => cachedAutoStore.Value;
 
 
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
@@ -41,10 +49,13 @@ namespace ResourceStorage
             SHelper = helper;
 
             Helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
+            Helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
             Helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
             Helper.Events.GameLoop.Saving += GameLoop_Saving;
 
-            harmony = new Harmony(ModManifest.UniqueID);
+            SharedResourceManager.Initialize(Monitor, helper, Config, ModManifest);
+
+            Harmony harmony = new Harmony(ModManifest.UniqueID);
 
             #region INVENTORY_PATCHES
             harmony.Patch(
@@ -92,13 +103,6 @@ namespace ResourceStorage
             harmony.Patch(
                 original: AccessTools.Method(typeof(Farmer), nameof(Farmer.couldInventoryAcceptThisItem), new Type[] { typeof(string), typeof(int), typeof(int) }),
                 postfix: new HarmonyMethod(typeof(ModEntry), nameof(Farmer_couldInventoryAcceptThisItem2_Postfix))
-            );
-            #endregion
-
-            #region OBJECT_PATCHES
-            harmony.Patch(
-                original: AccessTools.Method(typeof(Object), nameof(Object.ConsumeInventoryItem), new Type[] { typeof(Farmer), typeof(Item), typeof(int) }),
-                prefix: new HarmonyMethod(typeof(ModEntry), nameof(Object_ConsumeInventoryItem_Prefix))
             );
             #endregion
 
@@ -167,70 +171,40 @@ namespace ResourceStorage
             #endregion
         }
 
-        public void GameLoop_Saving(object sender, StardewModdingAPI.Events.SavingEventArgs e)
+        public void GameLoop_Saving(object sender, SavingEventArgs e)
         {
-            foreach (var f in Game1.getAllFarmers())
-            {
-                if (resourceDict.TryGetValue(f.UniqueMultiplayerID, out var dict))
-                {
-                    SMonitor.Log($"Saving resource dictionary for {f.Name}");
-                    f.modData[dictKey] = JsonConvert.SerializeObject(dict);
-                }
-            }
+            SaveResourceDictionary(Game1.player);
+
+            // We always save it after we edit AutoStore, so it shouldn't be necessary to save it here, but I'm doing it just to be safe.
+            PerPlayerConfig.SaveConfigOption(Game1.player, autoStoreKey, string.Join(',', AutoStore));
         }
 
-        public void GameLoop_SaveLoaded(object sender, StardewModdingAPI.Events.SaveLoadedEventArgs e)
+        public void GameLoop_SaveLoaded(object sender, SaveLoadedEventArgs e)
         {
-            if(Context.IsMainPlayer)
-            {
-                SMonitor.Log("Clearing the resource dictionary!");
-                resourceDict.Clear();
-            }
+            SMonitor.Log("Removing this player's dictionary.");
+            resourceDict.Remove(Game1.player.UniqueMultiplayerID);
+            cachedAutoStore.Value = PerPlayerConfig.LoadConfigOption(Game1.player, autoStoreKey, defaultValue: Config.AutoStore).Split(',').ToList();
         }
 
-        public void GameLoop_GameLaunched(object sender, StardewModdingAPI.Events.GameLaunchedEventArgs e)
+        public void GameLoop_ReturnedToTitle(object sender, ReturnedToTitleEventArgs e)
         {
-            var bcapi = Helper.ModRegistry.GetApi("leclair.bettercrafting");
-            if (bcapi is not null)
-            {
-                var type = bcapi.GetType().Assembly.GetType("Leclair.Stardew.Common.InventoryHelper");
-                if (type is not null)
-                {
-                    try
-                    {
-                        foreach(var m in type.GetMethods())
-                        {
-                            if(m.Name == "CountItem" && m.GetParameters().Length > 1 && m.GetParameters()[1].ParameterType == typeof(Farmer))
-                            {
-                                harmony.Patch(
-                                    original: m,
-                                    postfix: new HarmonyMethod(typeof(ModEntry), nameof(Leclair_Stardew_Common_InventoryHelper_CountItem_Postfix))
-                                );
-                            }
-                            else if (m.Name == "ConsumeItem")
-                            {
-                                harmony.Patch(
-                                    original: m,
-                                    prefix: new HarmonyMethod(typeof(ModEntry), nameof(Leclair_Stardew_Common_InventoryHelper_ConsumeItem_Prefix))
-                                );
-                            }
-                        }
-                    }
-                    catch(Exception ex)
-                    {
-                        Monitor.Log($"Error: {ex}", LogLevel.Error);
-                    }
-                }
-            }
+            SMonitor.Log("Removing this player's dictionary.");
+            resourceDict.Remove(Game1.player.UniqueMultiplayerID);
+        }
+
+        public void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
+        {
+            BetterCraftingIntegration.Initialize(SMonitor, SHelper, Config);
+
             // get Generic Mod Config Menu's API (if it's installed)
-            var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            var configMenu = SHelper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
             if (configMenu is not null)
             {
                 // register mod
                 configMenu.Register(
                     mod: ModManifest,
                     reset: () => Config = new ModConfig(),
-                    save: () => Helper.WriteConfig(Config)
+                    save: () => SHelper.WriteConfig(Config)
                 );
 
                 configMenu.AddBoolOption(
@@ -253,7 +227,15 @@ namespace ResourceStorage
                     getValue: () => Config.ShowMessage,
                     setValue: value => Config.ShowMessage = value
                 );
-                
+
+                configMenu.AddBoolOption(
+                    mod: ModManifest,
+                    name: () => SHelper.Translation.Get("GMCM_UseSharedResources_Name"),
+                    getValue: () => SharedResourceManager.UseSharedResources.Value,
+                    setValue: value => SharedResourceManager.ChangeShouldUseShared(value)
+                );
+
+                // KEYBINDS
                 configMenu.AddKeybind(
                     mod: ModManifest,
                     name: () => SHelper.Translation.Get("GMCM_Option_ResourcesKey_Name"),
@@ -288,7 +270,6 @@ namespace ResourceStorage
                     setValue: value => Config.ModKey2Amount = value
                 );
 
-
                 configMenu.AddKeybind(
                     mod: ModManifest,
                     name: () => SHelper.Translation.Get("GMCM_Option_ModKey3_Name"),
@@ -302,6 +283,7 @@ namespace ResourceStorage
                     setValue: value => Config.ModKey3Amount = value
                 );
 
+                // ICON POSITIONS
                 configMenu.AddNumberOption(
                     mod: ModManifest,
                     name: () => SHelper.Translation.Get("GMCM_Option_IconOffsetX_Name"),
@@ -316,6 +298,33 @@ namespace ResourceStorage
                     setValue: value => Config.IconOffsetY = value
                 );
 
+                configMenu.AddNumberOption(
+                    mod: ModManifest,
+                    name: () => SHelper.Translation.Get("GMCM_Option_SearchBarOffsetX_Name"),
+                    getValue: () => Config.SearchBarOffsetX,
+                    setValue: value => Config.SearchBarOffsetX = value
+                );
+
+                configMenu.AddNumberOption(
+                    mod: ModManifest,
+                    name: () => SHelper.Translation.Get("GMCM_Option_SearchBarOffsetY_Name"),
+                    getValue: () => Config.SearchBarOffsetY,
+                    setValue: value => Config.SearchBarOffsetY = value
+                );
+
+                configMenu.AddNumberOption(
+                    mod: ModManifest,
+                    name: () => SHelper.Translation.Get("GMCM_Option_SortButtonOffsetX_Name"),
+                    getValue: () => Config.SortButtonOffsetX,
+                    setValue: value => Config.SortButtonOffsetX = value
+                );
+
+                configMenu.AddNumberOption(
+                    mod: ModManifest,
+                    name: () => SHelper.Translation.Get("GMCM_Option_SortButtonOffsetY_Name"),
+                    getValue: () => Config.SortButtonOffsetY,
+                    setValue: value => Config.SortButtonOffsetY = value
+                );
             }
         }
     }

@@ -636,11 +636,6 @@ namespace Swim
                         buff.millisecondsDuration = 50;
                     }
                 }
-
-                if(Game1.player.running)
-                {
-                    Game1.player.setRunning(false);
-                }
             }
 
             if(!SwimUtils.isSafeToTryJump())

@@ -1,20 +1,12 @@
 ﻿using HarmonyLib;
-using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using StardewModdingAPI;
 using StardewValley;
-using StardewValley.BellsAndWhistles;
 using StardewValley.GameData.Shops;
 using StardewValley.Menus;
-using StardewValley.Network;
-using StardewValley.Objects;
-using StardewValley.Tools;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using xTile.Dimensions;
 using Object = StardewValley.Object;
 using Rectangle = Microsoft.Xna.Framework.Rectangle;
 
@@ -36,9 +28,9 @@ namespace SeedInfo
                 shopDict.Clear();
                 for(int i = 0; i < __instance.forSale.Count; i++)
                 {
-                    if (__instance.forSale[i] is not Object || (__instance.forSale[i] as Object).Category != Object.SeedsCategory)
+                    if (__instance.forSale[i] is not Item item || item.Category != Object.SeedsCategory)
                         continue;
-                    shopDict[((Object)__instance.forSale[i]).QualifiedItemId] = new SeedEntryInfo((Object)__instance.forSale[i]);
+                    shopDict[item.QualifiedItemId] = new SeedEntryInfo(item);
                 }
             }
         }

@@ -1,0 +1,19 @@
+﻿{
+  "Name": "Floor Content Pack for MSF",
+  "Author": "RedrusFijorn",
+  "Version": "1.0.1",
+  "Description": "",
+  "UniqueID": "Redrus.MSFFloorPack",
+  "MinimumApiVersion": "3.5.0",
+  "UpdateKeys": [ "Nexus:25303@RedrusFloorPack" ],
+  "ContentPackFor": {
+    "UniqueID": "FlyingTNT.MultipleFloorFarmhouse",
+    "MinimumVersion": "0.1.0"
+  },
+  "Dependencies": [
+   {
+      "UniqueID": "FlyingTNT.MultipleFloorFarmhouse",
+      "IsRequired": true
+   },
+  ]
+}

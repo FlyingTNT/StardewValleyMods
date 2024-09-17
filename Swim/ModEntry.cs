@@ -5,17 +5,12 @@ using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewModdingAPI.Utilities;
 using StardewValley;
-using StardewValley.GameData.Locations;
-using StardewValley.GameData.Shirts;
 using StardewValley.Menus;
 using StardewValley.Tools;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using xTile;
-using xTile.Dimensions;
-using xTile.Tiles;
+using Common.Integrations;
 using Rectangle = Microsoft.Xna.Framework.Rectangle; 
 
 namespace Swim
@@ -160,16 +155,6 @@ namespace Swim
             );
 
             harmony.Patch(
-               original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.performTouchAction), new Type[] {typeof(string), typeof(Vector2)}),
-               prefix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.GameLocation_performTouchAction_Prefix))
-            );
-
-            harmony.Patch(
-               original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.performTouchAction), new Type[] { typeof(string[]), typeof(Vector2) }),
-               prefix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.GameLocation_performTouchAction_PrefixArray))
-            );
-
-            harmony.Patch(
                original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.checkAction)),
                prefix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.GameLocation_checkAction_Prefix))
             );
@@ -196,6 +181,10 @@ namespace Swim
             else if (e.NameWithoutLocale.IsEquivalentTo("Portraits\\Mariner"))
             {
                 e.LoadFrom(() => {return Game1.content.Load<Texture2D>("Portraits\\Gil");}, AssetLoadPriority.Low);
+            }
+            else if (e.NameWithoutLocale.IsEquivalentTo("Mods/FlyingTNT.Swim/i18n"))
+            {
+                e.LoadFrom(() => SwimUtils.Geti18nDict(), AssetLoadPriority.Medium);
             }
             else
             {

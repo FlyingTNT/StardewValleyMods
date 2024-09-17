@@ -549,7 +549,7 @@ namespace Swim
         internal static bool CanSwimHere()
         {
             GameLocation location = Game1.player.currentLocation;
-            bool result = (!Config.SwimIndoors || location.IsOutdoors) && location is not VolcanoDungeon && location is not BathHousePool && location is not BoatTunnel && !ModEntry.locationIsPool.Value;
+            bool result = (!Config.SwimIndoors || location.IsOutdoors) && location is not VolcanoDungeon && location is not BoatTunnel && !ModEntry.locationIsPool.Value;
             if (!result)
                 return false;
 
@@ -602,6 +602,20 @@ namespace Swim
                     return 0; // Up
                 }
             }
+        }
+
+        public static Dictionary<string, string> Geti18nDict()
+        {
+            IEnumerable<Translation> translations = SHelper.Translation.GetTranslations();
+
+            Dictionary<string, string> i18nDict = new Dictionary<string, string>();
+
+            foreach(Translation translation in translations)
+            {
+                i18nDict.Add(translation.Key, translation);
+            }
+
+            return i18nDict;
         }
     }
 }

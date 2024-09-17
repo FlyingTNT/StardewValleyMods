@@ -10,7 +10,7 @@ namespace SeedInfo
         public List<QualityInfo> info = new();
         public string needFertilizer;
 
-        public SeedEntryInfo(Object seed)
+        public SeedEntryInfo(Item seed)
         {
             needFertilizer = ModEntry.NeedFertilizer(seed);
             foreach (int q in ModEntry.qualities)
@@ -28,11 +28,11 @@ namespace SeedInfo
         public ObjectInfo pickle;
         public ObjectInfo keg;
         public ObjectInfo dehydrate;
-        public QualityInfo(Object seed, int q)
+        public QualityInfo(Item seed, int q)
         {
             quality = q;
             crop = ModEntry.GetCrop(seed, q);
-            if (crop == null)
+            if (crop is null)
             {
                 return;
             }
@@ -48,14 +48,14 @@ namespace SeedInfo
 
     public class ObjectInfo
     {
-        public ObjectInfo(Object obj)
+        public ObjectInfo(Item obj)
         {
             this.obj = obj;
             name = obj.DisplayName;
             desc = obj.getDescription();
             price = obj.sellToStorePrice();
         }
-        public Object obj;
+        public Item obj;
         public string name;
         public string desc;
         public int price;

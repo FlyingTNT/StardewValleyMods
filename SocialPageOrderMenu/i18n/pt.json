@@ -1,0 +1,21 @@
+{
+  "sort": "Ordenar",
+  "sort-0": "Amizade (Asc)",
+  "sort-1": "Amizade (Desc)",
+  "sort-2": "Nome (Asc)",
+  "sort-3": "Nome (Desc)",
+  "sort-by": "Ordenar Por ", // Note: The sort option text (sort-0, sort-1...) is directly appended onto this, so it should have a trailing space (if necessary in your language)
+  "GMCM-EnableMod": "Ativar Mod",
+  "GMCM-PreviousSortKey": "Chave de Ordenação Anterior",
+  "GMCM-NextSortKey": "Próxima Chave de Ordenação",
+  "GMCM-UseFilter": "Usar Filtro",
+  "GMCM-UseButton": "Usar Botão",
+  "GMCM-UseDropdown": "Usar Menu Suspenso",
+  "GMCM-AutoFocusSearch": "Auto-Focar a Barra de Pesquisa",
+  "GMCM-ButtonOffsetX": "Deslocamento X do Botão",
+  "GMCM-ButtonOffsetY": "Deslocamento Y do Botão",
+  "GMCM-DropdownOffsetX": "Deslocamento X do Menu Suspenso",
+  "GMCM-DropdownOffsetY": "Deslocamento Y do Menu Suspenso",
+  "GMCM-FilterOffsetX": "Deslocamento X do Filtro",
+  "GMCM-FilterOffsetY": "Deslocamento Y do Filtro"
+}

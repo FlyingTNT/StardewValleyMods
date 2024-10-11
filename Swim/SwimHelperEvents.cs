@@ -287,7 +287,7 @@ namespace Swim
         public static void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
             ModEntry.setupModConfig();
-
+            
             // fix dive maps
 
             foreach (IContentPack contentPack in SHelper.ContentPacks.GetOwned())
@@ -316,6 +316,8 @@ namespace Swim
             {
                 LoadBreatheSound();
             }
+            var quickSaveApi = SHelper.ModRegistry.GetApi<IQuickSaveAPI>("DLX.QuickSave");
+            quickSaveApi.SavingEvent += (o, _) => GameLoop_Saving(o, new SavingEventArgs());
         }
 
         private static void LoadBreatheSound()

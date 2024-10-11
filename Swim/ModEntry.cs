@@ -195,6 +195,9 @@ namespace Swim
         public static void GameLoop_GameLaunched_ConfigOnly(object sender, GameLaunchedEventArgs e)
         {
             setupModConfig();
+            var quickSaveApi = SHelper.ModRegistry.GetApi<IQuickSaveAPI>("DLX.QuickSave");
+            quickSaveApi.SavingEvent += (o, _) => SwimHelperEvents.GameLoop_Saving(o, new SavingEventArgs());
+
         }
 
         public static void setupModConfig()

@@ -42,9 +42,6 @@ namespace SocialPageOrderRedux
         /// <summary> The button object. </summary>
         public static readonly PerScreen<ClickableTextureComponent> button = new();
 
-        /// <summary> The position to return to when returning to the social page after clicking to a ProfileMenu (the npc at the top of the screen when you click on a character to open their page).  </summary>
-        public static readonly PerScreen<int> lastSlotPosition = new PerScreen<int>(() => 0);
-
         /// <summary> The string that was in the filter field the last time it was checked. </summary>
         private static readonly PerScreen<string> lastFilterString = new PerScreen<string>(()=>"");
 
@@ -88,7 +85,6 @@ namespace SocialPageOrderRedux
             helper.Events.Content.LocaleChanged += Content_LocaleChanged;
 
             var harmony = new Harmony(ModManifest.UniqueID);
-            harmony.PatchAll();
 
             harmony.Patch(AccessTools.Constructor(typeof(SocialPage), new Type[] { typeof(int), typeof(int), typeof(int), typeof(int) }),
                 postfix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_Constructor_Postfix))
@@ -101,19 +97,27 @@ namespace SocialPageOrderRedux
             harmony.Patch(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.receiveKeyPress)),
                 prefix: new HarmonyMethod(typeof(ModEntry), nameof(GameMenu_recieveKeyPress_Prefix))
             );
-            
+
+            harmony.Patch(AccessTools.Method(typeof(SocialPage), nameof(SocialPage.receiveLeftClick)),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_receiveLeftClick_Prefix))
+            );
+
+            harmony.Patch(AccessTools.Method(typeof(SocialPage), nameof(SocialPage.releaseLeftClick)),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_releaseLeftClick_Prefix))
+            );
+
             harmony.Patch(AccessTools.Method(typeof(SocialPage), nameof(SocialPage.performHoverAction)),
                 postfix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_performHoverAction_Postfix))
-            );
-            
-            harmony.Patch(AccessTools.Method(typeof(SocialPage), nameof(SocialPage.updateSlots)),
-                prefix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_updateSlots_Prefix))
             );
             
             harmony.Patch(AccessTools.Method(typeof(SocialPage), nameof(SocialPage.FindSocialCharacters)),
                 postfix: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_FindSocialCharacters_Postfix))
             );
-            
+
+            harmony.Patch(AccessTools.Method(typeof(SocialPage), nameof(SocialPage.draw), new Type[] {typeof(SpriteBatch)}),
+                transpiler: new HarmonyMethod(typeof(ModEntry), nameof(SocialPage_draw_Transpiler))
+            );
+
             harmony.Patch(AccessTools.Method(typeof(IClickableMenu), nameof(IClickableMenu.populateClickableComponentList)),
                 postfix: new HarmonyMethod(typeof(ModEntry), nameof(IClickableMenu_populateClickableComponentList_Postfix))
             );
@@ -127,11 +131,11 @@ namespace SocialPageOrderRedux
             );
         }
 
+        #region EVENTS
         private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
-
             // get Generic Mod Config Menu's API (if it's installed)
-            var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>(IDs.GMCM);
             if (configMenu is null)
                 return;
 
@@ -253,37 +257,10 @@ namespace SocialPageOrderRedux
 
         private void Display_MenuChanged(object sender, MenuChangedEventArgs e)
         {
-            lastFilterString.Value += "dirty";// Force an update
-
-            if (Game1.activeClickableMenu is not GameMenu menu)
-                return;
-
-            if(Config.UseFilter && e.OldMenu is not ProfileMenu)
+            if (Config.UseFilter && filterField.Value is not null && e.OldMenu is not ProfileMenu && e.NewMenu is not ProfileMenu)
             {
+                SMonitor.Log("Clearing the filter field.");
                 filterField.Value.Text = "";
-            }
-
-            if (menu.GetCurrentPage() is not SocialPage socialPage)
-                return;
-
-            // Resort the social page (it is reset when the menu is changed); if the previous menu was a ProfileMenu (the menu that pops up when you click on a npc in the social page), scroll the menu to that npc
-            ResortSocialList(slotToSelect: e.OldMenu is ProfileMenu pm ? pm.Current : null);
-
-            // Snap the cursor to the selected item if necessary
-            if (Game1.options.snappyMenus && Game1.options.gamepadControls)
-            {
-                if(socialPage.currentlySnappedComponent is not null)
-                {
-                    // For some reason, the snapping doesn't work correctly in local multiplayer. I have no idea why. With moveCursorInDirection(-1), the cursor is at least consistently *in* the correct box.
-                    if (Context.IsSplitScreen)
-                        socialPage.moveCursorInDirection(-1);
-                    else
-                        socialPage.snapCursorToCurrentSnappedComponent();
-                }
-                else
-                {
-                    SMonitor.Log("Currently snapped component is null.");
-                }
             }
         }
 
@@ -304,7 +281,11 @@ namespace SocialPageOrderRedux
             dropDown.Value.RecalculateBounds();
         }
 
-        public static void SocialPage_Constructor_Postfix(SocialPage __instance)
+        #endregion
+
+        #region SOCIAL_PAGE_SETUP_PATCHES
+
+        public static void SocialPage_Constructor_Postfix()
         {
             if (!Config.EnableMod)
                 return;
@@ -315,9 +296,18 @@ namespace SocialPageOrderRedux
         public static void SocialPage_FindSocialCharacters_Postfix(List<SocialEntry> __result)
         {
             // __result is the list of all of the entries
-
             allEntries.Value.Clear();
             allEntries.Value.AddRange(__result);
+
+            // Remove all of the characters affected by the filter (the filter text should always be "" unless returning from a ProfileMenu)
+            if(Config.UseFilter && filterField.Value is not null && filterField.Value.Text != "")
+            {
+                __result.RemoveAll((entry) => !entry.DisplayName.ToLower().StartsWith(filterField.Value.Text.ToLower()));
+                lastFilterString.Value = filterField.Value.Text;
+            }
+
+            // Sort the characters
+            __result.Sort(GetSort());
         }
 
         public static void IClickableMenu_populateClickableComponentList_Postfix(IClickableMenu __instance)
@@ -328,6 +318,63 @@ namespace SocialPageOrderRedux
             __instance.allClickableComponents.Add(button.Value);
         }
 
+        #endregion
+
+        #region DRAW_PATCH
+
+        public static IEnumerable<CodeInstruction> SocialPage_draw_Transpiler(IEnumerable<CodeInstruction> instructions)
+        {
+            // This needs to be a transpiler instead of a prefix/postfix because the page starts a new SpriteBatch at the start and end of the method, and we want to use the same SpriteBatch it uses.
+            SMonitor.Log("Transpiling SocialPage.draw");
+            var codes = new List<CodeInstruction>(instructions);
+            int index = codes.FindLastIndex(ci => ci.opcode == OpCodes.Call && (MethodInfo)ci.operand == AccessTools.Method(typeof(IClickableMenu), nameof(IClickableMenu.drawTextureBox), new Type[] { typeof(SpriteBatch), typeof(Texture2D), typeof(Rectangle), typeof(int), typeof(int), typeof(int), typeof(int), typeof(Color), typeof(float), typeof(bool), typeof(float) }));
+            if(index > -1)
+            {
+                SMonitor.Log("Inserting dropdown draw method");
+                codes.Insert(index + 1, new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(ModEntry), nameof(DrawDropDown))));
+                codes.Insert(index + 1, new CodeInstruction(OpCodes.Ldarg_1));
+                codes.Insert(index + 1, new CodeInstruction(OpCodes.Ldarg_0));
+
+            }
+            return codes.AsEnumerable();
+        }
+
+        public static void DrawDropDown(SocialPage page, SpriteBatch b)
+        {
+            if (!Config.EnableMod)
+                return;
+
+            try
+            {
+                if (Config.UseFilter)
+                {
+                    UpdateFilterPosition(page);
+                    filterField.Value.Draw(b);
+                }
+
+                if (Config.UseDropdown)
+                {
+                    dropDown.Value.draw(b, GetDropdownX(page), GetDropdownY(page));
+                    if (SHelper.Input.IsDown(SButton.MouseLeft) && AccessTools.FieldRefAccess<OptionsDropDown, bool>(dropDown.Value, "clicked") && dropDown.Value.dropDownBounds.Contains(Game1.getMouseX() - GetDropdownX(page), Game1.getMouseY() - GetDropdownY(page)))
+                    {
+                        dropDown.Value.selectedOption = (int)Math.Max(Math.Min((float)(Game1.getMouseY() - GetDropdownY(page) - dropDown.Value.dropDownBounds.Y) / (float)dropDown.Value.bounds.Height, (float)(dropDown.Value.dropDownOptions.Count - 1)), 0f);
+                    }
+                }
+
+                if (Config.UseButton)
+                {
+                    button.Value.draw(b);
+                }
+            }
+            catch(Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(DrawDropDown)}: {ex}", LogLevel.Error);
+            }
+        }
+
+        #endregion
+
+        #region PLAYER_INPUT_PATCHES
         public static void IClickableMenu_readyToClose_Postfix(IClickableMenu __instance, ref bool __result)
         {
             if (!Config.EnableMod || __instance is not SocialPage || filterField.Value is null)
@@ -338,111 +385,65 @@ namespace SocialPageOrderRedux
             __result &= !filterField.Value.Selected;
         }
 
-        [HarmonyPatch(typeof(SocialPage), nameof(SocialPage.draw), new Type[] { typeof(SpriteBatch) })]
-        public class SocialPage_drawTextureBox_Patch
+        public static void SocialPage_performHoverAction_Postfix(SocialPage __instance, int x, int y, ref string ___hoverText)
         {
-            public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-            {
-                SMonitor.Log("Transpiling SocialPage.draw");
-                var codes = new List<CodeInstruction>(instructions);
-                int index = codes.FindLastIndex(ci => ci.opcode == OpCodes.Call && (MethodInfo)ci.operand == AccessTools.Method(typeof(IClickableMenu), nameof(IClickableMenu.drawTextureBox), new Type[] { typeof(SpriteBatch), typeof(Texture2D), typeof(Rectangle), typeof(int), typeof(int), typeof(int), typeof(int), typeof(Color), typeof(float), typeof(bool), typeof(float) }));
-                if(index > -1)
-                {
-                    SMonitor.Log("Inserting dropdown draw method");
-                    codes.Insert(index + 1, new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(SocialPage_drawTextureBox_Patch), nameof(DrawDropDown))));
-                    codes.Insert(index + 1, new CodeInstruction(OpCodes.Ldarg_1));
-                    codes.Insert(index + 1, new CodeInstruction(OpCodes.Ldarg_0));
+            if (!Config.EnableMod)
+                return;
 
-                }
-                return codes.AsEnumerable();
+            if (Config.UseFilter && filterField.Value is not null)
+            {
+                filterField.Value.Hover(x, y);
             }
-            public static void DrawDropDown(SocialPage page, SpriteBatch b)
+
+            if (Config.UseButton && button.Value is not null)
             {
-                if (!Config.EnableMod)
-                    return;
-
-                try
+                button.Value.bounds = GetButtonRectangle(__instance);
+                if (button.Value.bounds.Contains(x, y))
                 {
-                    if (Config.UseFilter)
-                    {
-                        UpdateFilterPosition(page);
-                        filterField.Value.Draw(b);
-                    }
-
-                    if (Config.UseDropdown)
-                    {
-                        dropDown.Value.draw(b, GetDropdownX(page), GetDropdownY(page));
-                        if (SHelper.Input.IsDown(SButton.MouseLeft) && AccessTools.FieldRefAccess<OptionsDropDown, bool>(dropDown.Value, "clicked") && dropDown.Value.dropDownBounds.Contains(Game1.getMouseX() - GetDropdownX(page), Game1.getMouseY() - GetDropdownY(page)))
-                        {
-                            dropDown.Value.selectedOption = (int)Math.Max(Math.Min((float)(Game1.getMouseY() - GetDropdownY(page) - dropDown.Value.dropDownBounds.Y) / (float)dropDown.Value.bounds.Height, (float)(dropDown.Value.dropDownOptions.Count - 1)), 0f);
-                        }
-                    }
-
-                    if (Config.UseButton)
-                    {
-                        button.Value.bounds = GetButtonRectangle(page);
-                        button.Value.draw(b);
-                        if (button.Value.bounds.Contains(Game1.getMousePosition()))
-                        {
-                            (Game1.activeClickableMenu as GameMenu).hoverText = SHelper.Translation.Get($"sort-by") + SHelper.Translation.Get($"sort-{CurrentSort}");
-                        }
-                    }
-                }
-                catch(Exception ex)
-                {
-                    SMonitor.Log($"Failed in {nameof(DrawDropDown)}: {ex}", LogLevel.Error);
+                    ___hoverText = SHelper.Translation.Get($"sort-by") + SHelper.Translation.Get($"sort-{CurrentSort}");
                 }
             }
         }
-        [HarmonyPatch(typeof(SocialPage), nameof(SocialPage.receiveLeftClick))]
-        public class SocialPage_receiveLeftClick_Patch
+
+        public static bool SocialPage_receiveLeftClick_Prefix(SocialPage __instance, int x, int y)
         {
-            public static bool Prefix(SocialPage __instance, int x, int y)
+            if (!Config.EnableMod)
+                return true;
+
+            if (Config.UseDropdown && dropDown.Value.bounds.Contains(x - GetDropdownX(__instance), y - GetDropdownY(__instance)))
             {
-                if (!Config.EnableMod)
-                    return true;
+                dropDown.Value.receiveLeftClick(x - GetDropdownX(__instance), y - GetDropdownY(__instance));
+                return false;
+            }
 
-                lastSlotPosition.Value = SHelper.Reflection.GetField<int>(__instance, "slotPosition").GetValue();
-
-                if (Config.UseDropdown && dropDown.Value.bounds.Contains(x - GetDropdownX(__instance), y - GetDropdownY(__instance)))
+            if(Config.UseButton)
+            {
+                if (button.Value.bounds.Contains(x, y))
                 {
-                    dropDown.Value.receiveLeftClick(x - GetDropdownX(__instance), y - GetDropdownY(__instance));
+                    IncrementSort();
                     return false;
                 }
-
-                if(Config.UseButton)
-                {
-                    if (button.Value.bounds.Contains(x, y))
-                    {
-                        IncrementSort();
-                        return false;
-                    }
-                }
-
-                if (Config.UseFilter)
-                    filterField.Value.Update();
-                return true;
             }
+
+            if (Config.UseFilter)
+                filterField.Value.Update();
+            return true;
         }
 
-        [HarmonyPatch(typeof(SocialPage), nameof(SocialPage.releaseLeftClick))]
-        public class SocialPage_releaseLeftClick_Patch
+        public static bool SocialPage_releaseLeftClick_Prefix(SocialPage __instance, int x, int y)
         {
-            public static bool Prefix(SocialPage __instance, int x, int y)
-            {
-                if (!Config.EnableMod || !Config.UseDropdown)
-                    return true;
-
-                if (AccessTools.FieldRefAccess<OptionsDropDown, bool>(dropDown.Value, "clicked"))
-                {
-                    if(dropDown.Value.dropDownBounds.Contains(Game1.getMouseX() - GetDropdownX(__instance), Game1.getMouseY() - GetDropdownY(__instance)))
-                    {
-                        dropDown.Value.leftClickReleased(Game1.getMouseX() - GetDropdownX(__instance), Game1.getMouseY() - GetDropdownY(__instance));
-                    }
-                    return false;
-                }
+            if (!Config.EnableMod || !Config.UseDropdown)
                 return true;
+
+            if (AccessTools.FieldRefAccess<OptionsDropDown, bool>(dropDown.Value, "clicked"))
+            {
+                if(dropDown.Value.dropDownBounds.Contains(Game1.getMouseX() - GetDropdownX(__instance), Game1.getMouseY() - GetDropdownY(__instance)))
+                {
+                    dropDown.Value.leftClickReleased(Game1.getMouseX() - GetDropdownX(__instance), Game1.getMouseY() - GetDropdownY(__instance));
+                }
+                return false;
             }
+            return true;
         }
 
         public static bool SocialPage_recieveKeyPress_Prefix(IClickableMenu __instance, Keys key)
@@ -456,7 +457,7 @@ namespace SocialPageOrderRedux
                 return true;
             }
 
-            socialPage.updateSlots();
+            ApplyFilter(socialPage);
             return false;
         }
 
@@ -471,33 +472,8 @@ namespace SocialPageOrderRedux
                 return true;
             }
 
-            socialPage.updateSlots();
+            ApplyFilter(socialPage);
             return false;
-        }
-
-        public static void SocialPage_performHoverAction_Postfix(int x, int y)
-        {
-            if (!Config.EnableMod || !Config.UseFilter)
-                return;
-            filterField.Value.Hover(x, y);
-        }
-
-        public static void SocialPage_updateSlots_Prefix(SocialPage __instance)
-        {
-            if (!Config.EnableMod || !Config.UseFilter || filterField.Value is null || lastFilterString.Value == filterField.Value.Text)
-                return;
-
-            lastFilterString.Value = filterField.Value.Text;
-
-            __instance.SocialEntries.Clear();
-
-            __instance.SocialEntries.AddRange(filterField.Value.Text == "" ? allEntries.Value : allEntries.Value.Where((entry)=>entry.DisplayName.ToLower().StartsWith(filterField.Value.Text)));
-
-            SHelper.Reflection.GetField<int>(__instance, "numFarmers").SetValue(__instance.SocialEntries.Count((SocialEntry p) => p.IsPlayer));
-
-            __instance.CreateComponents();
-
-            ResortSocialList();
         }
 
         public static void GameMenu_changeTab_Postfix(GameMenu __instance)
@@ -518,184 +494,246 @@ namespace SocialPageOrderRedux
                 filterField.Value.Selected = Config.SearchBarAutoFocus && (__instance.currentTab == GameMenu.socialTab);
         }
 
-        public static void ResortSocialList(SocialEntry slotToSelect = null)
+        #endregion
+
+        #region SORT_AND_FILTER_METHODS
+
+        public static void ResortSocialList()
         {
-            if (Game1.activeClickableMenu is GameMenu)
+            if (Game1.activeClickableMenu is not GameMenu activeMenu)
             {
-                SocialPage page = (Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab] as SocialPage;
+                return;
+            }
 
-                List<NameSpriteSlot> nameSprites = new List<NameSpriteSlot>();
-                List<ClickableTextureComponent> sprites = new List<ClickableTextureComponent>(SHelper.Reflection.GetField<List<ClickableTextureComponent>>(page, "sprites").GetValue());
-                for (int i = 0; i < page.SocialEntries.Count; i++)
+            if(GameMenu.socialTab >= activeMenu.pages.Count || activeMenu.pages[GameMenu.socialTab] is not SocialPage page)
+            {
+                return;
+            }
+
+            List<NameSpriteSlot> nameSprites = new();
+            List<ClickableTextureComponent> sprites = SHelper.Reflection.GetField<List<ClickableTextureComponent>>(page, "sprites").GetValue();
+
+            // Make sure the SocialEntries, sprites, and characterSlots have the same number of elements. If they don't use the lowest number of elements.
+            // It should be impossible for them to not be equal, but somebody got an index error somewhere in this function so I'm just being safe.
+            int count = sprites.Count;
+            if(page.SocialEntries.Count != sprites.Count || page.SocialEntries.Count != page.characterSlots.Count)
+            {
+                SMonitor.Log($"The Social Entry, sprites, and character slot counts are not equal ({page.SocialEntries.Count} vs {sprites.Count} vs {page.characterSlots.Count}).");
+                count = Math.Min(Math.Min(count, page.SocialEntries.Count), page.characterSlots.Count);
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                nameSprites.Add(new NameSpriteSlot(page.SocialEntries[i], sprites[i], page.characterSlots[i]));
+            }
+
+            // Sort the nameSprites list based on the current sort
+            Comparison<SocialEntry> sort = GetSort();
+            nameSprites.Sort((NameSpriteSlot x, NameSpriteSlot y) => sort(x.entry, y.entry));
+
+            var bounds = page.characterSlots.Select(slot => slot.bounds).ToList();
+
+            for (int i = 0; i < count; i++)
+            {
+                NameSpriteSlot nameSpriteSlot = nameSprites[i];
+
+                nameSpriteSlot.slot.myID = i;
+                nameSpriteSlot.slot.downNeighborID = i + 1;
+                nameSpriteSlot.slot.upNeighborID = i - 1;
+
+                // If this is the first slot, set its up neighbor to the social tab.
+                if (nameSpriteSlot.slot.upNeighborID < 0)
                 {
-                    nameSprites.Add(new NameSpriteSlot(page.SocialEntries[i], sprites[i], page.characterSlots[i]));
+                    nameSpriteSlot.slot.upNeighborID = GameMenu.region_socialTab;
                 }
-                switch (CurrentSort)
+
+                // If we have the button, set the slot's left neighbor to the button
+                if(Config.UseButton)
                 {
-                    case 0: // friend asc
-                        SMonitor.Log("sorting by friend asc");
-                        nameSprites.Sort(delegate (NameSpriteSlot x, NameSpriteSlot y)
-                        {
-                            if (x.entry.IsPlayer && y.entry.IsPlayer)
-                                return 0;
-
-                            if (x.entry.IsPlayer)
-                                return -1;
-
-                            if (y.entry.IsPlayer)
-                                return 1;
-
-                            bool xIsNullFriendship = x.entry.Friendship is null || x.entry.IsChild;
-                            bool yIsNullFriendship = y.entry.Friendship is null || y.entry.IsChild;
-                            if (xIsNullFriendship && yIsNullFriendship)
-                                return 0;
-
-                            if (xIsNullFriendship)
-                                return 1;
-
-                            if (yIsNullFriendship)
-                                return -1;
-
-                            int c = x.entry.Friendship.Points.CompareTo(y.entry.Friendship.Points);
-                            if (c == 0)
-                                c = x.entry.DisplayName.CompareTo(y.entry.DisplayName);
-                            return c;
-
-                        });
-                        break;
-                    case 1: // friend desc
-                        SMonitor.Log("sorting by friend desc");
-                        nameSprites.Sort(delegate (NameSpriteSlot x, NameSpriteSlot y)
-                        {
-                            if (x.entry.IsPlayer && y.entry.IsPlayer)
-                                return 0;
-
-                            if (x.entry.IsPlayer)
-                                return -1;
-
-                            if (y.entry.IsPlayer)
-                                return 1;
-
-                            bool xIsNullFriendship = x.entry.Friendship is null || x.entry.IsChild;
-                            bool yIsNullFriendship = y.entry.Friendship is null || y.entry.IsChild;
-                            if (xIsNullFriendship && yIsNullFriendship)
-                                return 0;
-
-                            if (xIsNullFriendship)
-                                return 1;
-
-                            if (yIsNullFriendship)
-                                return -1;
-
-                            int c = -x.entry.Friendship.Points.CompareTo(y.entry.Friendship.Points);
-                            if (c == 0)
-                                c = x.entry.DisplayName.CompareTo(y.entry.DisplayName);
-                            return c;
-
-                        });
-                        break;
-                    case 2: // alpha asc
-                        SMonitor.Log("sorting by alpha asc");
-                        nameSprites.Sort(delegate (NameSpriteSlot x, NameSpriteSlot y)
-                        {
-                            if (x.entry.IsPlayer && y.entry.IsPlayer)
-                                return 0;
-
-                            if (x.entry.IsPlayer)
-                                return -1;
-
-                            if (y.entry.IsPlayer)
-                                return 1;
-
-                            if (!x.entry.IsMet && !y.entry.IsMet)
-                                return 0;
-                            if (!x.entry.IsMet)
-                                return 1;
-                            if (!y.entry.IsMet)
-                                return -1;
-
-                            return x.entry.DisplayName.CompareTo(y.entry.DisplayName);
-                        });
-                        break;
-                    case 3: // alpha desc
-                        SMonitor.Log("sorting by alpha desc");
-                        nameSprites.Sort(delegate (NameSpriteSlot x, NameSpriteSlot y)
-                        {
-                            if (x.entry.IsPlayer && y.entry.IsPlayer)
-                                return 0;
-
-                            if (x.entry.IsPlayer)
-                                return -1;
-
-                            if (y.entry.IsPlayer)
-                                return 1;
-
-                            if (!x.entry.IsMet && !y.entry.IsMet)
-                                return 0;
-                            if (!x.entry.IsMet)
-                                return 1;
-                            if (!y.entry.IsMet)
-                                return -1;
-                            return -x.entry.DisplayName.CompareTo(y.entry.DisplayName);
-                        });
-                        break;
+                    nameSpriteSlot.slot.leftNeighborID = buttonId;
                 }
-                int indexToSelect = -1;
 
-                var cslots = page.characterSlots;
-                for (int i = 0; i < nameSprites.Count; i++)
-                {
-                    nameSprites[i].slot.myID = i;
-                    nameSprites[i].slot.downNeighborID = i + 1;
-                    nameSprites[i].slot.upNeighborID = i - 1;
-                    if (nameSprites[i].slot.upNeighborID < 0)
+                nameSpriteSlot.slot.bounds = bounds[i];
+
+                // Update the page's characterSlots, sprites, and SocialEntries
+                sprites[i] = nameSpriteSlot.sprite;
+                page.characterSlots[i] = nameSpriteSlot.slot;
+                page.SocialEntries[i] = nameSpriteSlot.entry;
+            }
+
+            page.updateSlots();
+        }
+
+        private static Comparison<SocialEntry> GetSort()
+        {
+            switch (CurrentSort)
+            {
+                case 0: // friend asc
+                    SMonitor.Log("sorting by friend asc");
+                    return delegate (SocialEntry x, SocialEntry y)
                     {
-                        nameSprites[i].slot.upNeighborID = 12342;
-                    }
-                    if(Config.UseButton)
-                    {
-                        nameSprites[i].slot.leftNeighborID = buttonId;
-                    }
-                    sprites[i] = nameSprites[i].sprite;
-                    nameSprites[i].slot.bounds = cslots[i].bounds;
-                    cslots[i] = nameSprites[i].slot;
-                    page.SocialEntries[i] = nameSprites[i].entry;
-                    if(slotToSelect is not null && slotToSelect.InternalName == nameSprites[i].entry.InternalName && slotToSelect.IsPlayer == nameSprites[i].entry.IsPlayer && slotToSelect.IsChild == nameSprites[i].entry.IsChild)
-                    {
-                        indexToSelect = i;
-                    }
-                }
-                SHelper.Reflection.GetField<List<ClickableTextureComponent>>((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "sprites").SetValue(new List<ClickableTextureComponent>(sprites));
+                        if (x.IsPlayer && y.IsPlayer)
+                            return 0;
 
-                if(indexToSelect == -1)
-                {
-                    for (int l = 0; l < page.SocialEntries.Count; l++)
+                        if (x.IsPlayer)
+                            return -1;
+
+                        if (y.IsPlayer)
+                            return 1;
+
+                        bool xIsNullFriendship = x.Friendship is null || x.IsChild;
+                        bool yIsNullFriendship = y.Friendship is null || y.IsChild;
+                        if (xIsNullFriendship && yIsNullFriendship)
+                            return 0;
+
+                        if (xIsNullFriendship)
+                            return 1;
+
+                        if (yIsNullFriendship)
+                            return -1;
+
+                        int c = x.Friendship.Points.CompareTo(y.Friendship.Points);
+                        if (c == 0)
+                            c = x.DisplayName.CompareTo(y.DisplayName);
+                        return c;
+                    };
+                case 1: // friend desc
+                    SMonitor.Log("sorting by friend desc");
+                    return delegate (SocialEntry x, SocialEntry y)
                     {
-                        if (!page.SocialEntries[l].IsPlayer)
-                        {
-                            indexToSelect = l;
-                            break;
-                        }
-                    }
-                }
+                        if (x.IsPlayer && y.IsPlayer)
+                            return 0;
 
-                indexToSelect = indexToSelect == -1 ? 0 : indexToSelect;
+                        if (x.IsPlayer)
+                            return -1;
 
-                if(slotToSelect is null)
-                {
-                    SHelper.Reflection.GetField<int>((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "slotPosition").SetValue(indexToSelect);
-                    SHelper.Reflection.GetMethod((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "setScrollBarToCurrentIndex").Invoke();
-                }
-                else
-                {
-                    page.updateSlots();
-                    page.currentlySnappedComponent = page.characterSlots[indexToSelect];
-                    SHelper.Reflection.GetField<int>((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "slotPosition").SetValue(lastSlotPosition.Value);
-                    SHelper.Reflection.GetMethod((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "setScrollBarToCurrentIndex").Invoke();
-                    page.updateSlots();
-                }
+                        if (y.IsPlayer)
+                            return 1;
+
+                        bool xIsNullFriendship = x.Friendship is null || x.IsChild;
+                        bool yIsNullFriendship = y.Friendship is null || y.IsChild;
+                        if (xIsNullFriendship && yIsNullFriendship)
+                            return 0;
+
+                        if (xIsNullFriendship)
+                            return 1;
+
+                        if (yIsNullFriendship)
+                            return -1;
+
+                        int c = -x.Friendship.Points.CompareTo(y.Friendship.Points);
+                        if (c == 0)
+                            c = x.DisplayName.CompareTo(y.DisplayName);
+                        return c;
+
+                    };
+                case 2: // alpha asc
+                    SMonitor.Log("sorting by alpha asc");
+                    return delegate (SocialEntry x, SocialEntry y)
+                    {
+                        if (x.IsPlayer && y.IsPlayer)
+                            return 0;
+
+                        if (x.IsPlayer)
+                            return -1;
+
+                        if (y.IsPlayer)
+                            return 1;
+
+                        if (!x.IsMet && !y.IsMet)
+                            return 0;
+                        if (!x.IsMet)
+                            return 1;
+                        if (!y.IsMet)
+                            return -1;
+
+                        return x.DisplayName.CompareTo(y.DisplayName);
+                    };
+                case 3: // alpha desc
+                    SMonitor.Log("sorting by alpha desc");
+                    return delegate (SocialEntry x, SocialEntry y)
+                    {
+                        if (x.IsPlayer && y.IsPlayer)
+                            return 0;
+
+                        if (x.IsPlayer)
+                            return -1;
+
+                        if (y.IsPlayer)
+                            return 1;
+
+                        if (!x.IsMet && !y.IsMet)
+                            return 0;
+                        if (!x.IsMet)
+                            return 1;
+                        if (!y.IsMet)
+                            return -1;
+                        return -x.DisplayName.CompareTo(y.DisplayName);
+                    };
+                default:
+                    goto case 2;
             }
         }
+        public static void IncrementSort()
+        {
+            CurrentSort++;
+            CurrentSort %= 4;
+            ResortSocialList();
+            if (Config.UseDropdown)
+            {
+                dropDown.Value.selectedOption = CurrentSort;
+            }
+        }
+
+        public static void DecrementSort()
+        {
+            CurrentSort--;
+            if (CurrentSort < 0)
+                CurrentSort = 3;
+            ResortSocialList();
+            if (Config.UseDropdown)
+            {
+                dropDown.Value.selectedOption = CurrentSort;
+            }
+        }
+
+        private static void ApplyFilter(SocialPage socialPage)
+        {
+            if (!Config.EnableMod || !Config.UseFilter || filterField.Value is null || lastFilterString.Value == filterField.Value.Text)
+                return;
+
+            lastFilterString.Value = filterField.Value.Text;
+
+            // Filter the SocialEntries
+            socialPage.SocialEntries.Clear();
+            socialPage.SocialEntries.AddRange(filterField.Value.Text == "" ? allEntries.Value : allEntries.Value.Where((entry) => entry.DisplayName.ToLower().StartsWith(filterField.Value.Text.ToLower())));
+
+            // Recalculate the number of farmers (affects the way the first {# of farmers} slots render)
+            SHelper.Reflection.GetField<int>(socialPage, "numFarmers").SetValue(socialPage.SocialEntries.Count((SocialEntry p) => p.IsPlayer));
+
+            // Move the slot position back to the top
+            for (int i = 0; i < socialPage.SocialEntries.Count; i++)
+            {
+                if (!socialPage.SocialEntries[i].IsPlayer)
+                {
+                    SHelper.Reflection.GetField<int>(socialPage, "slotPosition").SetValue(i);
+                    break;
+                }
+            }
+
+            // Recreate the characterSlots and sprites components
+            socialPage.CreateComponents();
+
+            // Reapply the sort (it will be unsorted because allEntries is unsorted)
+            ResortSocialList();
+
+            SHelper.Reflection.GetMethod((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "setScrollBarToCurrentIndex").Invoke();
+            socialPage.updateSlots();
+        }
+
+        #endregion
+
+        #region ELEMENT_SETUP_METHODS
 
         public static void UpdateFilterPosition(SocialPage page)
         {
@@ -727,22 +765,6 @@ namespace SocialPageOrderRedux
             return new Rectangle(GetButtonX(page), GetButtonY(page), buttonTextureSource.Width * 4, buttonTextureSource.Height * 4);
         }
 
-        public static void SetUseFilter(bool value)
-        {
-            if(value)
-            {
-                if(filterField.Value is null)
-                {
-                    filterField.Value = new TextBox(Game1.content.Load<Texture2D>("LooseSprites\\textBox"), null, Game1.smallFont, Game1.textColor)
-                    {
-                        Text = ""
-                    };
-                }
-            }
-
-            Config.UseFilter = value;
-        }
-
         public static void InitElements()
         {
             if (!WasModEnabled)
@@ -761,7 +783,7 @@ namespace SocialPageOrderRedux
 
             if(dropDown.Value is null)
             {
-                dropDown.Value = new MyOptionsDropDown("", -1);
+                dropDown.Value = new MyOptionsDropDown("");
 
                 for (int i = 0; i < 4; i++)
                 {
@@ -782,39 +804,16 @@ namespace SocialPageOrderRedux
             }
         }
 
-        public static void IncrementSort()
-        {
-            CurrentSort++;
-            CurrentSort %= 4;
-            ResortSocialList();
-            if(Config.UseDropdown)
-            {
-                dropDown.Value.selectedOption = CurrentSort;
-            }
-        }
-
-        public static void DecrementSort()
-        {
-            CurrentSort--;
-            if (CurrentSort < 0)
-                CurrentSort = 3;
-            ResortSocialList();
-            if (Config.UseDropdown)
-            {
-                dropDown.Value.selectedOption = CurrentSort;
-            }
-        }
+        #endregion
     }
-
-
 
     internal class NameSpriteSlot
     {
-        public SocialPage.SocialEntry entry;
+        public SocialEntry entry;
         public ClickableTextureComponent sprite;
         public ClickableTextureComponent slot;
 
-        public NameSpriteSlot(SocialPage.SocialEntry obj, ClickableTextureComponent clickableTextureComponent, ClickableTextureComponent slotComponent)
+        public NameSpriteSlot(SocialEntry obj, ClickableTextureComponent clickableTextureComponent, ClickableTextureComponent slotComponent)
         {
             entry = obj;
             sprite = clickableTextureComponent;

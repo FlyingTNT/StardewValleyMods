@@ -4,7 +4,7 @@ namespace SocialPageOrderRedux
 {
     public class MyOptionsDropDown : OptionsDropDown
     {
-        public MyOptionsDropDown(string label, int whichOption, int x = -1, int y = -1) : base(label, whichOption, x, y)
+        public MyOptionsDropDown(string label, int x = -1, int y = -1) : base(label, -1, x, y)
         {
         }
 		public override void leftClickReleased(int x, int y)
@@ -13,5 +13,7 @@ namespace SocialPageOrderRedux
             ModEntry.CurrentSort = selectedOption;
             ModEntry.ResortSocialList();
         }
+
+        
 	}
 }

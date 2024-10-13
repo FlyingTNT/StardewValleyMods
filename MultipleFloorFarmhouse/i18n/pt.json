@@ -1,0 +1,10 @@
+{
+    "GMCM_EnableMod": "Habilitar Mod",
+    "GMCM_StairsX": "Posição X das Escadas da Casa da Fazenda",
+    "GMCM_StairsY": "Posição Y das Escadas da Casa da Fazenda",
+    "GMCM_Stairs_Description": "A distância das escadas do canto superior esquerdo da casa da fazenda. Requer recarregar o jogo para ter efeito.",
+    "GMCM_CombineWithCellarStairs":  "Combinar com Escadas da Adega",
+    "GMCM_FloorNames": "Nomes dos Andares",
+    "GMCM_FloorNames_Description": "Os andares a serem usados de baixo para cima, sem distinção de maiúsculas e minúsculas. Requer recarregar o jogo para ter efeito. Os andares que você instalou são: {{allOptions}}",
+    "GMCM_ActiveFloors": "Os andares atualmente em uso são: {{activeFloors}}. Se algo estiver faltando, certifique-se de verificar a ortografia e recarregar o jogo."
+}

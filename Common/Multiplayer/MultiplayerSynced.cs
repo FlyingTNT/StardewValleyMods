@@ -3,6 +3,8 @@ using StardewModdingAPI.Events;
 using StardewValley;
 using System;
 
+namespace Common.Multiplayer;
+
 /// <summary>
 /// A value of type T synced across multiplayer clients. Should not be used as a PerScreen value.
 /// Uses mod messages to sync the data.
@@ -13,22 +15,22 @@ using System;
 /// implement that in the future.
 /// </summary>
 /// <typeparam name="T">The type of the value to be synced.</typeparam>
-public class MultiplayerSynced<T>
+public class MultiplayerSynced<T> : IMultiplayerSynced
 {
     /// <summary> The synced value. Undefined before a save is loaded. </summary>
     private T internalValue;
 
     /// <summary> A name for the value. Should be unique for this mod. </summary>
-    private string Name;
+    public string Name {get;}
 
     /// <summary> The IModHelper for the mod that owns this object.</summary>
-    private IModHelper SHelper;
+    private readonly IModHelper SHelper;
 
     /// <summary> The unique id for the mod that owns this object. </summary>
-    private string ModId;
+    private readonly string ModId;
 
     /// <summary> A function to initialize the value upon save load. </summary>
-    private Func<T> Initializer;
+    private readonly Func<T> Initializer;
 
     /// <summary>
     /// The synced value. Undefined before a save is loaded. 
@@ -58,16 +60,30 @@ public class MultiplayerSynced<T>
     /// <param name="helper">The IModHelper for the mod that owns this object.</param>
     /// <param name="name">A name for the value. Should be unique for this mod.</param>
     /// <param name="initializer">A function to initialize the value upon save load.</param>
-    public MultiplayerSynced(IModHelper helper, string name, Func<T> initializer)
+    public MultiplayerSynced(Mod mod, string name, Func<T> initializer)
+    {
+        Name = name;
+        SHelper = mod.Helper;
+        ModId = mod.ModManifest.UniqueID;
+        Initializer = initializer;
+
+        SHelper.Events.Multiplayer.ModMessageReceived += Multiplayer_ModMessageRecieved;
+        SHelper.Events.Multiplayer.PeerConnected += Multiplayer_PeerConnected;
+        SHelper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
+        SHelper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
+    }
+
+    /// <summary>
+    /// Method used by <see cref="MultiplayerSyncedGroup"/>
+    /// </summary>
+    /// <param name="name"></param>
+    /// <param name="initializer"></param>
+    internal MultiplayerSynced(string name, IModHelper helper, string modId, Func<T> initializer)
     {
         Name = name;
         SHelper = helper;
-        ModId = helper.ModRegistry.ModID;
+        ModId = modId;
         Initializer = initializer;
-
-        helper.Events.Multiplayer.ModMessageReceived += Multiplayer_ModMessageRecieved;
-        helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
-        helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
     }
 
     private void Multiplayer_ModMessageRecieved(object sender, ModMessageReceivedEventArgs args)
@@ -88,14 +104,7 @@ public class MultiplayerSynced<T>
         // If a remote player recieves a response from the main player, they update their Value.
         if(args.Type == Name + "Response")
         {
-            Message data = args.ReadAs<Message>();
-
-            // Main players ignore other main players (impossible situation) and remote players ignore other remote players (in case of desyncs??? idk if that can happen, but the main player should be ground truth)
-            if((data.IsFromMainPlayer && !Context.IsOnHostComputer) || (!data.IsFromMainPlayer && Context.IsMainPlayer))
-            {
-                internalValue = data.Value;
-                IsReady = true;
-            }
+            UpdateValueFrom(args);
 
             // If this is the main player, broadcast the new value
             if (Context.IsMainPlayer)
@@ -109,10 +118,12 @@ public class MultiplayerSynced<T>
 
     /// <summary>
     /// This is called immediately upon the main player loading the save or a farmhand joining.
+    /// This uses high event priority so that the value is ready in mods' SaveLoaded events *on the host computer*.
     /// 
     /// If this is the main player, it uses the initializer to initialize the value.
     /// If this is not on the host computer, it requests the value from the host.
     /// </summary>
+    [EventPriority(EventPriority.High)]
     private void GameLoop_SaveLoaded(object sender, SaveLoadedEventArgs args)
     {
         if(Context.IsMainPlayer)
@@ -126,8 +137,11 @@ public class MultiplayerSynced<T>
             return;
         }
 
-        // If the player is remote, request the value from the host.
-        SHelper.Multiplayer.SendMessage("", Name + "Request", new string[] {ModId}, null);
+        // If the player is remote and they haven't already received the value, request the value from the host.
+        if(!IsReady)
+        {
+            SHelper.Multiplayer.SendMessage("", Name + "Request", new string[] { ModId }, null);
+        }
     }
 
     private void GameLoop_ReturnedToTitle(object sender, ReturnedToTitleEventArgs args)
@@ -136,10 +150,26 @@ public class MultiplayerSynced<T>
     }
 
     /// <summary>
+    /// If this is the host instance, send the connecting player the value.
+    /// 
+    /// This is to try and reduce the amount of time it takes before the value is ready for remote players.
+    /// If they haven't received it when they get to their SaveLoaded event, they will still request it to be safe (idk if theres a chance for this event to not fire or messages to be dropped or smth).
+    /// </summary>
+    private void Multiplayer_PeerConnected(object sender, PeerConnectedEventArgs args)
+    {
+        if(!Context.IsMainPlayer || !args.Peer.HasSmapi || args.Peer.IsSplitScreen || args.Peer.IsHost || args.Peer.GetMod(ModId) is null || !IsReady)
+        {
+            return;
+        }
+
+        SendModelTo(new long[] { args.Peer.PlayerID });
+    }
+
+    /// <summary>
     /// Sends the current value to the given players. If given null as the parameter, will send the value to all players.
     /// </summary>
     /// <param name="UniqueMultiplayerIds">The unique ids of the players to send the value to, or null to send it to all players.</param>
-    private void SendModelTo(long[] UniqueMultiplayerIds)
+    public void SendModelTo(long[] UniqueMultiplayerIds)
     {
         SHelper.Multiplayer.SendMessage(new Message(internalValue, Context.IsMainPlayer), Name + "Response", new string[] {ModId}, UniqueMultiplayerIds);
     }
@@ -153,6 +183,29 @@ public class MultiplayerSynced<T>
     public void PushChanges()
     {
         SendModelTo(Context.IsMainPlayer ? null : new long[] { Game1.MasterPlayer.UniqueMultiplayerID });
+    }
+
+    public void UpdateValueFrom(ModMessageReceivedEventArgs message)
+    {
+        Message data = message.ReadAs<Message>();
+
+        // Main players ignore other main players (impossible situation) and remote players ignore other remote players (in case of desyncs??? idk if that can happen, but the main player should be ground truth)
+        if ((data.IsFromMainPlayer && !Context.IsOnHostComputer) || (!data.IsFromMainPlayer && Context.IsMainPlayer))
+        {
+            internalValue = data.Value;
+            IsReady = true;
+        }
+    }
+
+    public void Initialize()
+    {
+        Value = Initializer();
+        IsReady = true;
+    }
+
+    public void Invalidate()
+    {
+        IsReady = false;
     }
 
     public struct Message

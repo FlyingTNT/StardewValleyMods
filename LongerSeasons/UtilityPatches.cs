@@ -42,12 +42,12 @@ namespace LongerSeasons
         /// </summary>
         public static void Utility_getDaysOfBooksellerThisSeason_Postfix(ref List<int> __result)
         {
-            if (Config.DaysPerMonth <= 28 || !Config.ExtendBerry)
+            if (DaysPerMonth <= 28 || !Config.ExtendBerry)
                 return;
 
             for(int i = 0; i < __result.Count; i++)
             {
-                if (__result[i] + 28 <= Config.DaysPerMonth)
+                if (__result[i] + 28 <= DaysPerMonth)
                 {
                     __result.Add(__result[i] + 28);
                 }

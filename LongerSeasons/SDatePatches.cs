@@ -20,7 +20,7 @@ namespace LongerSeasons
             {
                 if (codes[i].opcode == OpCodes.Ldarg_1 && codes[i+1].opcode == OpCodes.Ldarg_0 && codes[i+2].opcode == OpCodes.Ldfld && ((FieldInfo)codes[i + 2].operand).Name == "DaysInSeason")
                 {
-                    SMonitor.Log($"Avoiding SMAPI {((FieldInfo)codes[i + 2].operand).Name} {Config.DaysPerMonth}");
+                    SMonitor.Log($"Avoiding SMAPI {((FieldInfo)codes[i + 2].operand).Name} {DaysPerMonth}");
                     codes[i + 1] = CodeInstruction.Call(typeof(Utilities), nameof(Utilities.GetDaysPerMonth));
                     outCodes.Add(codes[i++]);
                     outCodes.Add(codes[i++]);
@@ -33,7 +33,7 @@ namespace LongerSeasons
         }
         private static void SDate_Postfix(SDate __instance)
         {
-            typeof(SDate).GetField("DaysInSeason", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(__instance, Config.DaysPerMonth);
+            typeof(SDate).GetField("DaysInSeason", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(__instance, DaysPerMonth);
         }
 
     }

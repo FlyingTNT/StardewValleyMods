@@ -21,7 +21,7 @@ namespace LongerSeasons
             Season season = __instance.Location.GetSeason();
             int dayOfMonth = Game1.dayOfMonth;
 
-            float mult = Config.DaysPerMonth / 28f;
+            float mult = DaysPerMonth / 28f;
             if (season == Season.Spring)
             {
                 __result = dayOfMonth > 14 * mult && dayOfMonth < 19 * mult;

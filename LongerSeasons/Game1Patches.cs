@@ -90,15 +90,15 @@ namespace LongerSeasons
         {
             bool shouldIncrementSeason;
             if (Game1.season == Season.Spring) {
-                shouldIncrementSeason = CurrentSeasonMonth >= Config.MonthsPerSpring;
+                shouldIncrementSeason = CurrentSeasonMonth >= MonthsPerSpring;
             }
             else if (Game1.season == Season.Summer) {
-                shouldIncrementSeason = CurrentSeasonMonth >= Config.MonthsPerSummer;
+                shouldIncrementSeason = CurrentSeasonMonth >= MonthsPerSummer;
             }
             else if (Game1.season == Season.Fall) {
-                shouldIncrementSeason = CurrentSeasonMonth >= Config.MonthsPerFall;
+                shouldIncrementSeason = CurrentSeasonMonth >= MonthsPerFall;
             }
-            else {shouldIncrementSeason = CurrentSeasonMonth >= Config.MonthsPerWinter;}
+            else {shouldIncrementSeason = CurrentSeasonMonth >= MonthsPerWinter;}
 
             CurrentSeasonMonth = shouldIncrementSeason ? 1 : CurrentSeasonMonth + 1;
 

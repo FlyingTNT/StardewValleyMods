@@ -17,6 +17,11 @@
     <property name="Water" value="T"/>
    </properties>
   </tile>
+  <tile id="17">
+   <properties>
+    <property name="Spawnable" value="T"/>
+   </properties>
+  </tile>
   <tile id="18">
    <properties>
     <property name="Diggable" value="T"/>
@@ -66,6 +71,16 @@
    <properties>
     <property name="Diggable" value="T"/>
     <property name="Type" value="Dirt"/>
+   </properties>
+  </tile>
+  <tile id="34">
+   <properties>
+    <property name="Spawnable" value="T"/>
+   </properties>
+  </tile>
+  <tile id="35">
+   <properties>
+    <property name="Spawnable" value="T"/>
    </properties>
   </tile>
   <tile id="41">
@@ -146,6 +161,7 @@
   </tile>
   <tile id="75">
    <properties>
+    <property name="Spawnable" value="T"/>
     <property name="Water" value="T"/>
    </properties>
   </tile>
@@ -188,21 +204,25 @@
   </tile>
   <tile id="90">
    <properties>
+    <property name="Spawnable" value="T"/>
     <property name="Water" value="T"/>
    </properties>
   </tile>
   <tile id="91">
    <properties>
+    <property name="Spawnable" value="T"/>
     <property name="Water" value="T"/>
    </properties>
   </tile>
   <tile id="92">
    <properties>
+    <property name="Spawnable" value="T"/>
     <property name="Water" value="T"/>
    </properties>
   </tile>
   <tile id="93">
    <properties>
+    <property name="Spawnable" value="T"/>
     <property name="Water" value="T"/>
    </properties>
   </tile>
@@ -218,22 +238,26 @@
   </tile>
   <tile id="107">
    <properties>
+    <property name="Spawnable" value="T"/>
     <property name="Type" value="Dirt"/>
     <property name="Water" value="T"/>
    </properties>
   </tile>
   <tile id="108">
    <properties>
+    <property name="Spawnable" value="T"/>
     <property name="Water" value="T"/>
    </properties>
   </tile>
   <tile id="109">
    <properties>
+    <property name="Spawnable" value="T"/>
     <property name="Water" value="T"/>
    </properties>
   </tile>
   <tile id="110">
    <properties>
+    <property name="Spawnable" value="T"/>
     <property name="Water" value="T"/>
    </properties>
   </tile>
@@ -264,21 +288,25 @@
   </tile>
   <tile id="124">
    <properties>
+    <property name="Spawnable" value="T"/>
     <property name="Water" value="T"/>
    </properties>
   </tile>
   <tile id="125">
    <properties>
+    <property name="Spawnable" value="T"/>
     <property name="Water" value="T"/>
    </properties>
   </tile>
   <tile id="126">
    <properties>
+    <property name="Spawnable" value="T"/>
     <property name="Water" value="T"/>
    </properties>
   </tile>
   <tile id="127">
    <properties>
+    <property name="Spawnable" value="T"/>
     <property name="Water" value="T"/>
    </properties>
   </tile>

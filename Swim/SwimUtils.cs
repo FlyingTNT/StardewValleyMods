@@ -6,6 +6,7 @@ using StardewModdingAPI;
 using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.GameData.HomeRenovations;
+using StardewValley.GameData.Locations;
 using StardewValley.Locations;
 using StardewValley.TerrainFeatures;
 using System;
@@ -210,7 +211,7 @@ namespace Swim
 
         public static int CheckForBuriedItem(Farmer who)
         {
-            int objectIndex = 330;
+            int objectIndex = 330; // Clay
             if (Game1.random.NextDouble() < 0.1)
             {
                 if (Game1.random.NextDouble() < 0.75)
@@ -218,19 +219,19 @@ namespace Swim
                     switch (Game1.random.Next(5))
                     {
                         case 0:
-                            objectIndex = 96;
+                            objectIndex = 96; // Dwarf Scroll I
                             break;
                         case 1:
-                            objectIndex = (who.hasOrWillReceiveMail("lostBookFound") ? ((Game1.netWorldState.Value.LostBooksFound < 21) ? 102 : 770) : 770);
+                            objectIndex = (who.hasOrWillReceiveMail("lostBookFound") ? ((Game1.netWorldState.Value.LostBooksFound < 21) ? 102 : 770) : 770); // Lost book / mixed seeds
                             break;
                         case 2:
-                            objectIndex = 110;
+                            objectIndex = 110; // Rusty Spoon
                             break;
                         case 3:
-                            objectIndex = 112;
+                            objectIndex = 112; // Rusty Cog
                             break;
                         case 4:
-                            objectIndex = 585;
+                            objectIndex = 585; // Skeletal Tail
                             break;
                     }
                 }
@@ -240,48 +241,48 @@ namespace Swim
 
                     if (r < 0.75)
                     {
-                        objectIndex = ((Game1.random.NextDouble() < 0.5) ? 121 : 97);
+                        objectIndex = ((Game1.random.NextDouble() < 0.5) ? 121 : 97); // Dwarf hem / Dwarf scroll II
                     }
                     else if (r < 0.80)
                     {
-                        objectIndex = 99;
+                        objectIndex = 99; // Dwarf scroll IV
                     }
                     else
                     {
-                        objectIndex = ((Game1.random.NextDouble() < 0.5) ? 122 : 336);
+                        objectIndex = ((Game1.random.NextDouble() < 0.5) ? 122 : 336); // Dwarf Gadget / Gold Bar
                     }
                 }
                 else
                 {
-                    objectIndex = ((Game1.random.NextDouble() < 0.5) ? 126 : 127);
+                    objectIndex = ((Game1.random.NextDouble() < 0.5) ? 126 : 127); // Strange Doll / Strange Doll
                 }
             }
             else
             {
                 if (Game1.random.NextDouble() < 0.5)
                 {
-                    objectIndex = 330;
+                    objectIndex = 330; // Clay
                 }
                 else
                 {
                     if (Game1.random.NextDouble() < 0.25)
                     {
-                        objectIndex = 749;
+                        objectIndex = 749; // Omni Geode
                     }
                     else if (Game1.random.NextDouble() < 0.5)
                     {
                         var r = Game1.random.NextDouble();
                         if (r < 0.7)
                         {
-                            objectIndex = 535;
+                            objectIndex = 535; // Geode
                         }
-                        else if (r < 8.5)
+                        else if (r < 0.85)
                         {
-                            objectIndex = 537;
+                            objectIndex = 537; // Magma Geode
                         }
                         else
                         {
-                            objectIndex = 536;
+                            objectIndex = 536; // Frozen Geode
                         }
                     }
                 }

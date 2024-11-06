@@ -330,6 +330,18 @@ namespace Swim
 
         public static void GameLoop_DayStarted(object sender, DayStartedEventArgs e)
         {
+            if (Game1.getLocationFromName("Custom_ScubaCave") != null && !Game1.player.mailReceived.Contains("ScubaMask"))
+            {
+                SwimMaps.AddScubaChest(Game1.getLocationFromName("Custom_ScubaCave"), new Vector2(10, 14), "ScubaMask");
+            }
+            ModEntry.marinerQuestionsWrongToday.Value = false;
+            ModEntry.oxygen.Value = SwimUtils.MaxOxygen();
+
+            if (!Context.IsMainPlayer)
+            {
+                return;
+            }
+
             foreach (KeyValuePair<string, DiveMap> kvp in ModEntry.diveMaps)
             {
                 GameLocation location = Game1.getLocationFromName(kvp.Key);
@@ -390,17 +402,16 @@ namespace Swim
                     SwimMaps.RemoveWaterTiles(location);
                 }
             }
-            if (Game1.getLocationFromName("Custom_ScubaCave") != null && !Game1.player.mailReceived.Contains("ScubaMask"))
-            {
-                SwimMaps.AddScubaChest(Game1.getLocationFromName("Custom_ScubaCave"), new Vector2(10, 14), "ScubaMask");
-            }
-            ModEntry.marinerQuestionsWrongToday.Value = false;
-            ModEntry.oxygen.Value = SwimUtils.MaxOxygen();
         }
 
         public static void Input_ButtonPressed(object sender, ButtonPressedEventArgs e)
         {
             if (Game1.player == null || Game1.player.currentLocation == null)
+            {
+                return;
+            }
+
+            if(!e.Button.IsActionButton() && !e.Button.IsUseToolButton())
             {
                 return;
             }
@@ -487,24 +498,28 @@ namespace Swim
                 }
                 return;
             }
+
+#if DEBUG
+            GameLocation location = Game1.player.currentLocation;
+            Vector2 spot = Game1.player.Tile + new Vector2(0f, 1f);
+            int x = (int)spot.X;
+            int y = (int)spot.Y;
+
+
+            if(KeybindList.Parse("S").JustPressed())
+            {
+                bool total = (location.objects.ContainsKey(spot) || location.IsNoSpawnTile(spot) || location.doesTileHaveProperty(x, y, "Spawnable", "Back") == null || location.doesEitherTileOrTileIndexPropertyEqual(x, y, "Spawnable", "Back", "F") || !location.CanItemBePlacedHere(spot) || location.getTileIndexAt(x, y, "AlwaysFront") != -1 || location.getTileIndexAt(x, y, "AlwaysFront2") != -1 || location.getTileIndexAt(x, y, "AlwaysFront3") != -1 || location.getTileIndexAt(x, y, "Front") != -1 || location.isBehindBush(spot) && location.isBehindTree(spot));
+                SMonitor.Log($"Invalid Spot: {total}");
+                SMonitor.Log($"0| {location.objects.ContainsKey(spot)} 1| {location.IsNoSpawnTile(spot)} 2| {location.doesTileHaveProperty(x, y, "Spawnable", "Back") == null} 3| {location.doesEitherTileOrTileIndexPropertyEqual(x, y, "Spawnable", "Back", "F")} 4| {!location.CanItemBePlacedHere(spot)} 5| {location.getTileIndexAt(x, y, "AlwaysFront") != -1} 6| {location.getTileIndexAt(x, y, "Front") != -1} 7| {location.isBehindBush(spot)}");
+                SMonitor.Log($"{location.map.GetLayer("Back").Tiles[x, y]?.Properties?.Join(kvp => $"{kvp.Key}: {(kvp.Value is null ? "Null" : kvp.Value)}") ?? "No Properties"}");
+            }
+#endif
         }
 
         public static void GameLoop_UpdateTicked(object sender, UpdateTickedEventArgs e)
         {
-            if (Game1.player.currentLocation == null || Game1.player == null || !Game1.displayFarmer || Game1.player.position == null)
+            if (Game1.player.currentLocation is null || Game1.player is null || !Game1.displayFarmer || Game1.player.position is null)
                 return;
-
-
-            // Code to slow down the game to see individual animation frames
-            /*if(Helper.Input.IsDown(SButton.X))
-            {
-                Monitor.Log($"Animation frame {Game1.player.FarmerSprite.CurrentAnimationFrame.frame} {Game1.player.FarmerSprite.CurrentAnimationFrame.armOffset} {Game1.player.FarmerSprite.CurrentAnimationFrame.positionOffset} {Game1.player.FarmerSprite.CurrentAnimationFrame.xOffset} {Game1.player.FarmerSprite.CurrentAnimationFrame.positionOffset} {Game1.player.FarmerSprite.CurrentAnimationFrame.frameEndBehavior} {Game1.player.FarmerRenderer.textureName}");
-                GameRunner.instance.TargetElapsedTime = TimeSpan.FromSeconds(1 / 3d);
-            }
-            else
-            {
-                GameRunner.instance.TargetElapsedTime = TimeSpan.FromSeconds(1 / 60d);
-            }*/
 
             ModEntry.isUnderwater.Value = SwimUtils.IsMapUnderwater(Game1.player.currentLocation.Name);
 
@@ -513,7 +528,7 @@ namespace Swim
                 AbigailCaveTick();
             }
 
-            if (Game1.activeClickableMenu == null)
+            if (Game1.activeClickableMenu is null)
             {
                 SwimUtils.updateOxygenValue();
             }
@@ -521,7 +536,7 @@ namespace Swim
             if (SwimUtils.IsWearingScubaGear())
             {
                 ticksWearingScubaGear.Value++;
-                if (Config.BreatheSound && breatheEffect.Value != null && (lastBreatheSound.Value == 0 || ticksWearingScubaGear.Value - lastBreatheSound.Value > 6000 / 16))
+                if (Config.BreatheSound && breatheEffect.Value is not null && (lastBreatheSound.Value == 0 || ticksWearingScubaGear.Value - lastBreatheSound.Value > 6000 / 16))
                 {
                     SMonitor.Log("Playing breathe sound");
                     lastBreatheSound.Value = ticksWearingScubaGear.Value;
@@ -530,7 +545,7 @@ namespace Swim
             }
             else
             {
-                if (breatheEffect.Value != null && lastBreatheSound.Value != 0)
+                if (breatheEffect.Value is not null && lastBreatheSound.Value != 0)
                 {
                     breatheEffect.Value.Dispose();
                     LoadBreatheSound();

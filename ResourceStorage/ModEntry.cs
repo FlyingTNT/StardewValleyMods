@@ -1,6 +1,5 @@
 ﻿using HarmonyLib;
 using Microsoft.Xna.Framework.Graphics;
-using Newtonsoft.Json;
 using ResourceStorage.BetterCrafting;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
@@ -61,6 +60,12 @@ namespace ResourceStorage
             harmony.Patch(
                 original: AccessTools.Method(typeof(Inventory), nameof(Inventory.ReduceId)),
                 prefix: new HarmonyMethod(typeof(ModEntry), nameof(Inventory_ReduceId_Prefix))
+            );
+
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Inventory), nameof(Inventory.Reduce)),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(Inventory_Reduce_Prefix)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(Inventory_Reduce_Postfix))
             );
 
             harmony.Patch(

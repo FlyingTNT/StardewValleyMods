@@ -18,10 +18,19 @@ namespace ResourceStorage
 {
     public partial class ModEntry
     {
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="instance"></param>
+        /// <param name="id"></param>
+        /// <param name="amountToAdd"></param>
+        /// <param name="auto"></param>
+        /// <param name="notifyBetterCraftingIntegration"></param>
+        /// <returns> The amount it changed. </returns>
         public static long ModifyResourceLevel(Farmer instance, string id, int amountToAdd, bool auto = true, bool notifyBetterCraftingIntegration = true)
         {
             id = ItemRegistry.QualifyItemId(id);
-            if (id == null)
+            if (id is null)
             {
                 return 0;
             }
@@ -214,6 +223,12 @@ namespace ResourceStorage
 
         public static bool TryGetInventoryOwner(Inventory inventory, out Farmer farmer)
         {
+            if(inventory.IsLocalPlayerInventory)
+            {
+                farmer = Game1.player;
+                return true;
+            }
+
             foreach(Farmer f in Game1.getAllFarmers())
             {
                 if(ReferenceEquals(f.Items, inventory))

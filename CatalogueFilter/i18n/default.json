@@ -2,5 +2,13 @@
   "filter": "Filter",
 
   // GMCM
-  "GMCM_Option_ModEnabled_Name": "Mod Enabled?"
+  "GMCM_Option_ModEnabled_Name": "Mod Enabled?",
+  "GMCM_Option_ShowLabel_Name": "Show Label",
+  "GMCM_Option_TextColorR_Name": "Filter Text Color R",
+  "GMCM_Option_TextColorG_Name": "Filter Text Color G",
+  "GMCM_Option_TextColorB_Name": "Filter Text Color B",
+  "GMCM_Option_AutoSelectFilter_Name": "Auto-Select Filter",
+  "GMCM_Option_FilterOffsetX_Name": "Filter X Offset",
+  "GMCM_Option_FilterOffsetY_Name": "Filter Y Offset",
+  "GMCM_Option_FilterSelectKey_Name": "Select Filter Key"
 }

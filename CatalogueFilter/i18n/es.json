@@ -1,0 +1,15 @@
+{
+  "filter": "Filtro",
+
+  // GMCM
+  "GMCM_Option_ModEnabled_Name": "¿Activar mod?",
+  "GMCM_Option_ShowLabel_Name": "Mostrar etiqueta",
+  "GMCM_Option_TextColorR_Name": "Color R del texto del filtro",
+  "GMCM_Option_TextColorG_Name": "Color V del texto del filtro",
+  "GMCM_Option_TextColorB_Name": "Color A del texto del filtro",
+  "GMCM_Option_AutoSelectFilter_Name": "Elegir filtro automáticamente",
+  "GMCM_Option_FilterOffsetX_Name": "Compensación X del filtro",
+  "GMCM_Option_FilterOffsetY_Name": "Compensación Y del filtro",
+  "GMCM_Option_FilterSelectKey_Name": "Tecla de selección de filtro"
+
+}

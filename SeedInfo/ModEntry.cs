@@ -2,6 +2,8 @@
 using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using Common.Integrations;
+using StardewModdingAPI.Events;
+using StardewValley;
 
 namespace SeedInfo
 {
@@ -12,8 +14,6 @@ namespace SeedInfo
         public static IMonitor SMonitor;
         public static IModHelper SHelper;
         public static ModConfig Config;
-
-        public static ModEntry context;
 
         public static int[] qualities = new int[] { 0, 1, 2, 4 };
 
@@ -26,23 +26,53 @@ namespace SeedInfo
             if (!Config.ModEnabled)
                 return;
 
-            context = this;
-
             SMonitor = Monitor;
             SHelper = helper;
 
             helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
 
+            // The day started event updates Config.DaysPerSeason from Longer Seasons' API if it is installed
+            if (helper.ModRegistry.IsLoaded(IDs.LongerSeasons))
+            {
+                helper.Events.GameLoop.DayStarted += GameLoop_DayStarted;
+            }
+
             var harmony = new Harmony(ModManifest.UniqueID);
             harmony.PatchAll();
-
         }
 
-        public void GameLoop_GameLaunched(object sender, StardewModdingAPI.Events.GameLaunchedEventArgs e)
+        public void GameLoop_DayStarted(object sender, DayStartedEventArgs args)
+        {
+            var lsAPI = SHelper.ModRegistry.GetApi<ILongerSeasonsAPI>(IDs.LongerSeasons);
+            if(lsAPI is null)
+            {
+                return;
+            }
+
+            // It is possible that these would be null if this is a remote player because they might not be synced yet. If that's the case, it'll just get fixed at the start of the second day.
+            if(lsAPI.GetDaysPerMonth() is not int daysPerMonth)
+            {
+                return;
+            }
+
+            if (lsAPI.GetMonthsInSeason(Game1.season) is not int totalMonthsInSeason)
+            {
+                return;
+            }
+
+            if (lsAPI.GetCurrentSeasonMonth() is not int currentSeasonMonth)
+            {
+                return;
+            }
+
+            Config.DaysPerMonth = daysPerMonth * (totalMonthsInSeason - currentSeasonMonth + 1);
+        }
+
+        public void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
 
             // get Generic Mod Config Menu's API (if it's installed)
-            var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>(IDs.GMCM);
             if (configMenu is null)
                 return;
 

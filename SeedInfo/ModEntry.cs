@@ -4,6 +4,11 @@ using StardewModdingAPI;
 using Common.Integrations;
 using StardewModdingAPI.Events;
 using StardewValley;
+using System.Threading;
+using StardewValley.Menus;
+using StardewValley.GameData.Shops;
+using System;
+using Microsoft.Xna.Framework.Graphics;
 
 namespace SeedInfo
 {
@@ -36,9 +41,15 @@ namespace SeedInfo
             {
                 helper.Events.GameLoop.DayStarted += GameLoop_DayStarted;
             }
-
             var harmony = new Harmony(ModManifest.UniqueID);
-            harmony.PatchAll();
+
+            harmony.Patch(
+                original: AccessTools.Constructor(typeof(ShopMenu), new Type[] { typeof(string), typeof(ShopData), typeof(ShopOwnerData), typeof(NPC), typeof(ShopMenu.OnPurchaseDelegate), typeof(Func<ISalable, bool>), typeof(bool) }),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(ShopMenu_Constructor_Postfix)));
+
+            harmony.Patch(
+                original: AccessTools.Method(typeof(ShopMenu), nameof(ShopMenu.draw), new Type[] { typeof(SpriteBatch)}),
+                transpiler: new HarmonyMethod(typeof(ModEntry), nameof(ShopMenu_draw_Transpiler)));
         }
 
         public void GameLoop_DayStarted(object sender, DayStartedEventArgs args)

@@ -192,7 +192,7 @@ namespace SeedInfo
             {
                 if (shopMenu.currentItemIndex + i > shopMenu.forSale.Count - 1)
                     break;
-                if (shopMenu.forSale[shopMenu.currentItemIndex + i] != shopMenu.hoveredItem || shopMenu.forSale[shopMenu.currentItemIndex + i] is not Item || !shopDict.TryGetValue(shopMenu.forSale[shopMenu.currentItemIndex + i].QualifiedItemId, out var info))
+                if (shopMenu.forSale[shopMenu.currentItemIndex + i] != shopMenu.hoveredItem || shopMenu.forSale[shopMenu.currentItemIndex + i] is not Item || !ShopDict.TryGetValue(shopMenu.forSale[shopMenu.currentItemIndex + i].QualifiedItemId, out var info))
                     continue;
                 var mousePos = Game1.getMousePosition();
                 var pos = shopMenu.forSaleButtons[i].bounds.Location.ToVector2() + new Vector2(64, 64);

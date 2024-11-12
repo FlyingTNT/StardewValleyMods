@@ -169,7 +169,7 @@ namespace Swim
                postfix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.GameLocation_sinkDebris_Postfix))
             );
 
-            AnimationManager.Patch(harmony);
+            //AnimationManager.Patch(harmony);
         }
 
         private void Content_AssetRequested(object sender, AssetRequestedEventArgs e)

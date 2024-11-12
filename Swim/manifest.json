@@ -1,7 +1,7 @@
 ﻿{
   "Name": "Swim Mod",
   "Author": "aedenthorn, FlyingTNT",
-  "Version": "1.6.4",
+  "Version": "1.6.5",
   "Description": "Allows you to swim.",
   "UniqueID": "FlyingTNT.Swim",
   "EntryDll": "Swim.dll",

@@ -1,6 +1,10 @@
 ﻿using HarmonyLib;
 using StardewModdingAPI;
 using Common.Integrations;
+using StardewValley;
+using System;
+using xTile.Dimensions;
+using StardewValley.Locations;
 
 namespace BetterElevator
 {
@@ -33,13 +37,25 @@ namespace BetterElevator
             helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
 
             var harmony = new Harmony(ModManifest.UniqueID);
-            harmony.PatchAll();
+            harmony.Patch(
+               original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.performAction), new Type[] { typeof(string[]), typeof(Farmer), typeof(Location) }),
+               prefix: new HarmonyMethod(typeof(ModEntry), nameof(GameLocation_performAction_Prefix))
+            );
 
+            harmony.Patch(
+               original: AccessTools.Method(typeof(MineShaft), nameof(MineShaft.checkAction)),
+               prefix: new HarmonyMethod(typeof(ModEntry), nameof(MineShaft_checkAction_Prefix))
+            );
+
+            harmony.Patch(
+               original: AccessTools.Method(typeof(MineShaft), nameof(MineShaft.shouldCreateLadderOnThisLevel)),
+               postfix: new HarmonyMethod(typeof(ModEntry), nameof(MineShaft_shouldCreateLadderOnThisLevel_Postfix))
+            );
         }
         private void GameLoop_GameLaunched(object sender, StardewModdingAPI.Events.GameLaunchedEventArgs e)
         {
             // get Generic Mod Config Menu's API (if it's installed)
-            var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>(IDs.GMCM);
             if (configMenu is null)
                 return;
 

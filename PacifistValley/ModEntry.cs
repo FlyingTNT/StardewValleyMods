@@ -15,13 +15,13 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using Common.Integrations;
+using Common.Utilities;
 
 namespace PacifistValley
 {
     /// <summary>The mod entry point.</summary>
     public class ModEntry : Mod
     {
-        private static ModEntry context;
         private static ModConfig Config;
         private static IMonitor SMonitor;
 
@@ -29,7 +29,6 @@ namespace PacifistValley
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
         {
-            context = this;
             Config = this.Helper.ReadConfig<ModConfig>();
             SMonitor = Monitor;
 
@@ -105,44 +104,35 @@ namespace PacifistValley
                prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.ShadowShaman_behaviorAtGameTick_prefix))
             );
 
-            if (!Config.LovedMonstersStillSwarm || Config.MonstersIgnorePlayer)
-            {
-                harmony.Patch(
-                   original: AccessTools.Method(typeof(Skeleton), nameof(Skeleton.behaviorAtGameTick)),
-                   prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Skeleton_behaviorAtGameTick_prefix))
-                );
-                harmony.Patch(
-                   original: AccessTools.Method(typeof(Monster), nameof(Monster.updateMovement)),
-                   prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Monster_updateMovement_prefix))
-                );
-                harmony.Patch(
-                   original: AccessTools.Method(typeof(Serpent), "updateAnimation"),
-                   prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Serpent_updateAnimation_prefix))
-                );
-                harmony.Patch(
-                   original: AccessTools.Method(typeof(Bat), "behaviorAtGameTick"),
-                   postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Bat_behaviorAtGameTick_Postfix))
-                );
-                harmony.Patch(
-                   original: AccessTools.Method(typeof(Fly), "updateAnimation"),
-                   prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Fly_updateAnimation_prefix))
-                );
-                harmony.Patch(
-                   original: AccessTools.Method(typeof(GreenSlime), nameof(GreenSlime.behaviorAtGameTick)),
-                   prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.GreenSlime_behaviorAtGameTick_prefix))
-                );
-                harmony.Patch(
-                   original: AccessTools.Method(typeof(DustSpirit), nameof(DustSpirit.behaviorAtGameTick)),
-                   postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.DustSpirit_behaviorAtGameTick_Postfix))
-                );
-            }
-            else
-            {
-                harmony.Patch(
-                   original: AccessTools.Method(typeof(Skeleton), nameof(Skeleton.behaviorAtGameTick)),
-                   postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Skeleton_behaviorAtGameTick_postfix))
-                );
-            }
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Skeleton), nameof(Skeleton.behaviorAtGameTick)),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Skeleton_behaviorAtGameTick_prefix)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Skeleton_behaviorAtGameTick_postfix))
+            );
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Monster), nameof(Monster.updateMovement)),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Monster_updateMovement_prefix))
+            );
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Serpent), "updateAnimation"),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Serpent_updateAnimation_prefix))
+            );
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Bat), "behaviorAtGameTick"),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Bat_behaviorAtGameTick_Postfix))
+            );
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Fly), "updateAnimation"),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.Fly_updateAnimation_prefix))
+            );
+            harmony.Patch(
+                original: AccessTools.Method(typeof(GreenSlime), nameof(GreenSlime.behaviorAtGameTick)),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.GreenSlime_behaviorAtGameTick_prefix))
+            );
+            harmony.Patch(
+                original: AccessTools.Method(typeof(DustSpirit), nameof(DustSpirit.behaviorAtGameTick)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(ModEntry.DustSpirit_behaviorAtGameTick_Postfix))
+            );
 
             harmony.Patch(
                original: AccessTools.Method(typeof(FarmHouse), nameof(FarmHouse.UpdateWhenCurrentLocation)),
@@ -438,7 +428,7 @@ namespace PacifistValley
 
         private static void DustSpirit_behaviorAtGameTick_Postfix(DustSpirit __instance, ref bool ___runningAwayFromFarmer, ref bool ___chargingFarmer)
         {
-            if (__instance.Health <= 0 ||Config.MonstersIgnorePlayer)
+            if ((__instance.Health <= 0 && !Config.LovedMonstersStillSwarm) ||Config.MonstersIgnorePlayer)
             {
                 ___runningAwayFromFarmer = false;
                 ___chargingFarmer = false;
@@ -448,14 +438,14 @@ namespace PacifistValley
 
         private static void GreenSlime_behaviorAtGameTick_prefix(GreenSlime __instance, GameTime time, ref int ___readyToJump)
         {
-            if (__instance.Health <= 0 || Config.MonstersIgnorePlayer)
+            if ((__instance.Health <= 0 && !Config.LovedMonstersStillSwarm) || Config.MonstersIgnorePlayer)
             {
                 ___readyToJump = -1;
             }
         }
         private static void Fly_updateAnimation_prefix(Fly __instance, GameTime time, ref int ___invincibleCountdown)
         {
-            if (__instance.Health <= 0 || Config.MonstersIgnorePlayer)
+            if ((__instance.Health <= 0 && !Config.LovedMonstersStillSwarm) || Config.MonstersIgnorePlayer)
             {
                 ___invincibleCountdown = 1;
             }
@@ -465,7 +455,7 @@ namespace PacifistValley
         {
             try
             {
-                if (__instance.Health <= 0 || Config.MonstersIgnorePlayer)
+                if ((__instance.Health <= 0 && !Config.LovedMonstersStillSwarm) || Config.MonstersIgnorePlayer)
                 {
                     __instance.xVelocity = 0f;
                     __instance.yVelocity = 0f;
@@ -478,7 +468,7 @@ namespace PacifistValley
         }
         private static bool Serpent_updateAnimation_prefix(Serpent __instance, GameTime time)
         {
-            if (__instance.Health <= 0 || Config.MonstersIgnorePlayer)
+            if ((__instance.Health <= 0 && !Config.LovedMonstersStillSwarm) || Config.MonstersIgnorePlayer)
             {
                 var ftn = typeof(Monster).GetMethod("updateAnimation", BindingFlags.NonPublic | BindingFlags.Instance).MethodHandle.GetFunctionPointer();
                 var action = (Action<GameTime>)Activator.CreateInstance(typeof(Action<GameTime>), __instance, ftn);
@@ -493,7 +483,7 @@ namespace PacifistValley
         }
         private static bool Monster_updateMovement_prefix(Monster __instance, GameTime time)
         {
-            if ((__instance.Health <= 0 && __instance.IsWalkingTowardPlayer) || Config.MonstersIgnorePlayer)
+            if ((__instance.Health <= 0 && __instance.IsWalkingTowardPlayer && !Config.LovedMonstersStillSwarm) || Config.MonstersIgnorePlayer)
             {
                 __instance.defaultMovementBehavior(time);
                 return false;
@@ -502,7 +492,7 @@ namespace PacifistValley
         }
         private static void ShadowShaman_behaviorAtGameTick_prefix(SquidKid __instance, ref NetBool ___casting)
         {
-            if (__instance.Health <= 0 || Config.MonstersIgnorePlayer)
+            if ((__instance.Health <= 0 && !Config.LovedMonstersStillSwarm) || Config.MonstersIgnorePlayer)
             {
                 ___casting.Value = false;
             }
@@ -510,7 +500,7 @@ namespace PacifistValley
 
         private static void SquidKid_behaviorAtGameTick_prefix(ref GameTime time, SquidKid __instance, ref float ___lastFireball)
         {
-            if (__instance.Health <= 0 || Config.MonstersIgnorePlayer)
+            if ((__instance.Health <= 0 && !Config.LovedMonstersStillSwarm) || Config.MonstersIgnorePlayer)
             {
                 ___lastFireball = Math.Max(1f, ___lastFireball);
                 time = new GameTime(TimeSpan.Zero, TimeSpan.Zero);
@@ -523,7 +513,7 @@ namespace PacifistValley
 
         private static void DinoMonster_behaviorAtGameTick_postfix(DinoMonster __instance, ref int ___nextFireTime)
         {
-            if (__instance.Health <= 0 || Config.MonstersIgnorePlayer)
+            if ((__instance.Health <= 0 && !Config.LovedMonstersStillSwarm) || Config.MonstersIgnorePlayer)
             {
                 ___nextFireTime = 0;
             }
@@ -531,7 +521,7 @@ namespace PacifistValley
 
         private static bool Skeleton_behaviorAtGameTick_prefix(Skeleton __instance, GameTime time)
         {
-            if (__instance.Health <= 0 || Config.MonstersIgnorePlayer)
+            if ((__instance.Health <= 0 && !Config.LovedMonstersStillSwarm) || Config.MonstersIgnorePlayer)
             {
                 var ftn = typeof(Monster).GetMethod("behaviorAtGameTick", BindingFlags.Public | BindingFlags.Instance).MethodHandle.GetFunctionPointer();
                 var action = (Action<GameTime>)Activator.CreateInstance(typeof(Action<GameTime>), __instance, ftn);
@@ -543,7 +533,7 @@ namespace PacifistValley
 
         private static void Skeleton_behaviorAtGameTick_postfix(Skeleton __instance, ref NetBool ___throwing)
         {
-            if (__instance.Health <= 0 || Config.MonstersIgnorePlayer)
+            if ((__instance.Health <= 0 && !Config.LovedMonstersStillSwarm) || Config.MonstersIgnorePlayer)
             {
                 __instance.Sprite.StopAnimation();
                 ___throwing.Value = false;
@@ -630,27 +620,15 @@ namespace PacifistValley
             try
             {
                 var codes = new List<CodeInstruction>(instructions);
-                bool start = false;
 
                 for (int i = 1; i < codes.Count; i++)
                 {
-                    if (codes[i].opcode == OpCodes.Ldarg_0 && codes[i-1].operand is MethodInfo info && info == AccessTools.Method(typeof(Stats), "set_MonstersKilled"))
+                    if (codes[i].opcode == OpCodes.Call && codes[i].operand is MethodInfo info && info == AccessTools.Method(typeof(GameLocation), nameof(GameLocation.removeTemporarySpritesWithID)))
                     {
-                        start = true;
-                        SMonitor.Log("Starting!");
-                    }
+                        SMonitor.Log("Removing removeTemporarySpritesWithID");
 
-                    if(start)
-                    {
-                        if (codes[i].opcode == OpCodes.Call && codes[i].operand is MethodInfo info1 && info1 == AccessTools.Method(typeof(GameLocation), nameof(GameLocation.removeTemporarySpritesWithID)))
-                        {
-                            SMonitor.Log("Stopping!");
-                            codes[i].opcode = OpCodes.Nop;
-                            codes[i].operand = null;
-                            break;
-                        }
-                        codes[i].opcode = OpCodes.Nop;
-                        codes[i].operand = null;
+                        HarmonyTools.RemoveFunctionCall(codes, i);
+                        break;
                     }
                 }
             }
@@ -670,7 +648,10 @@ namespace PacifistValley
             return false;
         }
 
-        public static bool OldShouldMonsterBeRemoved(Monster monster)
+        /// <summary>
+        /// Necessary because we postfix the o.g. method to always be false.
+        /// </summary>
+        public static bool ShouldMonsterBeRemoved(Monster monster)
         {
             return monster.Health <= 0;
         }
@@ -685,43 +666,57 @@ namespace PacifistValley
             }
         }
 
-        public static IEnumerable<CodeInstruction> updateCharacters_Transpiler(IEnumerable<CodeInstruction> instructions)
+        /// <summary>
+        /// Finds the place where the code removes the monster after killed and instead makes it emote.
+        /// </summary>
+        public static IEnumerable<CodeInstruction> updateCharacters_Transpiler(IEnumerable<CodeInstruction> instructions, MethodBase original)
         {
             SMonitor.Log($"Transpiling GameLocation.updateCharacters");
 
-            int updatedCount = 0;
+            bool hasReplacedMethod = false;
 
             var codes = new List<CodeInstruction>(instructions);
             for (int i = 0; i < codes.Count; i++)
             {
-                if (i > 3 && codes[i].opcode == OpCodes.Callvirt && (MethodInfo)codes[i].operand == AccessTools.Method(typeof(NetCollection<NPC>), nameof(NetCollection<NPC>.RemoveAt)))
+                if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo info1 && info1 == AccessTools.Method(typeof(NetCollection<NPC>), nameof(NetCollection<NPC>.RemoveAt)))
                 {
                     SMonitor.Log("Overriding remove dead monster");
-                    codes[i - 2].opcode = OpCodes.Ldloc_2;
-                    codes[i - 2].operand = null;
-                    codes[i].opcode = OpCodes.Call;
-                    codes[i].operand = AccessTools.Method(typeof(ModEntry), nameof(ModEntry.EmoteMonster));
-                    updatedCount++;
+
+                    // Remove the RemoveAt call
+                    i = HarmonyTools.RemoveFunctionCall(codes, i);
+
+                    // Add a call to EmoteMonster
+                    HarmonyTools.AddFunctionCall(original, codes, i, AccessTools.Method(typeof(ModEntry), nameof(EmoteMonster)), new HarmonyTools.ParameterLocation[] { HarmonyTools.ParameterLocation.FromLocal });
+
+                    if(hasReplacedMethod)
+                    {
+                        break;
+                    }
+
+                    hasReplacedMethod = true;
                 }
 
                 if (codes[i].opcode == OpCodes.Callvirt && codes[i].operand is MethodInfo info && info == AccessTools.Method(typeof(Monster), nameof(Monster.ShouldMonsterBeRemoved)))
                 {
                     SMonitor.Log("Overriding should monster be removed");
-                    codes[i].opcode = OpCodes.Call;
-                    codes[i].operand = AccessTools.Method(typeof(ModEntry), nameof(ModEntry.OldShouldMonsterBeRemoved));
 
-                    updatedCount++;
-                }
+                    i = HarmonyTools.RemoveFunctionCall(codes, i, true);
 
-                if(updatedCount == 2)
-                {
-                    break;
+                    HarmonyTools.AddFunctionCall(original, codes, i, AccessTools.Method(typeof(ModEntry), nameof(ShouldMonsterBeRemoved)), new HarmonyTools.ParameterLocation[] { HarmonyTools.ParameterLocation.FromLocal });
+
+                    if (hasReplacedMethod)
+                    {
+                        break;
+                    }
+
+                    hasReplacedMethod = true;
                 }
             }
-            return codes.AsEnumerable();
+
+            return codes;
         }
 
-        private static void EmoteMonster(GameLocation location, NPC monster, int i)
+        private static void EmoteMonster(Monster monster)
         {
             if (Config.EnableMod && Config.ShowMonsterHeartEmote)
                 monster.doEmote(20, true);

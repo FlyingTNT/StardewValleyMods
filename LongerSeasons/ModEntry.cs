@@ -364,7 +364,7 @@ namespace LongerSeasons
                 mod: ModManifest,
                 name: () => SHelper.Translation.Get("GMCM_NumberOffsetX_Name", new{number = j.ToString()}),
                 tooltip: () => SHelper.Translation.Get("GMCM_NumberOffsetX_Description", new { number = j.ToString() }),
-                getValue: () => { SMonitor.Log($"{j}"); return Config.BillboardNumberOffestsX[j]; },
+                getValue: () => { return Config.BillboardNumberOffestsX[j]; },
                 setValue: value => {
                     if (value != Config.BillboardNumberOffestsX[j])
                     {

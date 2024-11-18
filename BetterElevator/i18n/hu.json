@@ -1,0 +1,9 @@
+﻿{
+  "level-reached-x": "Elért legalacsonyabb szint: {0}",
+  "enter-level": "Szint megadása:",
+  // GMCM
+  "GMCM_Option_ModEnabled_Name": "Mod engedélyezve?",
+  "GMCM_Option_ModKey_Name": "Mod billentyű",
+  "GMCM_Option_Unrestricted_Name": "Korlátlan",
+  "GMCM_Option_Unrestricted_Tooltip": "Lehetővé teszi, hogy bármelyik szintet meglátogasd, azt is, ahol még nem jártál."
+}

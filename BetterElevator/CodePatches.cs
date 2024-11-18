@@ -64,7 +64,7 @@ namespace BetterElevator
             }
             if (tileIndex == 173) // Down ladder
             {
-                if (__instance.mineLevel == 77376)
+                if (__instance.mineLevel == 77376) // 77377 is the level for the quarry mine shaft.
                 {
                     Game1.enterMine(__instance.mineLevel + 2);
                     __instance.playSound("stairsdown");

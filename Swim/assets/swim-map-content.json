@@ -6,6 +6,7 @@
                 "SmolFishies",
                 "Crabs",
                 "OceanTreasure",
+                "OceanResources",
                 "Underwater"
             ],
             "DiveLocations": [
@@ -140,7 +141,8 @@
             "Features":[
                 "BigFishies",
                 "Minerals",
-                "Underwater"
+                "Underwater",
+                "ArtifactSpots"
             ],
             "DiveLocations": [
                 {

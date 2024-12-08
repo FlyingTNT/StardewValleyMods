@@ -1,5 +1,6 @@
 ﻿using StardewModdingAPI;
 using StardewModdingAPI.Utilities;
+using StardewValley;
 
 namespace Swim
 {
@@ -46,7 +47,12 @@ namespace Swim
         public int TriggerDistanceDown { get; set; }
         public int TriggerDistanceLeft { get; set; }
         public int TriggerDistanceRight { get; set; }
-        public int AnimationPatches { get; set; }
+        public float StaminaLossPerSecond { get; set; }
+        public float StaminaLossMultiplierWithGear { get; set; } 
+        public int SwimSpeed { get; set; }
+        public int SwimRunSpeed { get; set; }
+        public int ScubaFinSpeed { get; set; }
+        public bool DebuffMinerals { get; set; }
 
         public ModConfig()
         {
@@ -57,7 +63,7 @@ namespace Swim
             PreventJumpButton = KeybindList.Parse("LeftShift, ControllerA");
 
             EnableMod = true;
-            ReadyToSwim = true;
+            ReadyToSwim = false;
             SwimIndoors = false;
             ShowOxygenBar = true;
             SwimSuitAlways = false;
@@ -72,11 +78,12 @@ namespace Swim
             BubbleMult = 1;
 
             AllowActionsWhileInSwimsuit = true;
-            AllowRunningWhileInSwimsuit = false;
+            AllowRunningWhileInSwimsuit = true;
 
             AddFishies = true;
             AddCrabs = true;
 
+            DebuffMinerals = false;
             MineralPerThousandMin = 10;
             MineralPerThousandMax = 30;
             CrabsPerThousandMin = 1;
@@ -93,11 +100,16 @@ namespace Swim
 
             TriggerDistanceMult = 1f;
             TriggerDistanceUp = 144;
-            TriggerDistanceDown = 96;
+            TriggerDistanceDown = 130;
             TriggerDistanceLeft = 130;
             TriggerDistanceRight = 130;
 
-            AnimationPatches = 2;
+            StaminaLossPerSecond = 0.5f;
+            StaminaLossMultiplierWithGear = 0.5f;
+
+            SwimSpeed = Farmer.walkingSpeed;
+            SwimRunSpeed = Farmer.runningSpeed - 1;
+            ScubaFinSpeed = 2;
         }
     }
 }

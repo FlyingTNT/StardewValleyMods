@@ -1,15 +1,18 @@
 ﻿using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
+using StardewValley.Extensions;
+using StardewValley.GameData.Locations;
+using StardewValley.Internal;
+using StardewValley.Locations;
 using StardewValley.Objects;
-using StardewValley.TerrainFeatures;
 using StardewValley.Tools;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using xTile;
 using xTile.Dimensions;
-using xTile.ObjectModel;
+using xTile.Layers;
 using xTile.Tiles;
 using Object = StardewValley.Object;
 
@@ -18,22 +21,21 @@ namespace Swim
     public class SwimMaps
     {
         private static IMonitor SMonitor;
-        private static ModConfig Config;
+        private static ModConfig Config => ModEntry.Config;
         private static IModHelper SHelper;
 
-        public static void Initialize(IMonitor monitor, IModHelper helper, ModConfig config)
+        public static void Initialize(IMonitor monitor, IModHelper helper)
         {
             SMonitor = monitor;
-            Config = config;
             SHelper = helper;
         }
 
         public static Object SpawnForageItem(GameLocation location, Vector2 position, string itemID)
         {
-            Object item = ItemRegistry.Create<Object>(itemID.StartsWith("(") ? itemID : "(O)" + itemID);
+            Object item = ItemRegistry.Create<Object>(ItemRegistry.ManuallyQualifyItemId(itemID, "(O)"));
             SMonitor.Log($"Spawning forage {item.Name} at ({position.X}, {position.Y})");
             location.numberOfSpawnedObjectsOnMap++;
-            location.overlayObjects[position] = item;
+            location.objects[position] = item;
             item.IsSpawnedObject = true;
             item.CanBeGrabbed = true;
             return item;
@@ -41,9 +43,9 @@ namespace Swim
 
         public static Object SpawnWorldItem(GameLocation location, Vector2 position, string itemID)
         {
-            Object item = ItemRegistry.Create<Object>(itemID.StartsWith("(") ? itemID : "(O)" + itemID);
+            Object item = ItemRegistry.Create<Object>(ItemRegistry.ManuallyQualifyItemId(itemID, "(O)"));
             SMonitor.Log($"Spawning world item {item.Name} at ({position.X}, {position.Y})");
-            location.overlayObjects[position] = item;
+            location.objects[position] = item;
             return item;
         }
 
@@ -51,15 +53,15 @@ namespace Swim
         {
             if (which == "ScubaTank" && !Game1.player.mailReceived.Contains(which))
             {
-                gameLocation.overlayObjects[pos] = new Chest( new List<Item>() { new Clothing(ModEntry.scubaTankID.Value) }, pos, false, 0);
+                gameLocation.overlayObjects[pos] = new Chest(new List<Item>() { new Clothing(ModEntry.scubaTankID) }, pos, false, 0);
             }
             else if (which == "ScubaMask" && !Game1.player.mailReceived.Contains(which))
             {
-                gameLocation.overlayObjects[pos] = new Chest( new List<Item>() { new Hat(ModEntry.scubaMaskID.Value )}, pos, false, 0);
+                gameLocation.overlayObjects[pos] = new Chest(new List<Item>() { new Hat(ModEntry.scubaMaskID) }, pos, false, 0);
             }
             else if (which == "ScubaFins" && !Game1.player.mailReceived.Contains(which))
             {
-                gameLocation.overlayObjects[pos] = new Chest( new List<Item>() { new Boots(ModEntry.scubaFinsID.Value) }, pos, false, 0);
+                gameLocation.overlayObjects[pos] = new Chest(new List<Item>() { new Boots(ModEntry.scubaFinsID) }, pos, false, 0);
             }
         }
         public static void AddWaterTiles(GameLocation gameLocation)
@@ -70,10 +72,19 @@ namespace Swim
             {
                 for (int y = 0; y < gameLocation.map.Layers[0].LayerHeight; y++)
                 {
-                    if (gameLocation.doesTileHaveProperty(x, y, "Water", "Back") != null)
+                    string waterProperty = gameLocation.doesTileHaveProperty(x, y, "Water", "Back");
+
+                    if (waterProperty != null)
                     {
                         foundAnyWater = true;
-                        gameLocation.waterTiles[x, y] = true;
+                        if (waterProperty == "I")
+                        {
+                            gameLocation.waterTiles.waterTiles[x, y] = new WaterTiles.WaterTileData(is_water: true, is_visible: false);
+                        }
+                        else
+                        {
+                            gameLocation.waterTiles[x, y] = true;
+                        }
                     }
                 }
             }
@@ -88,265 +99,321 @@ namespace Swim
             }
         }
 
-
         public static void AddMinerals(GameLocation l)
         {
-            List<Vector2> spots = new List<Vector2>();
-            for (int x = 0; x < l.map.Layers[0].LayerWidth; x++)
-            {
-                for (int y = 0; y < l.map.Layers[0].LayerHeight; y++)
-                {
-                    Tile tile = l.map.GetLayer("Back").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size);
-                    if (tile != null && l.map.GetLayer("Buildings").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size) == null && l.map.GetLayer("Front").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size) == null)
-                    {
-                        spots.Add(new Vector2(x, y));
-                    }
-                }
-            }
-            int n = spots.Count;
-            while (n > 1)
-            {
-                n--;
-                int k = Game1.random.Next(n + 1);
-                var value = spots[k];
-                spots[k] = spots[n];
-                spots[n] = value;
-            }
-
+            List<Vector2> spots = GetValidSpawnSpots(l);
             int mineralNo = (int)Math.Round(Game1.random.Next(Config.MineralPerThousandMin, Config.MineralPerThousandMax) / 1000f * spots.Count);
-            List<Vector2> mineralSpots = spots.Take(mineralNo).ToList();
 
-            foreach (Vector2 tile in mineralSpots)
+            // FlyingTNT.Swim/Minerals is a list of ((id, hp), weight) pairs
+            ((string, int), int)[] mineralData = SHelper.GameContent.Load<List<((string, int), int)>>("FlyingTNT.Swim/Minerals").ToArray();
+
+            ((string, int), float)[] weightedMinerals = GenerateWeitghedThreshholds(mineralData);
+
+            foreach (Vector2 v in GetRandom(spots, mineralNo))
             {
-                double chance = Game1.random.NextDouble();
-                if (chance < 0.2 /*&& !l.map.GetLayer("Back").Tiles[(int)tile.X, (int)tile.Y].Properties.ContainsKey("Treasure") && !l.map.GetLayer("Back").Tiles[(int)tile.X, (int)tile.Y].Properties.ContainsKey("Diggable")*/)
+                (string id, int hp) = GetRandom(weightedMinerals);
+               
+                if(hp is -1)
                 {
-                    // Treasure property is high-key kind of a nightmare (unused/rarely used in the game's code, so it is buggy), so while changing the tile index when there's buried treasure is cool, I'm just gonna do the worms
-                    //l.map.GetLayer("Back").Tiles[(int)tile.X, (int)tile.Y].TileIndex = 1299;
-                    //l.map.GetLayer("Back").Tiles[(int)tile.X, (int)tile.Y].Properties.Add("Treasure", new PropertyValue("Object " + SwimUtils.CheckForBuriedItem(Game1.player)));
-                    //l.map.GetLayer("Back").Tiles[(int)tile.X, (int)tile.Y].Properties.Add("Diggable", new PropertyValue("T"));
-
-                    l.Objects.Add(tile, ItemRegistry.Create<Object>("(O)590")); // Artifact spot
-                }
-                else if (chance < 0.4)
-                {
-                    SpawnWorldItem(l, tile, "(O)751").MinutesUntilReady = 2; // Copper stone
-                }
-                else if (chance < 0.5)
-                {
-                    SpawnWorldItem(l, tile, "(O)290").MinutesUntilReady = 4; // Iron stone
-                }
-                else if (chance < 0.55)
-                {
-                    SpawnWorldItem(l, tile, "(O)764").MinutesUntilReady = 8; // Gold stone
-                }
-                else if (chance < 0.56)
-                {
-                    SpawnWorldItem(l, tile, "(O)765").MinutesUntilReady = 16; // Iridium stone
-                }
-                else if (chance < 0.65)
-                {
-                    SpawnForageItem(l, tile, "(O)80"); // Quartz 
-                }
-                else if (chance < 0.74)
-                {
-                    SpawnForageItem(l, tile, "(O)82"); // Fire Quartz
-                }
-                else if (chance < 0.83)
-                {
-                    SpawnForageItem(l, tile, "(O)84"); // Frozen Tear
-                }
-                else if (chance < 0.90)
-                {
-                    SpawnForageItem(l, tile, "(O)86"); // Earth crystal
+                    SpawnForageItem(l, v, id);
                 }
                 else
                 {
-                    string[] gems = { "4","6","8","10","12","14","40" };
-                    string whichGem = gems[Game1.random.Next(gems.Length)];
-                    SpawnWorldItem(l, tile, whichGem).MinutesUntilReady = 5;
+                    SpawnWorldItem(l, v, id).MinutesUntilReady = hp;
                 }
             }
         }
 
         public static void AddCrabs(GameLocation l)
         {
-            if (Config.AddCrabs)
+            if (!Config.AddCrabs)
             {
-                List<Vector2> spots = new List<Vector2>();
-                for (int x = 0; x < l.map.Layers[0].LayerWidth; x++)
-                {
-                    for (int y = 0; y < l.map.Layers[0].LayerHeight; y++)
-                    {
-                        Tile tile = l.map.GetLayer("Back").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size);
-                        if (tile != null && l.map.GetLayer("Buildings").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size) == null && l.map.GetLayer("Front").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size) == null && !l.overlayObjects.ContainsKey(new Vector2(x, y)))
-                        {
-                            spots.Add(new Vector2(x, y));
-                        }
-                    }
-                }
-                int n = spots.Count;
-                while (n > 1)
-                {
-                    n--;
-                    int k = Game1.random.Next(n + 1);
-                    var value = spots[k];
-                    spots[k] = spots[n];
-                    spots[n] = value;
-                }
-                int crabs = (int)(Game1.random.Next(Config.CrabsPerThousandMin, Config.CrabsPerThousandMax) / 1000f * spots.Count);
-                for (int i = 0; i < crabs; i++)
-                {
-                    int idx = Game1.random.Next(spots.Count);
-                    l.characters.Add(new SeaCrab(new Vector2(spots[idx].X * Game1.tileSize, spots[idx].Y * Game1.tileSize)));
-                }
+                return;
+            }
+
+            List<Vector2> spots = GetValidSpawnSpots(l);
+            ShuffleLast(spots, spots.Count);
+            int crabs = (int)(Game1.random.Next(Config.CrabsPerThousandMin, Config.CrabsPerThousandMax) / 1000f * spots.Count);
+            for (int i = 0; i < crabs; i++)
+            {
+                int idx = Game1.random.Next(spots.Count);
+                l.characters.Add(new SeaCrab(new Vector2(spots[idx].X * Game1.tileSize, spots[idx].Y * Game1.tileSize)));
             }
         }
 
         public static void AddFishies(GameLocation l, bool smol = true)
         {
-            if (Config.AddFishies)
+            if (!Config.AddFishies)
             {
-                List<Vector2> spots = new List<Vector2>();
-                for (int x = 0; x < l.map.Layers[0].LayerWidth; x++)
+                return;
+            }
+
+            List<Vector2> spots = GetValidSpawnSpots(l);
+            if (spots.Count == 0)
+            {
+                SMonitor.Log($"No spots for fishies in map {l.Name}", LogLevel.Warn);
+                return;
+            }
+            ShuffleLast(spots, spots.Count);
+            if (smol)
+            {
+                int fishes = Game1.random.Next(Config.MinSmolFishies, Config.MaxSmolFishies);
+                for (int i = 0; i < fishes; i++)
                 {
-                    for (int y = 0; y < l.map.Layers[0].LayerHeight; y++)
-                    {
-                        Tile tile = l.map.GetLayer("Back").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size);
-                        if (tile != null && l.map.GetLayer("Buildings").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size) == null && l.map.GetLayer("Front").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size) == null && !l.overlayObjects.ContainsKey(new Vector2(x, y)))
-                        {
-                            spots.Add(new Vector2(x, y));
-                        }
-                    }
+                    int idx = Game1.random.Next(spots.Count);
+                    l.characters.Add(new Fishie(new Vector2(spots[idx].X * Game1.tileSize, spots[idx].Y * Game1.tileSize)));
                 }
-                if(spots.Count == 0)
+            }
+            else
+            {
+                int bigFishes = (int)(Game1.random.Next(Config.BigFishiesPerThousandMin, Config.BigFishiesPerThousandMax) / 1000f * spots.Count);
+                for (int i = 0; i < bigFishes; i++)
                 {
-                    SMonitor.Log($"No spots for fishies in map {l.Name}", LogLevel.Warn);
-                    return;
-                }
-                int n = spots.Count;
-                while (n > 1)
-                {
-                    n--;
-                    int k = Game1.random.Next(n + 1);
-                    var value = spots[k];
-                    spots[k] = spots[n];
-                    spots[n] = value;
-                }
-                if (smol)
-                {
-                    int fishes = Game1.random.Next(Config.MinSmolFishies, Config.MaxSmolFishies);
-                    for (int i = 0; i < fishes; i++)
-                    {
-                        int idx = Game1.random.Next(spots.Count);
-                        l.characters.Add(new Fishie(new Vector2(spots[idx].X * Game1.tileSize, spots[idx].Y * Game1.tileSize)));
-                    }
-                }
-                else
-                {
-                    int bigFishes = (int)(Game1.random.Next(Config.BigFishiesPerThousandMin, Config.BigFishiesPerThousandMax) / 1000f * spots.Count);
-                    for (int i = 0; i < bigFishes; i++)
-                    {
-                        int idx = Game1.random.Next(spots.Count);
-                        l.characters.Add(new BigFishie(new Vector2(spots[idx].X * Game1.tileSize, spots[idx].Y * Game1.tileSize)));
-                    }
+                    int idx = Game1.random.Next(spots.Count);
+                    l.characters.Add(new BigFishie(new Vector2(spots[idx].X * Game1.tileSize, spots[idx].Y * Game1.tileSize)));
                 }
             }
         }
+
+        private static List<Vector2> GetValidSpawnSpots(GameLocation l)
+        {
+            // I tested this on the underwater beach map, and on average it took 0.068ms to manually count all the valid spots, so while this could be made faster by 
+            // estimating the number of spots, imo it's not worth the complexity.
+            List<Vector2> spots = new();
+            for (int x = 0; x < l.map.Layers[0].LayerWidth; x++)
+            {
+                for (int y = 0; y < l.map.Layers[0].LayerHeight; y++)
+                {
+                    if (CanForageBePhysicallyPlacedHere(l, x, y))
+                    {
+                        spots.Add(new Vector2(x, y));
+                    }
+                }
+            }
+            return spots;
+        }
+
+        /// <summary>
+        /// Shuffles the last count elements in the given list. It will pull elements from the whole list, but only the last elements are guaranteed to be shuffled.
+        /// </summary>
+        /// <param name="list">The list to shuffle.</param>
+        /// <param name="count">The number of elements to shuffle.</param>
+        /// <returns>The given list instance.</returns>
+        private static List<T> ShuffleLast<T>(List<T> list, int count)
+        {
+            count = count > list.Count ? list.Count : count;
+            int n = list.Count;
+            while (n > list.Count - count)
+            {
+                n--;
+                int k = Game1.random.Next(n + 1);
+                (list[n], list[k]) = (list[k], list[n]);
+            }
+
+            return list;
+        }
+
+        /// <summary>
+        /// Randomly selects a number of elements from the given list. Won't repeat elements.
+        /// 
+        /// Will modify the list.
+        /// </summary>
+        /// <param name="list">The list to get elements from.</param>
+        /// <param name="count">The number of elements to get.</param>
+        /// <returns>An IEnumerable containing count random elements from the list. </returns>
+        private static IEnumerable<T> GetRandom<T>(List<T> list, int count)
+        {
+            return ShuffleLast(list, count).TakeLast(count > list.Count ? list.Count : count);
+        }
+
+        private static (T, float)[] GenerateWeitghedThreshholds<T>((T, int)[] weightedPairs)
+        {
+            float total = weightedPairs.Select(pair => pair.Item2).Sum();
+            (T, float)[] output = new (T, float)[weightedPairs.Length];
+
+            float accumulated = 0;
+
+            for(int i = 0; i < weightedPairs.Length; i++)
+            {
+                accumulated += weightedPairs[i].Item2 / total;
+                output[i] = (weightedPairs[i].Item1, accumulated);
+            }
+
+            output[^1].Item2 = 1; // In case any precision errors would cause it to be less than 1
+
+            return output;
+        }
+
+        private static T GetRandom<T>((T, float)[] itemsWithThreshholds)
+        {
+            float random = Game1.random.NextSingle();
+            for(int i = 0; i < itemsWithThreshholds.Length; i++)
+            {
+                if(random <= itemsWithThreshholds[i].Item2)
+                {
+                    return itemsWithThreshholds[i].Item1;
+                }
+            }
+
+            // Should not be possible to reach here if weightedThreshholds is set up right, but I want to be safe.
+            return itemsWithThreshholds[^1].Item1;
+        }
+
+        /// <summary>
+        /// Spawns ocean-themed forage in the given location.
+        /// </summary>
         public static void AddOceanForage(GameLocation l)
         {
-            List<Vector2> spots = new List<Vector2>();
-            for (int x = 0; x < l.map.Layers[0].LayerWidth; x++)
-            {
-                for (int y = 0; y < l.map.Layers[0].LayerHeight; y++)
-                {
-                    Tile tile = l.map.GetLayer("Back").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size);
-                    if (tile != null && l.map.GetLayer("Buildings").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size) == null && l.map.GetLayer("Front").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size) == null && !l.overlayObjects.ContainsKey(new Vector2(x, y)))
-                    {
-                        spots.Add(new Vector2(x, y));
-                    }
-                }
-            }
-            int n = spots.Count;
-            while (n > 1)
-            {
-                n--;
-                int k = Game1.random.Next(n + 1);
-                var value = spots[k];
-                spots[k] = spots[n];
-                spots[n] = value;
-            }
+            List<Vector2> spots = GetValidSpawnSpots(l);
             int forageNo = (int)(Game1.random.Next(Config.OceanForagePerThousandMin, Config.OceanForagePerThousandMax) / 1000f * spots.Count);
-            List<Vector2> forageSpots = spots.Take(forageNo).ToList();
 
-            foreach (Vector2 v in forageSpots)
+            (string, float)[] weightedForage = GenerateWeitghedThreshholds(SHelper.GameContent.Load<List<(string, int)>>("FlyingTNT.Swim/OceanForage").ToArray());
+
+            foreach (Vector2 v in GetRandom(spots, forageNo))
             {
-                double chance = Game1.random.NextDouble();
-                if (chance < 0.25)
-                {
-                    SpawnForageItem(l, v, "(O)152");// Seaweed
-                }
-                else if (chance < 0.4)
-                {
-                    SpawnForageItem(l, v, "(O)153");// Green Algae
-                }
-                else if (chance < 0.6)
-                {
-                    SpawnForageItem(l, v, "(O)157");// White Algae
-                }
-                else if (chance < 0.75)
-                {
-                    SpawnForageItem(l, v, "(O)372");// Clam
-                }
-                else if (chance < 0.85)
-                {
-                    SpawnForageItem(l, v, "(O)393");// Coral
-                }
-                else if (chance < 0.94)
-                {
-                    SpawnForageItem(l, v, "(O)397");// Sea Urchin
-                }
-                else if (chance < 0.97)
-                {
-                    SpawnForageItem(l, v, "(O)394");// Rainbow Shell
-                }
-                else
-                {
-                    SpawnForageItem(l, v, "(O)392");// Nautilus Shell
-                }
+                SpawnForageItem(l, v, GetRandom(weightedForage));
             }
         }
-        public static void AddOceanTreasure(GameLocation l)
+
+        /// <summary>
+        /// Spawns forage based on the location's forage data.
+        /// </summary>
+        /// <remarks>
+        /// This is useful because the base game's forage spawn method (<see cref="GameLocation.spawnObjects"/>) considers a tile an invalid spawn location if it is a water tile, so it will never be spawned
+        /// in the underwater maps because all of their tiles have the Water property. Imo, this is not a big enough issue to justify the patches that would be necessary to fix it. 
+        /// </remarks>
+        public static void AddForage(GameLocation l)
         {
-            List<Vector2> spots = new List<Vector2>();
-            for (int x = 0; x < l.map.Layers[0].LayerWidth; x++)
+            // Much of this was taken from GameLocation.spawnObjects()
+            Random r = Utility.CreateDaySaveRandom();
+            LocationData data = l.GetData();
+            if (data == null || l.numberOfSpawnedObjectsOnMap >= data.MaxSpawnedForageAtOnce)
             {
-                for (int y = 0; y < l.map.Layers[0].LayerHeight; y++)
+                return;
+            }    
+            List<SpawnForageData> possibleForage = new();
+            foreach (SpawnForageData spawn in data.Forage)
+            {
+                if ((spawn.Condition == null || GameStateQuery.CheckConditions(spawn.Condition, l, null, null, null, r)) && (!spawn.Season.HasValue || spawn.Season == l.GetSeason()))
                 {
-                    Tile tile = l.map.GetLayer("Back").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size);
-                    if (tile != null && l.map.GetLayer("Buildings").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size) == null && l.map.GetLayer("Front").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size) == null && !l.overlayObjects.ContainsKey(new Vector2(x, y)))
-                    {
-                        spots.Add(new Vector2(x, y));
-                    }
+                    possibleForage.Add(spawn);
                 }
             }
-            int n = spots.Count;
-            while (n > 1)
+            if(!possibleForage.Any())
             {
-                n--;
-                int k = Game1.random.Next(n + 1);
-                var value = spots[k];
-                spots[k] = spots[n];
-                spots[n] = value;
+                return;
             }
 
+            int numberToSpawn = r.Next(data.MinDailyForageSpawn, data.MaxDailyForageSpawn + 1);
+            numberToSpawn = Math.Min(numberToSpawn, data.MaxSpawnedForageAtOnce - l.numberOfSpawnedObjectsOnMap);
+            ItemQueryContext itemQueryContext = new(l, null, r, "get forage for Swim map");
+            foreach(Vector2 spot in GetRandom(GetValidSpawnSpots(l), numberToSpawn))
+            {
+                SpawnForageData forage = r.ChooseFrom(possibleForage);
+                if (!r.NextBool(forage.Chance))
+                {
+                    continue;
+                }
+                Item forageItem = ItemQueryResolver.TryResolveRandomItem(forage, itemQueryContext);
+                if (forageItem == null)
+                {
+                    continue;
+                }
+                SpawnForageItem(l, spot, forageItem.QualifiedItemId);
+            }
+        }
+
+        /// <summary>
+        /// Spawns artifact spots in the location.
+        /// </summary>
+        /// <remarks>
+        /// This is useful because the base game's artifact spawn method (<see cref="GameLocation.spawnObjects"/>) considers a tile an invalid spawn location if it is a water tile, so it will never be spawned
+        /// in the underwater maps because all of their tiles have the Water property. Imo, this is not a big enough issue to justify the patches that would be necessary to fix it. 
+        /// </remarks>
+        public static void AddArtifactSpots(GameLocation l)
+        {
+            // Much of this was taken from GameLocation.spawnObjects()
+
+            Random r = Utility.CreateDaySaveRandom(7); // The random needs to have a different seed than the one used in AddForage or they'd generate the same points
+
+            List<Vector2> positionOfArtifactSpots = new();
+            foreach ((Vector2 k, Object v) in l.objects.Pairs)
+            {
+                if (v.QualifiedItemId == "(O)590")
+                {
+                    positionOfArtifactSpots.Add(k);
+                }
+            }
+            for (int i = positionOfArtifactSpots.Count - 1; i >= 0; i--)
+            {
+                if (r.NextBool(0.15))
+                {
+                    l.objects.Remove(positionOfArtifactSpots[i]);
+                    positionOfArtifactSpots.RemoveAt(i);
+                }
+            }
+            if (positionOfArtifactSpots.Count > 4)
+            {
+                return;
+            }
+            double chanceForNewArtifactAttempt = 1.0;
+            while (r.NextDouble() < chanceForNewArtifactAttempt)
+            {
+                int x = r.Next(l.map.DisplayWidth / 64);
+                int y = r.Next(l.map.DisplayHeight / 64);
+                Vector2 location = new(x, y);
+                if (CanForageBePhysicallyPlacedHere(l, x, y))
+                {
+                    l.objects.Add(location, ItemRegistry.Create<Object>("(O)590"));
+                }
+                chanceForNewArtifactAttempt *= 0.75;
+            }
+        }
+
+        /// <summary>
+        /// Checks whether a forage item would be intersecting another object or the map if placed here.
+        /// </summary>
+        /// <remarks>
+        /// It might be good to check for other things like the Spawnable property in addition to calling this method.
+        /// </remarks>
+        private static bool CanForageBePhysicallyPlacedHere(GameLocation l, int x, int y)
+        {
+            if(l.getTileIndexAt(x, y, "Back") == -1)
+            {
+                return false;
+            }
+
+            if(l.getTileIndexAt(x, y, "Buildings") != -1 ||
+               l.getTileIndexAt(x, y, "Front") != -1 ||
+               l.getTileIndexAt(x, y, "AlwaysFront") != -1 ||
+               l.getTileIndexAt(x, y, "AlwaysFront1") != -1 ||
+               l.getTileIndexAt(x, y, "AlwaysFront2") != -1 ||
+               l.getTileIndexAt(x, y, "AlwaysFront3") != -1)
+            {
+                return false;
+            }
+
+            Vector2 vector = new(x, y);
+
+            if (l.objects.ContainsKey(vector) || l.overlayObjects.ContainsKey(vector))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Spawns a treasure chest containing ocean-themed treasure.
+        /// </summary>
+        /// <param name="l"></param>
+        public static void AddOceanTreasure(GameLocation l)
+        {
+            List<Vector2> spots = GetValidSpawnSpots(l);
             int treasureNo = (int)(Game1.random.Next(Config.MinOceanChests, Config.MaxOceanChests));
 
-            List<Vector2> treasureSpots = new List<Vector2>(spots).Take(treasureNo).ToList();
-
-            foreach (Vector2 v in treasureSpots)
+            foreach (Vector2 v in GetRandom(spots, treasureNo))
             {
-
                 List<Item> treasures = new List<Item>();
                 float chance = 1f;
                 while (Game1.random.NextDouble() <= (double)chance)
@@ -575,31 +642,30 @@ namespace Swim
             }
         }
 
-
         public static void RemoveWaterTiles(GameLocation l)
         {
             if (l == null || l.map == null)
                 return;
             Map map = l.map;
-            string mapName = l.Name;
+            //Layer back = map.RequireLayer("Back");
             for (int x = 0; x < map.Layers[0].LayerWidth; x++)
             {
                 for (int y = 0; y < map.Layers[0].LayerHeight; y++)
                 {
-                    if (SwimUtils.doesTileHaveProperty(map, x, y, "Water", "Back") != null)
+                    if (l.doesTileHaveProperty(x, y, "Water", "Back") != null)
                     {
-                        Tile tile = map.GetLayer("Back").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size);
-                        if (tile != null)
-                            tile.TileIndexProperties.Remove("Water");
+                        l.removeTileProperty(x, y, "Back", "Water");
                     }
+
+                    // This function basically has no effect because it doesn't remove the tile index properties, but I'm going to leave it out out
+                    // of fear that it would break something if it did.
+                    //back.Tiles[x, y]?.TileIndexProperties.Remove("Water"); <- not in the method originally
                 }
             }
         }
 
-
         public static void SwitchToWaterTiles(GameLocation location)
         {
-
             string mapName = location.Name;
 
             Map map = location.Map;
@@ -607,7 +673,7 @@ namespace Swim
             {
                 for (int y = 0; y < map.Layers[0].LayerHeight; y++)
                 {
-                    if (SwimUtils.doesTileHaveProperty(map, x, y, "Water", "Back") != null)
+                    if (location.doesTileHaveProperty(x, y, "Water", "Back") != null)
                     {
                         Tile tile = map.GetLayer("Back").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size);
                         if (tile != null)
@@ -642,7 +708,7 @@ namespace Swim
             {
                 for (int y = 0; y < map.Layers[0].LayerHeight; y++)
                 {
-                    if (SwimUtils.doesTileHaveProperty(map, x, y, "Water", "Back") != null)
+                    if (location.doesTileHaveProperty(x, y, "Water", "Back") != null)
                     {
                         Tile tile = map.GetLayer("Back").PickTile(new Location(x, y) * Game1.tileSize, Game1.viewport.Size);
                         if (tile != null)

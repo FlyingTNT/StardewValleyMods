@@ -16,8 +16,6 @@ namespace Swim
             "HermitCrab",
             "ChestCrab",
         };
-        private NetBool shellGone = new NetBool();
-        private NetInt shellHealth = new NetInt(5);
 
         public SeaCrab() : base()
         {

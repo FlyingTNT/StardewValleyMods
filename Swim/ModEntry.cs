@@ -11,41 +11,35 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Common.Integrations;
-using Rectangle = Microsoft.Xna.Framework.Rectangle; 
+using Rectangle = Microsoft.Xna.Framework.Rectangle;
+using System.IO;
+using System.Threading.Channels;
+using xTile;
+using StardewValley.Extensions;
 
 namespace Swim
 {
     public class ModEntry : Mod
     {
-        
-        public static ModConfig Config;
-        public static IMonitor SMonitor;
-        public static IModHelper SHelper;
-        public static ModEntry context;
 
-        public static PerScreen<Texture2D> OxygenBarTexture = new PerScreen<Texture2D>();
-        public static readonly PerScreen<string> scubaMaskID = new PerScreen<string>(() => "Swim_ScubaMask");
-        public static readonly PerScreen<string> scubaFinsID = new PerScreen<string>(() => "Swim_ScubaFins");
-        public static readonly PerScreen<string> scubaTankID = new PerScreen<string>(() => "Swim_ScubaTank");
+        public static ModConfig Config { get; private set; }
+        public static IMonitor SMonitor { get; private set; }
+        public static IModHelper SHelper { get; private set; }
+
+        public static readonly PerScreen<Texture2D> OxygenBarTexture = new();
+        public const string scubaMaskID = "Swim_ScubaMask";
+        public const string scubaFinsID = "Swim_ScubaFins";
+        public const string scubaTankID = "Swim_ScubaTank";
         public static readonly PerScreen<int> oxygen = new PerScreen<int>(() => 0);
         public static readonly PerScreen<int> lastUpdateMs = new PerScreen<int>(() => 0);
         public static readonly PerScreen<bool> willSwim = new PerScreen<bool>(() => false);
         public static readonly PerScreen<bool> isUnderwater = new PerScreen<bool>(() => false);
-        public static readonly PerScreen<NPC> oldMariner = new PerScreen<NPC>();
+        public static NPC oldMariner = null;
         public static readonly PerScreen<bool> marinerQuestionsWrongToday = new PerScreen<bool>(() => false);
         public static readonly PerScreen<Random> myRand = new PerScreen<Random>(() => new Random());
-        public static PerScreen<bool> locationIsPool = new PerScreen<bool>(() => false);
+        public static readonly PerScreen<bool> locationIsPool = new PerScreen<bool>(() => false);
 
-        public static Dictionary<string, DiveMap> diveMaps = new Dictionary<string, DiveMap>();
-
-        public static Dictionary<string,bool> changeLocations = new Dictionary<string, bool> {
-            {"Custom_UnderwaterMountain", false },
-            {"Mountain", false },
-            {"Town", false },
-            {"Forest", false },
-            {"Custom_UnderwaterBeach", false },
-            {"Beach", false },
-        };
+        public static readonly Dictionary<string, DiveMap> diveMaps = new Dictionary<string, DiveMap>();
 
         public static readonly PerScreen<List<Vector2>> bubbles = new PerScreen<List<Vector2>>(() => new List<Vector2>());
 
@@ -64,37 +58,38 @@ namespace Swim
         {           
             Config = Helper.ReadConfig<ModConfig>();
 
-            context = this;
-
             SMonitor = Monitor;
             SHelper = helper;
 
             // Without the config only option, the player would not be able to re-enable the mod after they disabled it because we never added the config options.
-            helper.Events.GameLoop.GameLaunched += Config.EnableMod ? SwimHelperEvents.GameLoop_GameLaunched : GameLoop_GameLaunched_ConfigOnly;
+            helper.Events.GameLoop.GameLaunched += SetupModConfig;
 
             if (!Config.EnableMod)
                 return;
 
-            SwimPatches.Initialize(Monitor, helper, Config);
-            SwimDialog.Initialize(Monitor, helper, Config);
-            SwimMaps.Initialize(Monitor, helper, Config);
-            SwimHelperEvents.Initialize(Monitor, helper, Config);
-            SwimUtils.Initialize(Monitor, helper, Config);
-            AnimationManager.Initialize(Monitor, helper, Config);
+            SwimPatches.Initialize(Monitor, helper);
+            SwimDialog.Initialize(Monitor, helper);
+            SwimMaps.Initialize(Monitor, helper);
+            SwimHelperEvents.Initialize(Monitor, helper);
+            SwimUtils.Initialize(Monitor, helper);
+            AnimationManager.Initialize(Monitor, helper);
 
             helper.Events.GameLoop.UpdateTicked += SwimHelperEvents.GameLoop_UpdateTicked;
-            helper.Events.Input.ButtonPressed += SwimHelperEvents.Input_ButtonPressed;
+            helper.Events.GameLoop.OneSecondUpdateTicked += SwimHelperEvents.GameLoop_OneSecondUpdateTicked;
             helper.Events.Input.ButtonsChanged += SwimHelperEvents.Input_ButtonsChanged;
             helper.Events.GameLoop.DayStarted += SwimHelperEvents.GameLoop_DayStarted;
             helper.Events.GameLoop.SaveLoaded += SwimHelperEvents.GameLoop_SaveLoaded;
             helper.Events.GameLoop.Saving += SwimHelperEvents.GameLoop_Saving;
+            helper.Events.GameLoop.GameLaunched += SwimHelperEvents.GameLoop_GameLaunched;
+            helper.Events.Input.ButtonPressed += SwimHelperEvents.Input_ButtonPressed;
             helper.Events.Display.RenderedHud += SwimHelperEvents.Display_RenderedHud;
             helper.Events.Display.RenderedWorld += SwimHelperEvents.Display_RenderedWorld;
             helper.Events.Player.InventoryChanged += SwimHelperEvents.Player_InventoryChanged;
             helper.Events.Player.Warped += SwimHelperEvents.Player_Warped;
+            helper.Events.Content.LocaleChanged += SwimHelperEvents.Content_LocaleChanged;
             helper.Events.Content.AssetRequested += Content_AssetRequested;
 
-            var harmony = new Harmony(this.ModManifest.UniqueID);
+            var harmony = new Harmony(ModManifest.UniqueID);
 
             harmony.Patch(
                original: AccessTools.Method(typeof(GameLocation), nameof(GameLocation.startEvent)),
@@ -169,7 +164,13 @@ namespace Swim
                postfix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.GameLocation_sinkDebris_Postfix))
             );
 
-            //AnimationManager.Patch(harmony);
+            harmony.Patch(
+               original: AccessTools.Method(typeof(Utility), nameof(Utility.playerCanPlaceItemHere)),
+               prefix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.Utility_playerCanPlaceItemHere_Prefix)),
+               postfix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.Utility_playerCanPlaceItemHere_Postfix))
+            );
+
+            AnimationManager.Patch(harmony);
         }
 
         private void Content_AssetRequested(object sender, AssetRequestedEventArgs e)
@@ -180,11 +181,115 @@ namespace Swim
             }
             else if (e.NameWithoutLocale.IsEquivalentTo("Portraits\\Mariner"))
             {
-                e.LoadFrom(() => {return Game1.content.Load<Texture2D>("Portraits\\Gil");}, AssetLoadPriority.Low);
+                e.LoadFrom(() => { return Game1.content.Load<Texture2D>("Portraits\\Gil"); }, AssetLoadPriority.Low);
             }
             else if (e.NameWithoutLocale.IsEquivalentTo("Mods/FlyingTNT.Swim/i18n"))
             {
                 e.LoadFrom(() => SwimUtils.Geti18nDict(), AssetLoadPriority.Medium);
+            }
+            else if (e.NameWithoutLocale.IsEquivalentTo("FlyingTNT.Swim/OceanForage"))
+            {
+                // Item id, weight
+                e.LoadFrom(() => new List<(string, int)>(new[] {
+                    ("(O)152", 25), // Seaweed
+                    ("(O)153", 15), // Green Algae
+                    ("(O)157", 20), // White Algae
+                    ("(O)327", 15), // Clam
+                    ("(O)393", 10), // Coral
+                    ("(O)397", 9), // Sea Urchin
+                    ("(O)394", 3), // Rainbow Shell
+                    ("(O)392", 3), // Nautilus Shell
+                    ("(O)719", 6), // Mussel
+                    ("(O)723", 6), // Oyster
+                    ("(O)718", 6) // Cockle
+                }), AssetLoadPriority.Medium);
+            }
+            else if (e.NameWithoutLocale.IsEquivalentTo("FlyingTNT.Swim/Minerals"))
+            {
+                // (Item id, rock hp or -1 if forage), weight
+                e.LoadFrom(() => new List<((string, int), int)>(new[] {
+                    (("(O)751", 2), 20), // Copper Stone
+                    (("(O)290", 4), 10), // Iron Stone
+                    (("(O)764", 8), 5), // Gold Stone
+                    (("(O)765", 1), 1), // Iridium Stone
+                    (("(O)80", -1), 9), // Quartz
+                    (("(O)82", -1), 9), // Fire Quartz
+                    (("(O)84", -1), 9), // Frozen Tear
+                    (("(O)86", -1), 7), // Earth Crystal
+                    (("(O)2", 10), 1), // Diamond Stone
+                    (("(O)4", 5), 1), // Ruby Stone
+                    (("(O)6", 5), 1), // Jade Stone
+                    (("(O)8", 5), 1), // Amethyst Stone
+                    (("(O)10", 5), 1), // Topaz Stone
+                    (("(O)12", 5), 1), // Emerald Stone
+                    (("(O)14", 5), 1), // Aquamarine Stone
+                    (("(O)44", 5), 1), // Gem Stone
+                }), AssetLoadPriority.Medium);
+            }
+            else if(e.NameWithoutLocale.IsEquivalentTo("FlyingTNT.Swim/DebuffedMinerals")) // Unused because stone drops don't work outside of the mines
+            {
+                e.LoadFrom(() => new List<((string, int), int)>(new[] {
+                    (("(O)32", 3), 15), // Stone
+                    (("(O)34", 3), 15), // Stone
+                    (("(O)36", 3), 15), // Stone
+                    (("(O)38", 3), 15), // Stone
+                    (("(O)40", 3), 15), // Stone
+                    (("(O)42", 3), 15), // Stone
+                    (("(O)760", 3), 20), // Stone Node
+                    (("(O)762", 3), 20), // Stone Node
+                    (("(O)2", 10), 1), // Diamond Stone
+                    (("(O)4", 5), 2), // Ruby Stone
+                    (("(O)6", 5), 2), // Jade Stone
+                    (("(O)8", 5), 2), // Amethyst Stone
+                    (("(O)10", 5), 2), // Topaz Stone
+                    (("(O)12", 5), 2), // Emerald Stone
+                    (("(O)14", 5), 2), // Aquamarine Stone
+                    (("(O)751", 2), 30), // Copper Stone
+                    (("(O)290", 4), 15), // Iron Stone
+                    (("(O)764", 8), 5), // Gold Stone
+                    (("(O)765", 1), 1), // Iridium Stone
+                    (("(O)80", -1), 4), // Quartz
+                    (("(O)82", -1), 4), // Fire Quartz
+                    (("(O)84", -1), 4), // Frozen Tear
+                    (("(O)86", -1), 4), // Earth Crystal
+                }), AssetLoadPriority.Medium);
+            }
+            else if(e.NameWithoutLocale.IsEquivalentTo("Maps/Beach"))
+            {
+                // Add water propery to tiles behind Willy's house to prevent the player from being able to clip out of bounds with them.
+                e.Edit(asset =>
+                {
+                    var data = asset.AsMap();
+                    const int x = 28;
+                    const int y = 26;
+                    var back = data.Data.RequireLayer("Back");
+                    for(int i = 0; i < 8; i++)
+                    {
+                        for(int j = 0; j < 5; j++)
+                        {
+                            if(back.GetTileIndexAt(x + i, y + j) == -1)
+                            {
+                                continue;
+                            }
+                            if(back.Tiles[x + i, y + j].Properties.ContainsKey("Water"))
+                            {
+                                continue;
+                            }
+                            if (back.Tiles[x + i, y + j].TileIndexProperties.ContainsKey("Water"))
+                            {
+                                continue;
+                            }
+                            back.Tiles[x + i, y + j].Properties.Add("Water", "I");
+                        }
+                    }
+                    /*
+                    data.PatchMap(
+                        source: SHelper.ModContent.Load<Map>("assets/BeachPatch.tmx"),
+                        sourceArea: null,
+                        targetArea: new(28, 26, 8, 5),
+                        PatchMapMode.Overlay
+                        );*/
+                });
             }
             else
             {
@@ -192,301 +297,345 @@ namespace Swim
             }
         }
 
-        public static void GameLoop_GameLaunched_ConfigOnly(object sender, GameLaunchedEventArgs e)
+        public void SetupModConfig(object sender, GameLaunchedEventArgs e)
         {
-            setupModConfig();
-            var quickSaveApi = SHelper.ModRegistry.GetApi<IQuickSaveAPI>("DLX.QuickSave");
-            quickSaveApi.SavingEvent += (o, _) => SwimHelperEvents.GameLoop_Saving(o, new SavingEventArgs());
+            const string keybindsPageId = "keybinds";
+            const string advancedPageId = "advancedSpawning";
 
-        }
-
-        public static void setupModConfig()
-        {
             // get Generic Mod Config Menu's API (if it's installed)
-            var configMenu = SHelper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
-            if (configMenu != null)
+            var configMenu = SHelper.ModRegistry.GetApi<IGenericModConfigMenuApi>(IDs.GMCM);
+            if(configMenu is null)
             {
-                // Register mod.
-                configMenu.Register(
-                    mod: ModEntry.context.ModManifest,
-                    reset: () => Config = new ModConfig(),
-                    save: () => SHelper.WriteConfig(Config)
-                );
-
-                #region Region: Basic Options.
-
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "Mod Enabled?",
-                    tooltip: () => "Enables and Disables mod. Requires game restart to go into effect.",
-                    getValue: () => Config.EnableMod,
-                    setValue: value => Config.EnableMod = value
-                );
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "Auto-Swim enabled?",
-                    tooltip: () => "Allow character to jump to the water automatically, when you walk to land edge.",
-                    getValue: () => Config.ReadyToSwim,
-                    setValue: value => Config.ReadyToSwim = value
-                );
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "ShowOxygenBar",
-                    tooltip: () => "Define, will oxygen bar draw or not, when you dive to the water.",
-                    getValue: () => Config.ShowOxygenBar,
-                    setValue: value => Config.ShowOxygenBar = value
-                );
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "SwimSuitAlways",
-                    tooltip: () => "If set's true, your character will always wear a swimsuit.",
-                    getValue: () => Config.SwimSuitAlways,
-                    setValue: value => Config.SwimSuitAlways = value
-                );
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "NoAutoSwimSuit",
-                    tooltip: () => "If set's false, character will NOT wear a swimsuit automatically when you enter the water.",
-                    getValue: () => Config.NoAutoSwimSuit,
-                    setValue: value => Config.NoAutoSwimSuit = value
-                );
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "DisplayHatWithSwimsuit",
-                    tooltip: () => "If set to true, will display your hat while you are wearing your swimming suit.",
-                    getValue: () => Config.DisplayHatWithSwimsuit,
-                    setValue: value => Config.DisplayHatWithSwimsuit = value
-                );
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "AllowActionsWhileInSwimsuit",
-                    tooltip: () => "Allow you to use items, while you're swimming (may cause some visual bugs).",
-                    getValue: () => Config.AllowActionsWhileInSwimsuit,
-                    setValue: value => Config.AllowActionsWhileInSwimsuit = value
-                );
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "AllowRunningWhileInSwimsuit",
-                    tooltip: () => "Allow you to run, while you're swimming (may cause some visual bugs).",
-                    getValue: () => Config.AllowRunningWhileInSwimsuit,
-                    setValue: value => Config.AllowRunningWhileInSwimsuit = value
-                );
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "EnableClickToSwim",
-                    tooltip: () => "Enables or Disables possibility to manual jump to the water (by clicking certain key).",
-                    getValue: () => Config.EnableClickToSwim,
-                    setValue: value => Config.EnableClickToSwim = value
-                );
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "MustClickOnOppositeTerrain",
-                    tooltip: () => "Whether you must click on land to leave the water (or vice versa) or can just click in the direction of land (when using click to swim).",
-                    getValue: () => Config.MustClickOnOppositeTerrain,
-                    setValue: value => Config.MustClickOnOppositeTerrain = value
-                );
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "SwimRestoresVitals",
-                    tooltip: () => "If set's true, your HP and Energy will restore, while you're swimming (like in Bath).",
-                    getValue: () => Config.SwimRestoresVitals,
-                    setValue: value => Config.SwimRestoresVitals = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "Animation Patches",
-                    tooltip: () => "Dictates the level at which to modify the bathing suit animations. Default 2 (all modifications). With level 0, the bathing suit will only be displayed when walking. With level 1, it will be displayed during most animations, although the arms may be weird. With level 2, the arms will look reasonable in most animations.",
-                    getValue: () => Config.AnimationPatches,
-                    setValue: value => Config.AnimationPatches = value,
-                    min: 0,
-                    max: 2
-                );
-                #endregion
-
-                #region Region: Key Binds.
-
-                configMenu.AddKeybindList(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "Enable Auto-Swimming",
-                    tooltip: () => "Enables and Disables auto-swimming option.",
-                    getValue: () => Config.SwimKey,
-                    setValue: value => Config.SwimKey = value
-                );
-                configMenu.AddKeybindList(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "Toggle Swimsuit",
-                    tooltip: () => "Change character cloth to swimsuit and vice versa.",
-                    getValue: () => Config.SwimSuitKey,
-                    setValue: value => Config.SwimSuitKey = value
-                );
-                configMenu.AddKeybindList(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "Dive",
-                    tooltip: () => "Change character cloth to swimsuit and vice versa.",
-                    getValue: () => Config.DiveKey,
-                    setValue: value => Config.DiveKey = value
-                );
-                configMenu.AddKeybindList(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "Manual Jump",
-                    tooltip: () => "Allow you to jump into the water by clicking a certain key.",
-                    getValue: () => Config.ManualJumpButton,
-                    setValue: value => Config.ManualJumpButton = value
-                );
-                configMenu.AddKeybindList(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "Prevent Jump",
-                    tooltip: () => "Prevents jumping into the water while held.",
-                    getValue: () => Config.PreventJumpButton,
-                    setValue: value => Config.PreventJumpButton = value
-                );
-                #endregion
-
-                #region Region: Advanced Tweaks.
-
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "JumpTimeInMilliseconds",
-                    tooltip: () => "Sets jumping animation time.",
-                    getValue: () => Config.JumpTimeInMilliseconds,
-                    setValue: value => Config.JumpTimeInMilliseconds = value
-                );
-
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "OxygenMult",
-                    tooltip: () => "Sets oxygen multiplier (Energy * Mult = O2).",
-                    getValue: () => Config.OxygenMult,
-                    setValue: value => Config.OxygenMult = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "BubbleMult",
-                    tooltip: () => "Set's quantity multiplier of bubbles.",
-                    getValue: () => Config.BubbleMult,
-                    setValue: value => Config.BubbleMult = value
-                );
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "AddFishies",
-                    tooltip: () => "Allow fishes to spawn in underwater.",
-                    getValue: () => Config.AddFishies,
-                    setValue: value => Config.AddFishies = value
-                );
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "AddCrabs",
-                    tooltip: () => "Allow crabs to spawn in underwater.",
-                    getValue: () => Config.AddCrabs,
-                    setValue: value => Config.AddCrabs = value
-                );
-                configMenu.AddBoolOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "BreatheSound",
-                    tooltip: () => "If sets true, while you're underwater you will hear breathe sound.",
-                    getValue: () => Config.BreatheSound,
-                    setValue: value => Config.BreatheSound = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "MineralPerThousandMin",
-                    tooltip: () => "Sets minimal quantity, that can be meet underwater.",
-                    getValue: () => Config.MineralPerThousandMin,
-                    setValue: value => Config.MineralPerThousandMin = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "MineralPerThousandMax",
-                    tooltip: () => "Sets maximal quantity, that can be meet underwater.",
-                    getValue: () => Config.MineralPerThousandMax,
-                    setValue: value => Config.MineralPerThousandMax = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "CrabsPerThousandMin",
-                    tooltip: () => "Sets minimal quantity, that can be meet underwater.",
-                    getValue: () => Config.CrabsPerThousandMin,
-                    setValue: value => Config.CrabsPerThousandMin = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "CrabsPerThousandMax",
-                    tooltip: () => "Sets maximal quantity, that can be meet underwater.",
-                    getValue: () => Config.CrabsPerThousandMax,
-                    setValue: value => Config.CrabsPerThousandMax = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "PercentChanceCrabIsMimic",
-                    tooltip: () => "Sets chance to change crab by the mimic one.",
-                    getValue: () => Config.PercentChanceCrabIsMimic,
-                    setValue: value => Config.PercentChanceCrabIsMimic = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "MinSmolFishies",
-                    tooltip: () => "Sets minimal quantity, that can be meet underwater.",
-                    getValue: () => Config.MinSmolFishies,
-                    setValue: value => Config.MinSmolFishies = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "MaxSmolFishies",
-                    tooltip: () => "Sets maximal quantity, that can be meet underwater.",
-                    getValue: () => Config.MaxSmolFishies,
-                    setValue: value => Config.MaxSmolFishies = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "BigFishiesPerThousandMin",
-                    tooltip: () => "Sets minimal quantity, that can be meet underwater.",
-                    getValue: () => Config.BigFishiesPerThousandMin,
-                    setValue: value => Config.BigFishiesPerThousandMin = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "BigFishiesPerThousandMax",
-                    tooltip: () => "Sets maximal quantity, that can be meet underwater.",
-                    getValue: () => Config.BigFishiesPerThousandMax,
-                    setValue: value => Config.BigFishiesPerThousandMax = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "OceanForagePerThousandMin",
-                    tooltip: () => "Sets minimal quantity, that can be meet underwater.",
-                    getValue: () => Config.OceanForagePerThousandMin,
-                    setValue: value => Config.OceanForagePerThousandMin = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "OceanForagePerThousandMax",
-                    tooltip: () => "Sets maximal quantity, that can be meet underwater.",
-                    getValue: () => Config.OceanForagePerThousandMax,
-                    setValue: value => Config.OceanForagePerThousandMax = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "MinOceanChests",
-                    tooltip: () => "Sets minimal quantity, that can be meet in underwater biome ocean.",
-                    getValue: () => Config.MinOceanChests,
-                    setValue: value => Config.MinOceanChests = value
-                );
-                configMenu.AddNumberOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "MaxOceanChests",
-                    tooltip: () => "Sets maximal quantity, that can be meet in underwater biome ocean",
-                    getValue: () => Config.MaxOceanChests,
-                    setValue: value => Config.MaxOceanChests = value
-                );
-                configMenu.AddTextOption(
-                    mod: ModEntry.context.ModManifest,
-                    name: () => "JumpDistanceMult",
-                    tooltip: () => "Multiply jump sensitivity by this amount",
-                    getValue: () => Config.TriggerDistanceMult + "",
-                    setValue: delegate (string value) { if (float.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var f)) { Config.TriggerDistanceMult = f; } }
-                );
-                #endregion
+                return;
             }
+
+            // Register mod.
+            configMenu.Register(
+                mod: ModManifest,
+                reset: () => Config = new ModConfig(),
+                save: () => SHelper.WriteConfig(Config)
+            );
+
+            #region Region: Basic Options.
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-EnableMod-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-EnableMod-Description"),
+                getValue: () => Config.EnableMod,
+                setValue: value => Config.EnableMod = value
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-ReadyToSwim-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-ReadyToSwim-Description"),
+                getValue: () => Config.ReadyToSwim,
+                setValue: value => Config.ReadyToSwim = value
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-ShowOxygenBar-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-ShowOxygenBar-Description"),
+                getValue: () => Config.ShowOxygenBar,
+                setValue: value => Config.ShowOxygenBar = value
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-SwimSuitAlways-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-SwimSuitAlways-Description"),
+                getValue: () => Config.SwimSuitAlways,
+                setValue: value => Config.SwimSuitAlways = value
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-NoAutoSwimSuit-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-NoAutoSwimSuit-Description"),
+                getValue: () => Config.NoAutoSwimSuit,
+                setValue: value => Config.NoAutoSwimSuit = value
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-DisplayHatWithSwimsuit-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-DisplayHatWithSwimsuit-Description"),
+                getValue: () => Config.DisplayHatWithSwimsuit,
+                setValue: value => Config.DisplayHatWithSwimsuit = value
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-AllowActionsWhileInSwimsuit-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-AllowActionsWhileInSwimsuit-Description"),
+                getValue: () => Config.AllowActionsWhileInSwimsuit,
+                setValue: value => Config.AllowActionsWhileInSwimsuit = value
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-AllowRunningWhileInSwimsuit-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-AllowRunningWhileInSwimsuit-Description"),
+                getValue: () => Config.AllowRunningWhileInSwimsuit,
+                setValue: value => Config.AllowRunningWhileInSwimsuit = value
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-EnableClickToSwim-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-EnableClickToSwim-Description"),
+                getValue: () => Config.EnableClickToSwim,
+                setValue: value => Config.EnableClickToSwim = value
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-SwimRestoresVitals-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-SwimRestoresVitals-Description"),
+                getValue: () => Config.SwimRestoresVitals,
+                setValue: value => Config.SwimRestoresVitals = value
+            );
+
+            configMenu.AddPageLink(
+                mod: ModManifest,
+                pageId: keybindsPageId,
+                text: () => SwimUtils.GetTranslation("GMCM-Keybinds-PageName")
+            );
+            configMenu.AddPageLink(
+                mod: ModManifest,
+                pageId: advancedPageId,
+                text: () => SwimUtils.GetTranslation("GMCM-Advanced-PageName")
+            );
+            #endregion
+
+            #region Region: Key Binds.
+
+            configMenu.AddPage(
+                mod: ModManifest,
+                pageId: keybindsPageId,
+                pageTitle: () => SwimUtils.GetTranslation("GMCM-Keybinds-PageName")
+            );
+
+            configMenu.AddKeybindList(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-SwimKey-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-SwimKey-Description"),
+                getValue: () => Config.SwimKey,
+                setValue: value => Config.SwimKey = value
+            );
+            configMenu.AddKeybindList(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-SwimSuitKey-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-SwimSuitKey-Description"),
+                getValue: () => Config.SwimSuitKey,
+                setValue: value => Config.SwimSuitKey = value
+            );
+            configMenu.AddKeybindList(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-DiveKey-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-DiveKey-Description"),
+                getValue: () => Config.DiveKey,
+                setValue: value => Config.DiveKey = value
+            );
+            configMenu.AddKeybindList(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-ManualJumpButton-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-ManualJumpButton-Description"),
+                getValue: () => Config.ManualJumpButton,
+                setValue: value => Config.ManualJumpButton = value
+            );
+            configMenu.AddKeybindList(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-PreventJumpButton-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-PreventJumpButton-Description"),
+                getValue: () => Config.PreventJumpButton,
+                setValue: value => Config.PreventJumpButton = value
+            );
+            #endregion
+
+            #region Region: Advanced Tweaks.
+
+            configMenu.AddPage(
+                mod: ModManifest,
+                pageId: advancedPageId,
+                pageTitle: () => SwimUtils.GetTranslation("GMCM-Advanced-PageName")
+            );
+
+            configMenu.AddTextOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-StaminaLossPerSecond-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-StaminaLossPerSecond-Description"),
+                getValue: () => Config.StaminaLossPerSecond.ToString(),
+                setValue: value => Config.StaminaLossPerSecond = float.TryParse(value, out float staminaLossPerSecond) ? staminaLossPerSecond : Config.StaminaLossPerSecond
+            );
+            configMenu.AddTextOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-StaminaLossMultiplierWithGear-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-StaminaLossMultiplierWithGear-Description"),
+                getValue: () => Config.StaminaLossMultiplierWithGear.ToString(),
+                setValue: value => Config.StaminaLossMultiplierWithGear = float.TryParse(value, out float staminaLossPerSecond) ? staminaLossPerSecond : Config.StaminaLossMultiplierWithGear
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-SwimSpeed-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-SwimSpeed-Description"),
+                getValue: () => Config.SwimSpeed,
+                setValue: value => Config.SwimSpeed = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-SwimRunSpeed-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-SwimRunSpeed-Description"),
+                getValue: () => Config.SwimRunSpeed,
+                setValue: value => Config.SwimRunSpeed = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-ScubaFinSpeed-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-ScubaFinSpeed-Description"),
+                getValue: () => Config.ScubaFinSpeed,
+                setValue: value => Config.ScubaFinSpeed = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-JumpTimeInMilliseconds-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-JumpTimeInMilliseconds-Description"),
+                getValue: () => Config.JumpTimeInMilliseconds,
+                setValue: value => Config.JumpTimeInMilliseconds = value
+            );
+            configMenu.AddTextOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-TriggerDistanceMult-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-TriggerDistanceMult-Description"),
+                getValue: () => Config.TriggerDistanceMult.ToString(),
+                setValue: delegate (string value) { if (float.TryParse(value, NumberStyles.Any, CultureInfo.InvariantCulture, out var f)) { Config.TriggerDistanceMult = f; } }
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-MustClickOnOppositeTerrain-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-MustClickOnOppositeTerrain-Description"),
+                getValue: () => Config.MustClickOnOppositeTerrain,
+                setValue: value => Config.MustClickOnOppositeTerrain = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-OxygenMult-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-OxygenMult-Description"),
+                getValue: () => Config.OxygenMult,
+                setValue: value => Config.OxygenMult = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-BubbleMult-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-BubbleMult-Description"),
+                getValue: () => Config.BubbleMult,
+                setValue: value => Config.BubbleMult = value
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-AddFishies-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-AddFishies-Description"),
+                getValue: () => Config.AddFishies,
+                setValue: value => Config.AddFishies = value
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-AddCrabs-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-AddCrabs-Description"),
+                getValue: () => Config.AddCrabs,
+                setValue: value => Config.AddCrabs = value
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-BreatheSound-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-BreatheSound-Description"),
+                getValue: () => Config.BreatheSound,
+                setValue: value => Config.BreatheSound = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-MineralPerThousandMin-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-MineralPerThousandMin-Description"),
+                getValue: () => Config.MineralPerThousandMin,
+                setValue: value => Config.MineralPerThousandMin = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-MineralPerThousandMax-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-MineralPerThousandMax-Description"),
+                getValue: () => Config.MineralPerThousandMax,
+                setValue: value => Config.MineralPerThousandMax = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-CrabsPerThousandMin-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-CrabsPerThousandMin-Description"),
+                getValue: () => Config.CrabsPerThousandMin,
+                setValue: value => Config.CrabsPerThousandMin = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-CrabsPerThousandMax-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-CrabsPerThousandMax-Description"),
+                getValue: () => Config.CrabsPerThousandMax,
+                setValue: value => Config.CrabsPerThousandMax = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-PercentChanceCrabIsMimic-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-PercentChanceCrabIsMimic-Description"),
+                getValue: () => Config.PercentChanceCrabIsMimic,
+                setValue: value => Config.PercentChanceCrabIsMimic = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-MinSmolFishies-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-MinSmolFishies-Description"),
+                getValue: () => Config.MinSmolFishies,
+                setValue: value => Config.MinSmolFishies = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-MaxSmolFishies-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-MaxSmolFishies-Description"),
+                getValue: () => Config.MaxSmolFishies,
+                setValue: value => Config.MaxSmolFishies = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-BigFishiesPerThousandMin-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-BigFishiesPerThousandMin-Description"),
+                getValue: () => Config.BigFishiesPerThousandMin,
+                setValue: value => Config.BigFishiesPerThousandMin = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-BigFishiesPerThousandMax-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-BigFishiesPerThousandMax-Description"),
+                getValue: () => Config.BigFishiesPerThousandMax,
+                setValue: value => Config.BigFishiesPerThousandMax = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-OceanForagePerThousandMin-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-OceanForagePerThousandMin-Description"),
+                getValue: () => Config.OceanForagePerThousandMin,
+                setValue: value => Config.OceanForagePerThousandMin = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-OceanForagePerThousandMax-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-OceanForagePerThousandMax-Description"),
+                getValue: () => Config.OceanForagePerThousandMax,
+                setValue: value => Config.OceanForagePerThousandMax = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-MinOceanChests-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-MinOceanChests-Description"),
+                getValue: () => Config.MinOceanChests,
+                setValue: value => Config.MinOceanChests = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-MaxOceanChests-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-MaxOceanChests-Description"),
+                getValue: () => Config.MaxOceanChests,
+                setValue: value => Config.MaxOceanChests = value
+            );
+            #endregion
         }
 
         public override object GetApi()

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Xna.Framework;
 using StardewModdingAPI;
+using StardewModdingAPI.Utilities;
 using StardewValley;
 using System;
 using System.Collections.Generic;
@@ -9,18 +10,15 @@ namespace Swim
     internal class SwimDialog
     {
         private static IMonitor SMonitor;
-        private static ModConfig Config;
+        private static ModConfig Config => ModEntry.Config;
         private static IModHelper SHelper;
-        private static List<int> marinerQuestions;
+        private static readonly PerScreen<List<int>> marinerQuestions = new(() => new());
+        private static List<int> MarinerQuestions => marinerQuestions.Value;
 
-        public static void Initialize(IMonitor monitor, IModHelper helper, ModConfig config)
+        public static void Initialize(IMonitor monitor, IModHelper helper)
         {
             SMonitor = monitor;
-            Config = config;
             SHelper = helper;
-
-            marinerQuestions = new List<int>();
-
         }
 
         internal static void OldMarinerDialogue(string whichAnswer)
@@ -65,7 +63,7 @@ namespace Swim
                         return;
                 }
                 int next = int.Parse(keys[keys.Length - 2]) + 1;
-                if(marinerQuestions.Count > next)
+                if(MarinerQuestions.Count > next)
                 {
                     ShowNextQuestion(preface, next);
                 }
@@ -78,30 +76,28 @@ namespace Swim
 
         private static void CreateMarinerQuestions()
         {
-            if (marinerQuestions.Count == 0)
+            if (MarinerQuestions.Count == 0)
             {
                 int i = 1;
                 while (true)
                 {
                     if (!TryGetTranslation($"SwimMod_Mariner_Question_{i}", out string _))
                         break;
-                    marinerQuestions.Add(i++);
+                    MarinerQuestions.Add(i++);
                 }
             }
-            int n = marinerQuestions.Count;
+            int n = MarinerQuestions.Count;
             while (n > 1)
             {
                 n--;
                 int k = ModEntry.myRand.Value.Next(n + 1);
-                var value = marinerQuestions[k];
-                marinerQuestions[k] = marinerQuestions[n];
-                marinerQuestions[n] = value;
+                (MarinerQuestions[n], MarinerQuestions[k]) = (MarinerQuestions[k], MarinerQuestions[n]);
             }
         }
 
         private static void ShowNextQuestion(string preface, int index)
         {
-            int qi = marinerQuestions[index];
+            int qi = MarinerQuestions[index];
             if (!TryGetTranslation($"SwimMod_Mariner_Question_{qi}", out string s2))
             {
                 SMonitor.Log("no dialogue: " + s2, LogLevel.Error);

@@ -1,7 +1,7 @@
 {
     "Name": "Swim Items",
-    "Author": "aedenthorn",
-    "Version": "1.0.1",
+    "Author": "aedenthorn, FlyingTNT",
+    "Version": "1.0.2",
     "Description": "Adds swim mod's scuba gear.",
     "UniqueID": "FlyingTNT.SwimItems",
     "UpdateKeys": [ "Nexus:23169@SwimItems" ],

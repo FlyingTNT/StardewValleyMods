@@ -243,7 +243,7 @@ namespace Swim
         {
             try
             {
-                if (Config.AllowActionsWhileInSwimsuit)
+                if (Config.AllowActionsWhileInSwimsuit && f.bathingClothes.Value)
                 {
                     f.bathingClothes.Value = false;
                     __state = true;

@@ -704,7 +704,7 @@ namespace Swim
                     int xTile = (int)Math.Round((Game1.viewport.X + Game1.getOldMouseX()) / 64f);
                     int yTile = (int)Math.Round((Game1.viewport.Y + Game1.getOldMouseY()) / 64f);
                     //Monitor.Log($"Click tile: ({xTile}, {yTile}), Player tile: ({Game1.player.TilePoint.X}, {Game1.player.TilePoint.Y})");
-                    bool clickTileIsWater = Game1.player.currentLocation.waterTiles[xTile, yTile];
+                    bool clickTileIsWater = Game1.player.currentLocation.isTileOnMap(xTile, yTile) && Game1.player.currentLocation.waterTiles is not null && Game1.player.currentLocation.waterTiles[xTile, yTile];
                     bool isClickingOnOppositeTerrain = clickTileIsWater != Game1.player.swimming.Value;
                     if (isClickingOnOppositeTerrain || !Config.MustClickOnOppositeTerrain)
                     {

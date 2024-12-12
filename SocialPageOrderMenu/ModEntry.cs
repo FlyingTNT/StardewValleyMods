@@ -54,6 +54,9 @@ namespace SocialPageOrderRedux
         /// <summary> Whether the mod was enabled when the game was loaded. If it wasn't, we don't do anything because the patches weren't applied. </summary>
         private static bool WasModEnabled = false;
 
+        /// <summary> Whether the GameMenu.receiveLeftClick method is currently being called. Used in <see cref="IClickableMenu_readyToClose_Postfix(IClickableMenu, ref bool)"/>. </summary>
+        private static readonly PerScreen<bool> isInGameMenuLeftClick = new(() => false);
+
         /// <summary>
         /// The sort curently selected by Game1.player. It is stored in their mod data so that it is preserved between sessions, and for splitscreen support (it used to be stored in the config file,
         /// but this would link the two screens' sorts together).
@@ -128,6 +131,11 @@ namespace SocialPageOrderRedux
 
             harmony.Patch(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.changeTab)),
                 postfix: new HarmonyMethod(typeof(ModEntry), nameof(GameMenu_changeTab_Postfix))
+            );
+
+            harmony.Patch(AccessTools.Method(typeof(GameMenu), nameof(GameMenu.receiveLeftClick)),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(GameMenu_receiveLeftClick_Prefix)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(GameMenu_receiveLeftClick_Postfix))
             );
         }
 
@@ -375,9 +383,20 @@ namespace SocialPageOrderRedux
         #endregion
 
         #region PLAYER_INPUT_PATCHES
+        public static void GameMenu_receiveLeftClick_Prefix()
+        {
+            isInGameMenuLeftClick.Value = true;
+        }
+
+        public static void GameMenu_receiveLeftClick_Postfix()
+        {
+            isInGameMenuLeftClick.Value = false;
+        }
+
         public static void IClickableMenu_readyToClose_Postfix(IClickableMenu __instance, ref bool __result)
         {
-            if (!Config.EnableMod || __instance is not SocialPage || filterField.Value is null)
+            // isInGameMenuLeftClick is necessary so that the player doesn't need to deselect the field before moving to another tab
+            if (!Config.EnableMod || __instance is not SocialPage || filterField.Value is null || isInGameMenuLeftClick.Value)
                 return;
 
             // If the filter is selected, make the result false. This is because some mods that add their own menus will overwrite the current one when their menu's key is pressed,
@@ -437,9 +456,9 @@ namespace SocialPageOrderRedux
 
             if (AccessTools.FieldRefAccess<OptionsDropDown, bool>(dropDown.Value, "clicked"))
             {
-                if(dropDown.Value.dropDownBounds.Contains(Game1.getMouseX() - GetDropdownX(__instance), Game1.getMouseY() - GetDropdownY(__instance)))
+                if(dropDown.Value.dropDownBounds.Contains(x - GetDropdownX(__instance), y - GetDropdownY(__instance)))
                 {
-                    dropDown.Value.leftClickReleased(Game1.getMouseX() - GetDropdownX(__instance), Game1.getMouseY() - GetDropdownY(__instance));
+                    dropDown.Value.leftClickReleased(x - GetDropdownX(__instance), y - GetDropdownY(__instance));
                 }
                 return false;
             }
@@ -515,8 +534,8 @@ namespace SocialPageOrderRedux
 
             // Make sure the SocialEntries, sprites, and characterSlots have the same number of elements. If they don't use the lowest number of elements.
             // It should be impossible for them to not be equal, but somebody got an index error somewhere in this function so I'm just being safe.
-            int count = sprites.Count;
-            if(page.SocialEntries.Count != sprites.Count || page.SocialEntries.Count != page.characterSlots.Count)
+            int count = page.SocialEntries.Count;
+            if(count != sprites.Count || count != page.characterSlots.Count)
             {
                 SMonitor.Log($"The Social Entry, sprites, and character slot counts are not equal ({page.SocialEntries.Count} vs {sprites.Count} vs {page.characterSlots.Count}).");
                 count = Math.Min(Math.Min(count, page.SocialEntries.Count), page.characterSlots.Count);

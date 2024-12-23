@@ -8,5 +8,9 @@
   "GMCM_Option_DatingGiftsPerDay_Name": "Dating / Day",
   "GMCM_Option_DatingGiftsPerWeek_Name": "Dating / Week",
   "GMCM_Option_SpouseGiftsPerDay_Name": "Spouse / Day",
-  "GMCM_Option_SpouseGiftsPerWeek_Name": "Spouse / Week"
+  "GMCM_Option_SpouseGiftsPerWeek_Name": "Spouse / Week",
+  "GMCM_Option_MaxedHeartsGiftsPerDay_Name": "MaxedHearts / Day",
+  "GMCM_Option_MaxedHeartsGiftsPerWeek_Name": "MaxedHearts / Week",
+  "GMCM_Option_CompatibilityMode_Name": "Compatibility Mode",
+  "GMCM_Option_CompatibilityMode_Description": "Will modify the gift numbers so that mods will correctly recognize if the limits have been reached, even if they don't check this mod's limits. I.e. if per-day limit was three gifts, it would show other mods that you have given zero gifts until you reached the limit of three so that they know you can still give gifts."
 }

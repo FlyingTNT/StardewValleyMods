@@ -7,4 +7,5 @@ public static class IDs
     public const string QuickSave = "DLX.QuickSave";
 
     public const string LongerSeasons = "FlyingTNT.LongerSeasons";
+    public const string CustomGiftLimits = "FlyingTNT.CustomGiftLimits";
 }

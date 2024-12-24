@@ -1,4 +1,6 @@
-﻿namespace CustomGiftLimits
+﻿using StardewValley;
+
+namespace CustomGiftLimits
 {
     public class CustomGiftLimitsAPI : ICustomGiftLimitsAPI
     {
@@ -23,5 +25,9 @@
         public int DatingGiftsPerWeek => ModEntry.Config.DatingGiftsPerWeek;
 
         public int SpouseGiftsPerWeek => ModEntry.Config.SpouseGiftsPerWeek;
+        public void GetGiftLimits(Friendship friendship, out int giftsPerWeek, out int giftePerDay)
+        {
+            ModEntry.GetGiftLimits(friendship, out giftsPerWeek, out giftePerDay, out _);
+        }
     }
 }

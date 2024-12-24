@@ -4,7 +4,7 @@ namespace CustomGiftLimits
 {
     partial class ModEntry
     {
-        private static void GetGiftLimits(Farmer farmer, NPC npc, out int giftsPerWeek, out int giftsPerDay, out FriendshipLevel level)
+        public static void GetGiftLimits(Farmer farmer, NPC npc, out int giftsPerWeek, out int giftsPerDay, out FriendshipLevel level)
         {
             if (!farmer.friendshipData.TryGetValue(npc.Name, out Friendship f))
             {
@@ -17,8 +17,16 @@ namespace CustomGiftLimits
             GetGiftLimits(f, out giftsPerWeek, out giftsPerDay, out level);
         }
 
-        private static void GetGiftLimits(Friendship friendship, out int giftsPerWeek, out int giftsPerDay, out FriendshipLevel level)
+        public static void GetGiftLimits(Friendship friendship, out int giftsPerWeek, out int giftsPerDay, out FriendshipLevel level)
         {
+            if(friendship is null)
+            {
+                giftsPerWeek = Config.OrdinaryGiftsPerWeek;
+                giftsPerDay = Config.OrdinaryGiftsPerDay;
+                level = FriendshipLevel.stranger;
+                return;
+            }
+
             if (friendship.IsMarried() || friendship.IsRoommate())
             {
                 giftsPerWeek = Config.SpouseGiftsPerWeek;

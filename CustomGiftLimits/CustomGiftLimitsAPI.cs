@@ -25,9 +25,16 @@ namespace CustomGiftLimits
         public int DatingGiftsPerWeek => ModEntry.Config.DatingGiftsPerWeek;
 
         public int SpouseGiftsPerWeek => ModEntry.Config.SpouseGiftsPerWeek;
-        public void GetGiftLimits(Friendship friendship, out int giftsPerWeek, out int giftePerDay)
+        public void GetGiftLimits(Friendship friendship, out int giftsPerWeek, out int giftsPerDay)
         {
-            ModEntry.GetGiftLimits(friendship, out giftsPerWeek, out giftePerDay, out _);
+            if (!ModEnabled)
+            {
+                giftsPerWeek = 2;
+                giftsPerDay = 1;
+                return;
+            }
+
+            ModEntry.GetGiftLimits(friendship, out giftsPerWeek, out giftsPerDay, out _);
         }
     }
 }

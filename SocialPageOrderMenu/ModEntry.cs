@@ -15,6 +15,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using static StardewValley.Menus.SocialPage;
+using SocialPageOrderRedux.UI;
 
 namespace SocialPageOrderRedux
 {
@@ -28,13 +29,25 @@ namespace SocialPageOrderRedux
         public static readonly Rectangle buttonTextureSource = new Rectangle(162, 440, 16, 16);
 
         /// <summary> The X offset of the sort button from the left of the game menu. </summary>
-        private const int xOffset = -16;
+        private const int buttonXOffset = -16;
+
+        /// <summary> The X offset of the hide talked item from the left of the game menu. </summary>
+        private const int talkedXOffset = buttonXOffset - 20;
+
+        /// <summary> The Y offset of the hide talked item from the left of the game menu. </summary>
+        private const int talkedYOffset = 80;
 
         /// <summary> The Y offset ot the dropdown from the bottom of the game menu. </summary>
         private const int dropdownYOffset = -28;
 
         /// <summary> The unique id of the sort button Clickable Component. </summary>
         private const int buttonId = 231445356;
+
+        /// <summary> The unique id of the show talked NPCs Clickable Component. </summary>
+        private const int talkedId = buttonId + 1;
+
+        /// <summary> The unique id of the show gifted NPCs Clickable Component. </summary>
+        private const int giftedId = buttonId + 2;
 
         /// <summary> The dropdown object. </summary>
         public static readonly PerScreen<MyOptionsDropDown> dropDown = new();
@@ -48,6 +61,12 @@ namespace SocialPageOrderRedux
         /// <summary> The filter field (search bar) object. </summary>
         private static readonly PerScreen<TextBox> filterField = new();
 
+        /// <summary> The checkbox for hiding NPCs that have been talked to today. </summary>
+        private static readonly PerScreen<BrightDarkBox> showTalkedCheckbox = new();
+
+        /// <summary> The checkbox for hiding NPCs that have max gifts. </summary>
+        private static readonly PerScreen<BrightDarkBox> showGiftedCheckbox = new();
+
         /// <summary> All of the entries in the social page, before we removed any when searching. Used to restore the page when we clear the search bar. </summary>
         private static readonly PerScreen<List<SocialEntry>> allEntries = new PerScreen<List<SocialEntry>>(() => new List<SocialEntry>());
 
@@ -56,6 +75,8 @@ namespace SocialPageOrderRedux
 
         /// <summary> Whether the GameMenu.receiveLeftClick method is currently being called. Used in <see cref="IClickableMenu_readyToClose_Postfix(IClickableMenu, ref bool)"/>. </summary>
         private static readonly PerScreen<bool> isInGameMenuLeftClick = new(() => false);
+
+        private static ICustomGiftLimitsAPI CustomGiftLimitsAPI;
 
         /// <summary>
         /// The sort curently selected by Game1.player. It is stored in their mod data so that it is preserved between sessions, and for splitscreen support (it used to be stored in the config file,
@@ -70,6 +91,30 @@ namespace SocialPageOrderRedux
             set
             {
                 PerPlayerConfig.SaveConfigOption(Game1.player, "FlyingTNT.SocialPageOrderRedux.CurrentSort", value);
+            }
+        }
+
+        public static bool ShowTalked
+        {
+            get
+            {
+                return !Config.UseShowTalked || PerPlayerConfig.LoadConfigOption(Game1.player, "FlyingTNT.SocialPageOrderRedux.ShowTalked", defaultValue: true);
+            }
+            set
+            {
+                PerPlayerConfig.SaveConfigOption(Game1.player, "FlyingTNT.SocialPageOrderRedux.ShowTalked", value);
+            }
+        }
+
+        public static bool ShowGifted
+        {
+            get
+            {
+                return !Config.UseShowGifted || PerPlayerConfig.LoadConfigOption(Game1.player, "FlyingTNT.SocialPageOrderRedux.ShowGifted", defaultValue: true);
+            }
+            set
+            {
+                PerPlayerConfig.SaveConfigOption(Game1.player, "FlyingTNT.SocialPageOrderRedux.ShowGifted", value);
             }
         }
 
@@ -125,6 +170,10 @@ namespace SocialPageOrderRedux
                 postfix: new HarmonyMethod(typeof(ModEntry), nameof(IClickableMenu_populateClickableComponentList_Postfix))
             );
 
+            harmony.Patch(AccessTools.Method(typeof(IClickableMenu), nameof(IClickableMenu.gameWindowSizeChanged)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(ICLickableMenu_gameWindowSizeChanged_Postfix))
+            );
+
             harmony.Patch(AccessTools.Method(typeof(IClickableMenu), nameof(IClickableMenu.readyToClose)),
                 postfix: new HarmonyMethod(typeof(ModEntry), nameof(IClickableMenu_readyToClose_Postfix))
             );
@@ -142,6 +191,8 @@ namespace SocialPageOrderRedux
         #region EVENTS
         private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
+            CustomGiftLimitsAPI = SHelper.ModRegistry.GetApi<ICustomGiftLimitsAPI>(IDs.CustomGiftLimits);
+
             // get Generic Mod Config Menu's API (if it's installed)
             var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>(IDs.GMCM);
             if (configMenu is null)
@@ -175,6 +226,20 @@ namespace SocialPageOrderRedux
                 setValue: value => Config.nextButton = value
             );
 
+            configMenu.AddKeybindList(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM-ToggleShowTalkedKey"),
+                getValue: () => Config.toggleShowTalked,
+                setValue: value => Config.toggleShowTalked = value
+            );
+
+            configMenu.AddKeybindList(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM-ToggleShowGiftedKey"),
+                getValue: () => Config.toggleShowGifted,
+                setValue: value => Config.toggleShowGifted = value
+            );
+
             configMenu.AddBoolOption(
                 mod: ModManifest,
                 name: () => SHelper.Translation.Get("GMCM-UseFilter"),
@@ -197,6 +262,26 @@ namespace SocialPageOrderRedux
                 getValue: () => Config.UseDropdown,
                 setValue: (value) => { Config.UseDropdown = value;
                                        InitElements();}
+            );
+
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM-UseShowTalked"),
+                getValue: () => Config.UseShowTalked,
+                setValue: (value) => {
+                    Config.UseShowTalked = value;
+                    InitElements();
+                }
+            );
+
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM-UseShowGifted"),
+                getValue: () => Config.UseShowGifted,
+                setValue: (value) => {
+                    Config.UseShowGifted = value;
+                    InitElements();
+                }
             );
 
             configMenu.AddBoolOption(
@@ -247,11 +332,25 @@ namespace SocialPageOrderRedux
                 getValue: () => Config.FilterOffsetY,
                 setValue: value => Config.FilterOffsetY = value
             );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM-TalkedOffsetX"),
+                getValue: () => Config.TalkedOffsetX,
+                setValue: value => Config.TalkedOffsetX = value
+            );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM-TalkedOffsetY"),
+                getValue: () => Config.TalkedOffsetY,
+                setValue: value => Config.TalkedOffsetY = value
+            );
         }
 
         private void Input_ButtonsChanged(object sender, ButtonsChangedEventArgs e)
         {
-            if (!WasModEnabled || Game1.activeClickableMenu is not GameMenu || (Game1.activeClickableMenu as GameMenu).GetCurrentPage() is not SocialPage)
+            if (!WasModEnabled || Game1.activeClickableMenu is not GameMenu menu || menu.GetCurrentPage() is not SocialPage page)
                 return;
             if (Config.prevButton.JustPressed())
             {
@@ -261,12 +360,40 @@ namespace SocialPageOrderRedux
             {
                 IncrementSort();
             }
+
+            if(Config.UseFilter && filterField.Value.Selected)
+            {
+                return;
+            }
+
+            if(Config.UseShowGifted && Config.toggleShowGifted.JustPressed())
+            {
+                bool newValue = !ShowGifted;
+                showGiftedCheckbox.Value.isBright = newValue;
+                ShowGifted = newValue;
+                ApplyFilter(page, true);
+            }
+
+            if (Config.UseShowTalked && Config.toggleShowTalked.JustPressed())
+            {
+                bool newValue = !ShowTalked;
+                showTalkedCheckbox.Value.isBright = newValue;
+                ShowTalked = newValue;
+                ApplyFilter(page, true);
+            }
         }
 
         private void Display_MenuChanged(object sender, MenuChangedEventArgs e)
         {
             if (Config.UseFilter && filterField.Value is not null && e.OldMenu is not ProfileMenu && e.NewMenu is not ProfileMenu)
             {
+                // For some reason, when the window is resized it closes and then re-opens the GameMenu back to the same tab, and we don't want to clear the field in that case.
+                // That should hopefully be the only time when it goes directly from GameMenu to GameMenu
+                if(e.OldMenu is GameMenu && e.NewMenu is GameMenu)
+                {
+                    return;
+                }
+
                 SMonitor.Log("Clearing the filter field.");
                 filterField.Value.Text = "";
             }
@@ -293,12 +420,13 @@ namespace SocialPageOrderRedux
 
         #region SOCIAL_PAGE_SETUP_PATCHES
 
-        public static void SocialPage_Constructor_Postfix()
+        public static void SocialPage_Constructor_Postfix(SocialPage __instance)
         {
             if (!Config.EnableMod)
                 return;
 
             InitElements();
+            UpdateElementPositions(__instance);
         }
 
         public static void SocialPage_FindSocialCharacters_Postfix(List<SocialEntry> __result)
@@ -307,12 +435,8 @@ namespace SocialPageOrderRedux
             allEntries.Value.Clear();
             allEntries.Value.AddRange(__result);
 
-            // Remove all of the characters affected by the filter (the filter text should always be "" unless returning from a ProfileMenu)
-            if(Config.UseFilter && filterField.Value is not null && filterField.Value.Text != "")
-            {
-                __result.RemoveAll((entry) => !entry.DisplayName.ToLower().StartsWith(filterField.Value.Text.ToLower()));
-                lastFilterString.Value = filterField.Value.Text;
-            }
+            // Remove all of the characters affected by the filter
+            ApplyFilter(__result);
 
             // Sort the characters
             __result.Sort(GetSort());
@@ -320,10 +444,37 @@ namespace SocialPageOrderRedux
 
         public static void IClickableMenu_populateClickableComponentList_Postfix(IClickableMenu __instance)
         {
-            if (!Config.EnableMod || !Config.UseButton || __instance is not SocialPage)
+            if (!Config.EnableMod || __instance is not SocialPage)
                 return;
 
-            __instance.allClickableComponents.Add(button.Value);
+            if(Config.UseButton)
+            {
+                __instance.allClickableComponents.Add(button.Value);
+            }
+
+            if(Config.UseShowTalked)
+            {
+                __instance.allClickableComponents.Add(showTalkedCheckbox.Value);
+            }
+
+            if(Config.UseShowGifted)
+            {
+                __instance.allClickableComponents.Add(showGiftedCheckbox.Value);
+            }
+        }
+
+        /// <remarks>
+        /// As it stands, this is not necessary as logging the stack trace shows that the SocialPage constructor is called every time the window is resized for some reason, but I stll do this patch just to be
+        /// safe.
+        /// </remarks>
+        public static void ICLickableMenu_gameWindowSizeChanged_Postfix(IClickableMenu __instance)
+        {
+            if(__instance is not SocialPage page)
+            {
+                return;
+            }
+
+            UpdateElementPositions(page);
         }
 
         #endregion
@@ -356,7 +507,6 @@ namespace SocialPageOrderRedux
             {
                 if (Config.UseFilter)
                 {
-                    UpdateFilterPosition(page);
                     filterField.Value.Draw(b);
                 }
 
@@ -372,6 +522,16 @@ namespace SocialPageOrderRedux
                 if (Config.UseButton)
                 {
                     button.Value.draw(b);
+                }
+
+                if(Config.UseShowGifted)
+                {
+                    showGiftedCheckbox.Value.draw(b);
+                }
+
+                if (Config.UseShowTalked)
+                {
+                    showTalkedCheckbox.Value.draw(b);
                 }
             }
             catch(Exception ex)
@@ -416,10 +576,25 @@ namespace SocialPageOrderRedux
 
             if (Config.UseButton && button.Value is not null)
             {
-                button.Value.bounds = GetButtonRectangle(__instance);
                 if (button.Value.bounds.Contains(x, y))
                 {
                     ___hoverText = SHelper.Translation.Get($"sort-by") + SHelper.Translation.Get($"sort-{CurrentSort}");
+                }
+            }
+
+            if(Config.UseShowGifted && showGiftedCheckbox.Value is not null)
+            {
+                if(showGiftedCheckbox.Value.bounds.Contains(x, y))
+                {
+                    ___hoverText = SHelper.Translation.Get($"{(ShowGifted ? "showing" : "hiding")}-gifted");
+                }
+            }
+
+            if (Config.UseShowTalked && showTalkedCheckbox.Value is not null)
+            {
+                if (showTalkedCheckbox.Value.bounds.Contains(x, y))
+                {
+                    ___hoverText = SHelper.Translation.Get($"{(ShowTalked ? "showing" : "hiding")}-talked");
                 }
             }
         }
@@ -446,6 +621,17 @@ namespace SocialPageOrderRedux
 
             if (Config.UseFilter)
                 filterField.Value.Update();
+
+            if(Config.UseShowGifted)
+            {
+                showGiftedCheckbox.Value.receiveLeftClick(x, y);
+            }
+
+            if (Config.UseShowTalked)
+            {
+                showTalkedCheckbox.Value.receiveLeftClick(x, y);
+            }
+
             return true;
         }
 
@@ -500,50 +686,61 @@ namespace SocialPageOrderRedux
             if (!Config.EnableMod)
                 return;
 
-            if (__instance.currentTab == GameMenu.socialTab)
+            if (__instance.GetCurrentPage() is SocialPage page)
             {
                 if (Config.UseButton)
                     __instance.tabs[GameMenu.inventoryTab].leftNeighborID = buttonId;
-                ResortSocialList();
+
+                if (Config.UseFilter && filterField.Value is not null && !Game1.options.gamepadControls)
+                    filterField.Value.Selected = Config.SearchBarAutoFocus;
+
+                ApplyFilter(page);
                 if(Game1.options.SnappyMenus)
                     __instance.snapToDefaultClickableComponent();
             }
-
-            if (Config.UseFilter && filterField.Value is not null && !Game1.options.gamepadControls)
-                filterField.Value.Selected = Config.SearchBarAutoFocus && (__instance.currentTab == GameMenu.socialTab);
+            else
+            {
+                filterField.Value.Selected = false;
+            }
         }
 
         #endregion
 
         #region SORT_AND_FILTER_METHODS
 
-        public static void ResortSocialList()
+        public static void ResortSocialList(SocialPage page = null)
         {
-            if (Game1.activeClickableMenu is not GameMenu activeMenu)
+            if(page is null)
             {
-                return;
-            }
+                if (Game1.activeClickableMenu is not GameMenu activeMenu)
+                {
+                    SMonitor.Log("Skipping sort.");
+                    return;
+                }
 
-            if(GameMenu.socialTab >= activeMenu.pages.Count || activeMenu.pages[GameMenu.socialTab] is not SocialPage page)
-            {
-                return;
+                if (GameMenu.socialTab >= activeMenu.pages.Count || activeMenu.pages[GameMenu.socialTab] is not SocialPage)
+                {
+                    SMonitor.Log("Skipping sort..");
+                    return;
+                }
+
+                page = activeMenu.pages[GameMenu.socialTab] as SocialPage;
             }
 
             List<NameSpriteSlot> nameSprites = new();
-            List<ClickableTextureComponent> sprites = SHelper.Reflection.GetField<List<ClickableTextureComponent>>(page, "sprites").GetValue();
 
             // Make sure the SocialEntries, sprites, and characterSlots have the same number of elements. If they don't use the lowest number of elements.
             // It should be impossible for them to not be equal, but somebody got an index error somewhere in this function so I'm just being safe.
             int count = page.SocialEntries.Count;
-            if(count != sprites.Count || count != page.characterSlots.Count)
+            if(count != page.sprites.Count || count != page.characterSlots.Count)
             {
-                SMonitor.Log($"The Social Entry, sprites, and character slot counts are not equal ({page.SocialEntries.Count} vs {sprites.Count} vs {page.characterSlots.Count}).");
+                SMonitor.Log($"The Social Entry, sprites, and character slot counts are not equal ({page.SocialEntries.Count} vs {page.sprites.Count} vs {page.characterSlots.Count}).");
                 count = Math.Min(Math.Min(count, page.SocialEntries.Count), page.characterSlots.Count);
             }
 
             for (int i = 0; i < count; i++)
             {
-                nameSprites.Add(new NameSpriteSlot(page.SocialEntries[i], sprites[i], page.characterSlots[i]));
+                nameSprites.Add(new NameSpriteSlot(page.SocialEntries[i], page.sprites[i], page.characterSlots[i]));
             }
 
             // Sort the nameSprites list based on the current sort
@@ -575,7 +772,7 @@ namespace SocialPageOrderRedux
                 nameSpriteSlot.slot.bounds = bounds[i];
 
                 // Update the page's characterSlots, sprites, and SocialEntries
-                sprites[i] = nameSpriteSlot.sprite;
+                page.sprites[i] = nameSpriteSlot.sprite;
                 page.characterSlots[i] = nameSpriteSlot.slot;
                 page.SocialEntries[i] = nameSpriteSlot.entry;
             }
@@ -716,48 +913,123 @@ namespace SocialPageOrderRedux
             }
         }
 
-        private static void ApplyFilter(SocialPage socialPage)
+        private static void ApplyFilter(SocialPage socialPage, bool keepPosition = false)
         {
-            if (!Config.EnableMod || !Config.UseFilter || filterField.Value is null || lastFilterString.Value == filterField.Value.Text)
+            if (!Config.EnableMod)
                 return;
 
-            lastFilterString.Value = filterField.Value.Text;
-
             // Filter the SocialEntries
-            socialPage.SocialEntries.Clear();
-            socialPage.SocialEntries.AddRange(filterField.Value.Text == "" ? allEntries.Value : allEntries.Value.Where((entry) => entry.DisplayName.ToLower().StartsWith(filterField.Value.Text.ToLower())));
+            ApplyFilter(socialPage.SocialEntries);
 
             // Recalculate the number of farmers (affects the way the first {# of farmers} slots render)
-            SHelper.Reflection.GetField<int>(socialPage, "numFarmers").SetValue(socialPage.SocialEntries.Count((SocialEntry p) => p.IsPlayer));
+            socialPage.numFarmers = socialPage.SocialEntries.Count((SocialEntry p) => p.IsPlayer);
 
-            // Move the slot position back to the top
-            for (int i = 0; i < socialPage.SocialEntries.Count; i++)
+            if (!keepPosition)
             {
-                if (!socialPage.SocialEntries[i].IsPlayer)
+                // Move the slot position back to the top
+                for (int i = 0; i < socialPage.SocialEntries.Count; i++)
                 {
-                    SHelper.Reflection.GetField<int>(socialPage, "slotPosition").SetValue(i);
-                    break;
+                    if (!socialPage.SocialEntries[i].IsPlayer)
+                    {
+                        socialPage.slotPosition = i;
+                        break;
+                    }
                 }
+            }
+            else
+            {
+                socialPage.slotPosition = Math.Max(0, Math.Min(socialPage.SocialEntries.Count - 5, socialPage.slotPosition));
             }
 
             // Recreate the characterSlots and sprites components
             socialPage.CreateComponents();
 
             // Reapply the sort (it will be unsorted because allEntries is unsorted)
-            ResortSocialList();
+            ResortSocialList(socialPage);
 
-            SHelper.Reflection.GetMethod((Game1.activeClickableMenu as GameMenu).pages[GameMenu.socialTab], "setScrollBarToCurrentIndex").Invoke();
+            SHelper.Reflection.GetMethod(socialPage, "setScrollBarToCurrentIndex").Invoke();
             socialPage.updateSlots();
+        }
+
+        private static void ApplyFilter(List<SocialEntry> entries)
+        {
+            string filterString = Config.UseFilter ? filterField.Value?.Text ?? "" : "";
+
+            entries.Clear();
+            entries.AddRange(filterString is "" ? allEntries.Value : allEntries.Value.Where((entry) => entry.DisplayName.ToLower().StartsWith(filterString.ToLower())));
+
+            if (!ShowGifted)
+            {
+                entries.RemoveAll(entry => IsMaxGifted(entry));
+            }
+            if (!ShowTalked)
+            {
+                entries.RemoveAll(entry => entry.Friendship?.TalkedToToday ?? false);
+            }
+
+            lastFilterString.Value = filterString;
+        }
+
+        private static bool IsMaxGifted(SocialEntry entry)
+        {
+            if(entry.Friendship is null)
+            {
+                return false;
+            }
+
+            int perDayLimit;
+            int perWeekLimit;
+            if(CustomGiftLimitsAPI is not null)
+            {
+                CustomGiftLimitsAPI.GetGiftLimits(entry.Friendship, out perWeekLimit, out perDayLimit);
+            }
+            else
+            {
+                perDayLimit = 1;
+                perWeekLimit = entry.IsMarriedToCurrentPlayer() ? -1 : 2;
+            }
+
+            return ((entry.Friendship.GiftsThisWeek >= perWeekLimit && perWeekLimit >= 0) || (entry.Friendship.GiftsToday >= perDayLimit && perDayLimit >= 0)) && !(IsBirthday(entry) && entry.Friendship.GiftsToday < 1);
+        }
+
+        private static bool IsBirthday(SocialEntry entry)
+        {
+            if (entry.Data is null)
+            {
+                return false;
+            }
+
+            return entry.Data.BirthSeason == Game1.season && entry.Data.BirthDay == Game1.dayOfMonth;
         }
 
         #endregion
 
         #region ELEMENT_SETUP_METHODS
 
-        public static void UpdateFilterPosition(SocialPage page)
+        private static void UpdateElementPositions(SocialPage page)
         {
-            filterField.Value.X = page.xPositionOnScreen + page.width / 2 - filterField.Value.Width / 2 + Config.FilterOffsetX;
-            filterField.Value.Y = page.yPositionOnScreen + page.height + (Config.UseDropdown ? dropDown.Value.bounds.Height + dropdownYOffset + 20 : 0) + Config.FilterOffsetY;
+            if(Config.UseButton)
+            {
+                button.Value.bounds = GetButtonRectangle(page);
+            }
+
+            if (Config.UseFilter)
+            {
+                filterField.Value.X = page.xPositionOnScreen + page.width / 2 - filterField.Value.Width / 2 + Config.FilterOffsetX;
+                filterField.Value.Y = page.yPositionOnScreen + page.height + (Config.UseDropdown ? dropDown.Value.bounds.Height + dropdownYOffset + 20 : 0) + Config.FilterOffsetY;
+            }
+
+            if(Config.UseShowGifted)
+            {
+                showGiftedCheckbox.Value.bounds.X = GetShowGiftedX(page);
+                showGiftedCheckbox.Value.bounds.Y = GetShowGiftedY(page);
+            }
+
+            if (Config.UseShowTalked)
+            {
+                showTalkedCheckbox.Value.bounds.X = GetShowTalkedX(page);
+                showTalkedCheckbox.Value.bounds.Y = GetShowTalkedY(page);
+            }
         }
 
         public static int GetDropdownX(SocialPage page)
@@ -771,7 +1043,7 @@ namespace SocialPageOrderRedux
 
         public static int GetButtonX(SocialPage page)
         {
-            return page.xPositionOnScreen + xOffset + Config.ButtonOffsetX;
+            return page.xPositionOnScreen + buttonXOffset + Config.ButtonOffsetX;
         }
 
         public static int GetButtonY(SocialPage page)
@@ -782,6 +1054,25 @@ namespace SocialPageOrderRedux
         public static Rectangle GetButtonRectangle(SocialPage page)
         {
             return new Rectangle(GetButtonX(page), GetButtonY(page), buttonTextureSource.Width * 4, buttonTextureSource.Height * 4);
+        }
+
+        public static int GetShowTalkedX(SocialPage page)
+        {
+            return page.xPositionOnScreen + talkedXOffset + Config.TalkedOffsetX;
+        }
+
+        public static int GetShowTalkedY(SocialPage page)
+        {
+            return page.yPositionOnScreen + talkedYOffset + Config.TalkedOffsetY;
+        }
+
+        public static int GetShowGiftedX(SocialPage page)
+        {
+            return page.xPositionOnScreen + talkedXOffset + Config.TalkedOffsetX;
+        }
+        public static int GetShowGiftedY(SocialPage page)
+        {
+            return page.yPositionOnScreen + talkedYOffset + Config.TalkedOffsetY + (Config.UseShowTalked ? 12 * 4 : 0);
         }
 
         public static void InitElements()
@@ -813,13 +1104,84 @@ namespace SocialPageOrderRedux
                 dropDown.Value.selectedOption = CurrentSort;
             }
 
-            if(button.Value is null)
-            {
-                button.Value = new ClickableTextureComponent(Rectangle.Empty, Game1.mouseCursors, buttonTextureSource, 4, false)
+            button.Value ??= new ClickableTextureComponent(Rectangle.Empty, Game1.mouseCursors, buttonTextureSource, 4, false)
                 {
                     rightNeighborID = GameMenu.region_inventoryTab,
                     myID = buttonId
                 };
+
+            showTalkedCheckbox.Value ??= 
+                new BrightDarkBox(
+                    "Hide Talked", 
+                    0, 
+                    0, 
+                    "LooseSprites/Cursors2",
+                    new(181, 175, 12, 11),
+                    onClicked: value =>
+                    {
+                        ShowTalked = value;
+                        if (Game1.activeClickableMenu is not GameMenu activeMenu)
+                        {
+                            return;
+                        }
+
+                        if (GameMenu.socialTab >= activeMenu.pages.Count || activeMenu.pages[GameMenu.socialTab] is not SocialPage page)
+                        {
+                            return;
+                        }
+                        ApplyFilter(page, true);
+                    })
+                {
+                    myID = talkedId
+                };
+
+            showGiftedCheckbox.Value ??= 
+                new BrightDarkBox(
+                    "Hide Gifted",
+                    0,
+                    0,
+                    "LooseSprites/Cursors2",
+                    new(167, 175, 12, 11),
+                    onClicked: value =>
+                    {
+                        ShowGifted = value;
+                        if (Game1.activeClickableMenu is not GameMenu activeMenu)
+                        {
+                            return;
+                        }
+
+                        if (GameMenu.socialTab >= activeMenu.pages.Count || activeMenu.pages[GameMenu.socialTab] is not SocialPage page)
+                        {
+                            return;
+                        }
+                        ApplyFilter(page, true);
+                    })
+                {
+                    myID = giftedId
+                };
+
+            showTalkedCheckbox.Value.isBright = ShowTalked;
+            showGiftedCheckbox.Value.isBright = ShowGifted;
+
+            if(Config.UseButton)
+            {
+                // Set its down neighbor id to the gifted or talked checkbox as necessary
+                if (Config.UseShowTalked)
+                {
+                    button.Value.downNeighborID = talkedId;
+                    showTalkedCheckbox.Value.upNeighborID = buttonId;
+                }
+                else if (Config.UseShowGifted)
+                {
+                    button.Value.downNeighborID = giftedId;
+                    showGiftedCheckbox.Value.upNeighborID = buttonId;
+                }
+            }
+
+            if(Config.UseShowGifted && Config.UseShowTalked)
+            {
+                showTalkedCheckbox.Value.downNeighborID = giftedId;
+                showGiftedCheckbox.Value.upNeighborID = talkedId;
             }
         }
 

@@ -7,6 +7,7 @@ These are all continuations of mods from aedenthorn. The original code can be fo
 - [Longer Seasons](https://www.nexusmods.com/stardewvalley/mods/25164)
 - [Multiple Floor Farmhouse](https://www.nexusmods.com/stardewvalley/mods/25303)
 - [Pacifist Valley](https://www.nexusmods.com/stardewvalley/mods/23109)
+- [Painting Display](https://www.nexusmods.com/stardewvalley/mods/30352/)
 - [Quest Time Limits](https://www.nexusmods.com/stardewvalley/mods/22349/)
 - [Resource Storage](https://www.nexusmods.com/stardewvalley/mods/22539)
 - [Seed Info](https://www.nexusmods.com/stardewvalley/mods/22519)

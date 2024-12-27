@@ -3,16 +3,16 @@
   "Author": "aedenthorn",
   "Version": "1.0.0",
   "Description": "Painting Display.",
-  "UniqueID": "aedenthorn.PaintingDisplay",
+  "UniqueID": "FlyingTNT.PaintingDisplay",
   "EntryDll": "PaintingDisplay.dll",
-  "MinimumApiVersion": "3.13.0",
+  "MinimumApiVersion": "4.0.0",
   "ModUpdater": {
     "Repository": "StardewValleyMods",
-    "User": "aedenthorn",
+    "User": "FlyingTNT",
     "Directory": "_releases",
     "ModFolder": "PaintingDisplay"
   },
-  "UpdateKeys": [ "Nexus:" ],
+  "UpdateKeys": [ "Nexus:30352" ],
   "Dependencies": [
     {
       "UniqueID": "Platonymous.ModUpdater",

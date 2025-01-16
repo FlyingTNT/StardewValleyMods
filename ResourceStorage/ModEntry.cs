@@ -331,6 +331,22 @@ namespace ResourceStorage
                     setValue: value => Config.SortButtonOffsetY = value
                 );
             }
+
+            IQuickSaveAPI quickSaveAPI = SHelper.ModRegistry.GetApi<IQuickSaveAPI>(IDs.QuickSave);
+            if (quickSaveAPI is not null)
+            {
+                quickSaveAPI.SavingEvent += (o, _) =>
+                {
+                    GameLoop_Saving(o, new SavingEventArgs());
+                    SharedResourceManager.GameLoop_Saving(o, new SavingEventArgs());
+                };
+
+                quickSaveAPI.LoadedEvent += (o, _) =>
+                {
+                    GameLoop_SaveLoaded(o, new SaveLoadedEventArgs());
+                    SharedResourceManager.GameLoop_SaveLoaded(o, new SaveLoadedEventArgs());
+                };
+            }
         }
     }
 }

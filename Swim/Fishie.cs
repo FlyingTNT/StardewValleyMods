@@ -99,10 +99,5 @@ namespace Swim
             }
             base.resetAnimationSpeed();
         }
-
-        private float targetRotation;
-        private bool turningRight;
-        private int wasHitCounter;
-
     }
 }

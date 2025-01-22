@@ -31,6 +31,43 @@ namespace ResourceStorage
             count += (int)ModifyResourceLevel(farmer, ItemRegistry.QualifyItemId(itemId), -count, auto: true);
             return count > 0;
         }
+
+        /// <summary>
+        /// We should let it reduce that Item as usual, becasue if they're calling this over ReduceId they probably want to reduce the item, but if
+        /// we need to reduceRemainderFromInventory we'll pull from the Resource Storage
+        /// </summary>
+        public static void Inventory_Reduce_Prefix(Inventory __instance, Item item, ref int count, bool reduceRemainderFromInventory, ref int __state)
+        {
+            if(!reduceRemainderFromInventory)
+            {
+                return;
+            }
+
+            int overflow = count - item.Stack;
+            if(overflow <= 0)
+            {
+                return;
+            }
+
+            if(!TryGetInventoryOwner(__instance, out Farmer owner))
+            {
+                return;
+            }
+
+            // __state is the amount we removed from the storage
+            __state = (int)(-ModifyResourceLevel(owner, item.QualifiedItemId, -overflow));
+
+            count -= __state;
+        }
+
+        /// <summary>
+        /// Adds the amount we removed (stored in __state) to the amount the Inventory function removed so that what we removed is included in the return value.
+        /// </summary>
+        public static int Inventory_Reduce_Postfix(int result, int __state)
+        {
+            return result + __state;
+        }
+
         public static void Inventory_CountId_Postfix(Inventory __instance, string itemId, ref int __result)
         {
             if (!Config.ModEnabled || !Config.AutoUse || !ModEntry.TryGetInventoryOwner(__instance, out Farmer farmer))
@@ -222,7 +259,7 @@ namespace ResourceStorage
             return true;
         }
 
-        public static bool InventoryPage_receiveKeyPressPrefix(InventoryPage __instance, Keys key, ref string ___hoverText)
+        public static bool InventoryPage_receiveKeyPressPrefix(Keys key, ref string ___hoverText)
         {
             if (!Config.ModEnabled || Game1.activeClickableMenu is not GameMenu)
                 return true;
@@ -237,11 +274,11 @@ namespace ResourceStorage
             return true;
         }
 
-        public static bool InventoryPage_receiveGamePadButton_Prefix(InventoryPage __instance, Buttons b, ref string ___hoverText)
+        public static bool InventoryPage_receiveGamePadButton_Prefix(Buttons button, ref string ___hoverText)
         {
             if (!Config.ModEnabled || Game1.activeClickableMenu is not GameMenu)
                 return true;
-            if (SButtonExtensions.ToSButton(b) == Config.ResourcesKey)
+            if (SButtonExtensions.ToSButton(button) == Config.ResourcesKey)
             {
                 ___hoverText = "";
                 Game1.playSound("bigSelect");
@@ -252,7 +289,7 @@ namespace ResourceStorage
             return true;
         }
 
-        public static bool InventoryPage_receiveLeftClick_Prefix(InventoryPage __instance, ref string ___hoverText, int x, int y)
+        public static bool InventoryPage_receiveLeftClick_Prefix(ref string ___hoverText, int x, int y)
         {
             if (!Config.ModEnabled || Game1.activeClickableMenu is not GameMenu)
                 return true;

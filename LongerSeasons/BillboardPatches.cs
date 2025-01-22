@@ -1,11 +1,8 @@
 ﻿using HarmonyLib;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using StardewValley;
 using StardewValley.Menus;
-using StardewValley.Objects;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -69,7 +66,7 @@ namespace LongerSeasons
         private static string GetDisplayDay(int dayOnThisPage)
         {
             int day = GetDay(dayOnThisPage);
-            return day <= Config.DaysPerMonth ? day.ToString() : "";
+            return day <= DaysPerMonth ? day.ToString() : "";
         }
 
         public static IEnumerable<CodeInstruction> Billboard_draw_Transpiler(IEnumerable<CodeInstruction> instructions)
@@ -100,6 +97,11 @@ namespace LongerSeasons
             }
 
             return codes.AsEnumerable();
+        }
+
+        public static void Billboard_Constructor_Postfix(ref Texture2D ___billboardTexture)
+        {
+            ___billboardTexture = Game1.temporaryContent.Load<Texture2D>("FlyingTNT.LongerSeasons/Billboard");
         }
     }
 }

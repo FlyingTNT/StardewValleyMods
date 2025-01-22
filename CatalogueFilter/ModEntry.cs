@@ -7,7 +7,9 @@ using StardewValley.Menus;
 using System;
 using System.Collections.Generic;
 using Common.Integrations;
-
+using System.Reflection;
+using Microsoft.Xna.Framework;
+using StardewModdingAPI.Events;
 
 namespace CatalogueFilter
 {
@@ -19,11 +21,6 @@ namespace CatalogueFilter
         public static IModHelper SHelper;
         public static ModConfig Config;
 
-        public static ModEntry context;
-
-        public static bool accelerating;
-        private static Texture2D boardTexture;
-
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
@@ -33,25 +30,20 @@ namespace CatalogueFilter
             if (!Config.ModEnabled)
                 return;
 
-            context = this;
-
             SMonitor = Monitor;
             SHelper = helper;
             helper.Events.GameLoop.GameLaunched += GameLoop_GameLaunched;
+            helper.Events.Input.ButtonsChanged += Input_ButtonsChanged;
 
             var harmony = new Harmony(ModManifest.UniqueID);
 
-            harmony.Patch(
-                original: AccessTools.Constructor(typeof(ShopMenu), new Type[] { typeof(string), typeof(ShopData), typeof(ShopOwnerData), typeof(NPC), typeof(Func<ISalable, Farmer, int, bool>), typeof(Func<ISalable, bool>), typeof(bool) }),
-                postfix: new HarmonyMethod(typeof(ModEntry), nameof(Shopmenu_Constructor_Postfix)));
-
-            harmony.Patch(
-                original: AccessTools.Constructor(typeof(ShopMenu), new Type[] { typeof(string), typeof(Dictionary<ISalable, ItemStockInformation>), typeof(int), typeof(string), typeof(Func<ISalable, Farmer, int, bool>), typeof(Func<ISalable, bool>), typeof(bool) }),
-                postfix: new HarmonyMethod(typeof(ModEntry), nameof(Shopmenu_Constructor_Postfix)));
-
-            harmony.Patch(
-                original: AccessTools.Constructor(typeof(ShopMenu), new Type[] { typeof(string), typeof(List<ISalable>), typeof(int), typeof(string), typeof(Func<ISalable, Farmer, int, bool>), typeof(Func<ISalable, bool>), typeof(bool) }),
-                postfix: new HarmonyMethod(typeof(ModEntry), nameof(Shopmenu_Constructor_Postfix)));
+            // The postfix only uses the ShopMenu instance as a parameter so it is safe to iterate regardless of the types
+            foreach(ConstructorInfo constructor in AccessTools.GetDeclaredConstructors(typeof(ShopMenu)))
+            {
+                harmony.Patch(
+                    original: constructor,
+                    postfix: new HarmonyMethod(typeof(ModEntry), nameof(ShopMenu_Constructor_Postfix)));
+            }
 
             harmony.Patch(
                 original: AccessTools.Method(typeof(ShopMenu), nameof(ShopMenu.applyTab)),
@@ -61,7 +53,21 @@ namespace CatalogueFilter
                 original: AccessTools.Method(typeof(ShopMenu), nameof(ShopMenu.updatePosition)),
                 postfix: new HarmonyMethod(typeof(ModEntry), nameof(ShopMenu_updatePosition_Postfix)));
 
-            harmony.PatchAll();
+            harmony.Patch(
+                original: AccessTools.Method(typeof(ShopMenu), nameof(ShopMenu.drawCurrency)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(ShopMenu_drawCurrency_Postfix)));
+
+            harmony.Patch(
+                original: AccessTools.Method(typeof(ShopMenu), nameof(ShopMenu.receiveLeftClick)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(ShopMenu_receiveLeftClick_Postfix)));
+
+            harmony.Patch(
+                original: AccessTools.Method(typeof(ShopMenu), nameof(ShopMenu.receiveKeyPress)),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(ShopMenu_receiveKeyPress_Prefix)));
+
+            harmony.Patch(
+                original: AccessTools.Method(typeof(ShopMenu), nameof(ShopMenu.performHoverAction)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(ShopMenu_performHoverAction_Postfix)));
         }
 
 
@@ -82,10 +88,77 @@ namespace CatalogueFilter
 
             configMenu.AddBoolOption(
                 mod: ModManifest,
-                name: () => ModEntry.SHelper.Translation.Get("GMCM_Option_ModEnabled_Name"),
+                name: () => SHelper.Translation.Get("GMCM_Option_ModEnabled_Name"),
                 getValue: () => Config.ModEnabled,
                 setValue: value => Config.ModEnabled = value
             );
+
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_Option_AutoSelectFilter_Name"),
+                getValue: () => Config.AutoSelectFilter,
+                setValue: value => Config.AutoSelectFilter = value
+            );
+
+            configMenu.AddKeybindList(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_Option_FilterSelectKey_Name"),
+                getValue: () => Config.SelectFilterKey,
+                setValue: value => Config.SelectFilterKey = value
+            );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_Option_FilterOffsetX_Name"),
+                getValue: () => Config.FilterOffsetX,
+                setValue: value => Config.FilterOffsetX = value
+            );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_Option_FilterOffsetY_Name"),
+                getValue: () => Config.FilterOffsetY,
+                setValue: value => Config.FilterOffsetY = value
+            );
+
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_Option_ShowLabel_Name"),
+                getValue: () => Config.ShowLabel,
+                setValue: value => Config.ShowLabel = value
+            );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_Option_TextColorR_Name"),
+                getValue: () => Config.LabelColor.R,
+                setValue: value => { if (0 <= value && value <= 255) Config.LabelColor = new((byte)value, Config.LabelColor.G, Config.LabelColor.B, Config.LabelColor.A);}
+            );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_Option_TextColorG_Name"),
+                getValue: () => Config.LabelColor.G,
+                setValue: value => { if (0 <= value && value <= 255) Config.LabelColor = new(Config.LabelColor.R, (byte)value, Config.LabelColor.B, Config.LabelColor.A); }
+            );
+
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM_Option_TextColorB_Name"),
+                getValue: () => Config.LabelColor.G,
+                setValue: value => { if (0 <= value && value <= 255) Config.LabelColor = new(Config.LabelColor.R, Config.LabelColor.G, (byte)value, Config.LabelColor.A); }
+            );
+        }
+
+        private static void Input_ButtonsChanged(object sender, ButtonsChangedEventArgs args)
+        {
+            if(Config.ModEnabled && Game1.activeClickableMenu is ShopMenu)
+            {
+                if(Config.SelectFilterKey.JustPressed())
+                {
+                    FilterField.Selected = !FilterField.Selected;
+                }
+            }
         }
     }
 }

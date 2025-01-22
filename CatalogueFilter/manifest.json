@@ -1,7 +1,7 @@
 ﻿{
-  "Name": "CatalogueFilter - Continued",
+  "Name": "Catalogue Filter",
   "Author": "aedenthorn, FlyingTNT",
-  "Version": "1.0.2",
+  "Version": "1.1.0",
   "Description": "Adds a filter to shop menus.",
   "UniqueID": "FlyingTNT.CatalogueFilter",
   "EntryDll": "CatalogueFilter.dll",

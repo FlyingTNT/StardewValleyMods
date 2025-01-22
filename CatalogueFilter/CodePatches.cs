@@ -1,132 +1,140 @@
 ﻿using HarmonyLib;
-using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using StardewModdingAPI;
+using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.BellsAndWhistles;
-using StardewValley.GameData.Shops;
 using StardewValley.Menus;
-using System;
 using System.Collections.Generic;
 
 namespace CatalogueFilter
 {
     public partial class ModEntry
     {
-        private static string lastFilterString = "";
-        private static TextBox filterField;
-        private static List<ISalable> allItems;
+        private static readonly PerScreen<string> lastFilterString = new(() => "");
+        private static readonly PerScreen<TextBox> filterField = new(() => null);
+        private static readonly PerScreen<List<ISalable>> allItems = new(() => null);
 
-        // new Type[] { typeof(string), typeof(ShopData), typeof(ShopOwnerData), typeof(NPC), typeof(Func<ISalable, Farmer, int, bool>), typeof(Func<ISalable, bool>), typeof(bool)}
-        // new Type[] {typeof(string), typeof(Dictionary<ISalable, ItemStockInformation>), typeof(int), typeof(string), typeof(Func<ISalable, Farmer, int, bool>), typeof(Func<ISalable, bool>), typeof(bool)}
-        // new Type[] {typeof(string), typeof(List<ISalable>), typeof(int), typeof(string), typeof(Func<ISalable, Farmer, int, bool>), typeof(Func<ISalable, bool>), typeof(bool)}
 
-        public static void Shopmenu_Constructor_Postfix(ShopMenu __instance)
+        private static string LastFilterString
+        {
+            get => lastFilterString.Value;
+            set => lastFilterString.Value = value;
+        }
+
+        private static TextBox FilterField
+        {
+            get => filterField.Value;
+            set => filterField.Value = value;
+        }
+
+        private static List<ISalable> AllItems
+        {
+            get => allItems.Value;
+            set => allItems.Value = value;
+        }
+
+        public static void ShopMenu_Constructor_Postfix(ShopMenu __instance)
         {
             if (!Config.ModEnabled)
                 return;
-            allItems = new List<ISalable>(__instance.forSale);
-            filterField = new TextBox(Game1.content.Load<Texture2D>("LooseSprites\\textBox"), null, Game1.smallFont, Game1.textColor)
+            AllItems = new List<ISalable>(__instance.forSale);
+            FilterField = new TextBox(Game1.content.Load<Texture2D>("LooseSprites\\textBox"), null, Game1.smallFont, Game1.textColor)
             {
-                X = __instance.xPositionOnScreen + 28,
-                Y = __instance.yPositionOnScreen + __instance.height - 88,
-                Text = ""
+                X = __instance.xPositionOnScreen + 28 + Config.FilterOffsetX,
+                Y = __instance.yPositionOnScreen + __instance.height - 88 + Config.FilterOffsetY,
+                Text = "",
+                Selected = Config.AutoSelectFilter
             };
         }
 
         public static void ShopMenu_applyTab_Postfix(ShopMenu __instance)
         {
-            if (filterField != null)
+            if (FilterField != null)
             {
-                filterField.Text = "";
+                FilterField.Text = "";
             }
-            allItems = new List<ISalable>(__instance.forSale);
+            AllItems = new List<ISalable>(__instance.forSale);
         }
 
         public static void ShopMenu_updatePosition_Postfix(ShopMenu __instance)
         {
-            if (filterField == null) // This is called during the constructor, and we setup the field after the constructor, so the field might be null.
+            if (FilterField is null) // This is called during the constructor, and we setup the field after the constructor, so the field might be null.
                 return;
 
-            filterField.X = __instance.xPositionOnScreen + 28;
-            filterField.Y = __instance.yPositionOnScreen + __instance.height - 88;
+            FilterField.X = __instance.xPositionOnScreen + 28 + Config.FilterOffsetX;
+            FilterField.Y = __instance.yPositionOnScreen + __instance.height - 88 + Config.FilterOffsetY;
         }
 
-        [HarmonyPatch(typeof(ShopMenu), nameof(ShopMenu.drawCurrency))]
-        public class ShopMenu_drawCurrency_Patch
+        public static void ShopMenu_drawCurrency_Postfix(ShopMenu __instance, SpriteBatch b)
         {
-
-            public static void Postfix(ShopMenu __instance, SpriteBatch b)
+            if (!Config.ModEnabled)
+                return;
+            if (LastFilterString != FilterField.Text)
             {
-                if (!Config.ModEnabled)
-                    return;
-                if(lastFilterString != filterField.Text)
+                LastFilterString = FilterField.Text;
+
+                foreach (var i in __instance.forSale)
                 {
-                    lastFilterString = filterField.Text;
-
-                    foreach (var i in __instance.forSale)
+                    if (!AllItems.Contains(i))
                     {
-                        if (!allItems.Contains(i))
-                            allItems.Add(i);
+                        AllItems.Add(i);
                     }
-                    for (int i = allItems.Count - 1; i >= 0; i--)
-                    {
-                        if (!__instance.itemPriceAndStock.ContainsKey(allItems[i]))
-                            allItems.RemoveAt(i);
-                    }
-                    __instance.forSale.Clear();
-                    if (filterField.Text == "")
-                    {
-                        __instance.forSale.AddRange(allItems);
-                        return;
-                    }
-                    foreach (var i in allItems)
-                    {
-                        if (__instance.itemPriceAndStock.ContainsKey(i) && i.DisplayName.ToLower().Contains(filterField.Text.ToLower()))
-                            __instance.forSale.Add(i);
-                    }
-                    __instance.currentItemIndex = 0;
-
-                    if(!SHelper.ModRegistry.IsLoaded("spacechase0.BiggerBackpack"))
-                        __instance.gameWindowSizeChanged(Game1.graphics.GraphicsDevice.Viewport.Bounds, Game1.graphics.GraphicsDevice.Viewport.Bounds);
                 }
-                filterField.Draw(b);
-                if (Config.ShowLabel)
+                for (int i = AllItems.Count - 1; i >= 0; i--)
                 {
-                    SpriteText.drawStringHorizontallyCenteredAt(b, SHelper.Translation.Get("filter"), __instance.xPositionOnScreen + 128, __instance.yPositionOnScreen + __instance.height - 136, 999999, -1, 999999, 1, 0.88f, false, Config.LabelColor, 99999);
+                    if (!__instance.itemPriceAndStock.ContainsKey(AllItems[i]))
+                    {
+                        AllItems.RemoveAt(i);
+                    }
                 }
+                __instance.forSale.Clear();
+                if (FilterField.Text == "")
+                {
+                    __instance.forSale.AddRange(AllItems);
+                }
+                else
+                {
+                    foreach (var item in AllItems)
+                    {
+                        if (item.DisplayName.ToLower().Contains(FilterField.Text.ToLower()))
+                        {
+                            __instance.forSale.Add(item);
+                        }
+                    }
+                }
+                __instance.currentItemIndex = 0;
+
+                if (!SHelper.ModRegistry.IsLoaded("spacechase0.BiggerBackpack"))
+                    __instance.gameWindowSizeChanged(Game1.graphics.GraphicsDevice.Viewport.Bounds, Game1.graphics.GraphicsDevice.Viewport.Bounds);
+            }
+
+            FilterField.Draw(b);
+            if (Config.ShowLabel)
+            {
+                SpriteText.drawStringHorizontallyCenteredAt(b, SHelper.Translation.Get("filter"), __instance.xPositionOnScreen + 128 + Config.FilterOffsetX, __instance.yPositionOnScreen + __instance.height - 136 + Config.FilterOffsetY, 999999, -1, 999999, 1, 0.88f, false, Config.LabelColor, 99999);
             }
         }
-        
-        [HarmonyPatch(typeof(ShopMenu), nameof(ShopMenu.receiveLeftClick))]
-        public class ShopMenu_receiveLeftClick_Patch
+
+        public static void ShopMenu_receiveLeftClick_Postfix()
         {
-            public static void Postfix(ShopMenu __instance)
-            {
-                if (!Config.ModEnabled)
-                    return;
-                filterField.Update();
-            }
+            if (!Config.ModEnabled)
+                return;
+            FilterField.Update();
         }
-        [HarmonyPatch(typeof(ShopMenu), nameof(ShopMenu.receiveKeyPress))]
-        public class ShopMenu_receiveKeyPress_Patch
-        {
-            public static bool Prefix(ShopMenu __instance, Keys key)
-            {
-                if (!Config.ModEnabled || !filterField.Selected || key == Keys.Escape)
-                    return true;
-                return false;
-            }
+
+        public static bool ShopMenu_receiveKeyPress_Prefix(Keys key)
+        { 
+            // If the filter is selected, absorb all key presses except escape
+            return !Config.ModEnabled || !FilterField.Selected || key == Keys.Escape;
         }
-        [HarmonyPatch(typeof(ShopMenu), nameof(ShopMenu.performHoverAction))]
-        public class ShopMenu_performHoverAction_Patch
+
+        public static void ShopMenu_performHoverAction_Postfix(int x, int y)
         {
-            public static void Postfix(ShopMenu __instance, int x, int y)
-            {
-                if (!Config.ModEnabled)
-                    return;
-                filterField.Hover(x, y);
-            }
+            if (!Config.ModEnabled)
+                return;
+            FilterField.Hover(x, y);
         }
     }
 }

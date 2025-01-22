@@ -1,6 +1,5 @@
 ﻿using HarmonyLib;
 using Microsoft.Xna.Framework.Graphics;
-using Newtonsoft.Json;
 using ResourceStorage.BetterCrafting;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
@@ -61,6 +60,12 @@ namespace ResourceStorage
             harmony.Patch(
                 original: AccessTools.Method(typeof(Inventory), nameof(Inventory.ReduceId)),
                 prefix: new HarmonyMethod(typeof(ModEntry), nameof(Inventory_ReduceId_Prefix))
+            );
+
+            harmony.Patch(
+                original: AccessTools.Method(typeof(Inventory), nameof(Inventory.Reduce)),
+                prefix: new HarmonyMethod(typeof(ModEntry), nameof(Inventory_Reduce_Prefix)),
+                postfix: new HarmonyMethod(typeof(ModEntry), nameof(Inventory_Reduce_Postfix))
             );
 
             harmony.Patch(
@@ -325,6 +330,22 @@ namespace ResourceStorage
                     getValue: () => Config.SortButtonOffsetY,
                     setValue: value => Config.SortButtonOffsetY = value
                 );
+            }
+
+            IQuickSaveAPI quickSaveAPI = SHelper.ModRegistry.GetApi<IQuickSaveAPI>(IDs.QuickSave);
+            if (quickSaveAPI is not null)
+            {
+                quickSaveAPI.SavingEvent += (o, _) =>
+                {
+                    GameLoop_Saving(o, new SavingEventArgs());
+                    SharedResourceManager.GameLoop_Saving(o, new SavingEventArgs());
+                };
+
+                quickSaveAPI.LoadedEvent += (o, _) =>
+                {
+                    GameLoop_SaveLoaded(o, new SaveLoadedEventArgs());
+                    SharedResourceManager.GameLoop_SaveLoaded(o, new SaveLoadedEventArgs());
+                };
             }
         }
     }

@@ -141,7 +141,8 @@
             "Features":[
                 "BigFishies",
                 "Minerals",
-                "Underwater"
+                "Underwater",
+                "ArtifactSpots"
             ],
             "DiveLocations": [
                 {

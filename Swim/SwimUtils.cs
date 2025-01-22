@@ -1,17 +1,13 @@
 ﻿using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
-using Microsoft.Xna.Framework.Input;
-using Netcode;
 using StardewModdingAPI;
 using StardewModdingAPI.Utilities;
 using StardewValley;
-using StardewValley.GameData.HomeRenovations;
 using StardewValley.Locations;
-using StardewValley.TerrainFeatures;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using xTile;
@@ -24,7 +20,7 @@ namespace Swim
     internal class SwimUtils
     {
         private static IMonitor SMonitor;
-        private static ModConfig Config;
+        private static ModConfig Config => ModEntry.Config;
         private static IModHelper SHelper;
         public static Dictionary<string, string> seaMonsterSounds = new Dictionary<string, string>() {
             {"A","dialogueCharacter"},
@@ -55,10 +51,9 @@ namespace Swim
             {"Z","harvest"},
         };
 
-        public static void Initialize(IMonitor monitor, IModHelper helper, ModConfig config)
+        public static void Initialize(IMonitor monitor, IModHelper helper)
         {
             SMonitor = monitor;
-            Config = config;
             SHelper = helper;
         }
 
@@ -141,7 +136,7 @@ namespace Swim
         public static bool isSafeToTryJump()
         {
             // Null checks
-            if (Game1.player == null || Game1.player.currentLocation == null || Game1.player.currentLocation.waterTiles == null)
+            if (Game1.player?.currentLocation?.waterTiles == null)
             {
                 return false;
             }
@@ -210,7 +205,7 @@ namespace Swim
 
         public static int CheckForBuriedItem(Farmer who)
         {
-            int objectIndex = 330;
+            int objectIndex = 330; // Clay
             if (Game1.random.NextDouble() < 0.1)
             {
                 if (Game1.random.NextDouble() < 0.75)
@@ -218,19 +213,19 @@ namespace Swim
                     switch (Game1.random.Next(5))
                     {
                         case 0:
-                            objectIndex = 96;
+                            objectIndex = 96; // Dwarf Scroll I
                             break;
                         case 1:
-                            objectIndex = (who.hasOrWillReceiveMail("lostBookFound") ? ((Game1.netWorldState.Value.LostBooksFound < 21) ? 102 : 770) : 770);
+                            objectIndex = (who.hasOrWillReceiveMail("lostBookFound") ? ((Game1.netWorldState.Value.LostBooksFound < 21) ? 102 : 770) : 770); // Lost book / mixed seeds
                             break;
                         case 2:
-                            objectIndex = 110;
+                            objectIndex = 110; // Rusty Spoon
                             break;
                         case 3:
-                            objectIndex = 112;
+                            objectIndex = 112; // Rusty Cog
                             break;
                         case 4:
-                            objectIndex = 585;
+                            objectIndex = 585; // Skeletal Tail
                             break;
                     }
                 }
@@ -240,48 +235,48 @@ namespace Swim
 
                     if (r < 0.75)
                     {
-                        objectIndex = ((Game1.random.NextDouble() < 0.5) ? 121 : 97);
+                        objectIndex = ((Game1.random.NextDouble() < 0.5) ? 121 : 97); // Dwarf hem / Dwarf scroll II
                     }
                     else if (r < 0.80)
                     {
-                        objectIndex = 99;
+                        objectIndex = 99; // Dwarf scroll IV
                     }
                     else
                     {
-                        objectIndex = ((Game1.random.NextDouble() < 0.5) ? 122 : 336);
+                        objectIndex = ((Game1.random.NextDouble() < 0.5) ? 122 : 336); // Dwarf Gadget / Gold Bar
                     }
                 }
                 else
                 {
-                    objectIndex = ((Game1.random.NextDouble() < 0.5) ? 126 : 127);
+                    objectIndex = ((Game1.random.NextDouble() < 0.5) ? 126 : 127); // Strange Doll / Strange Doll
                 }
             }
             else
             {
                 if (Game1.random.NextDouble() < 0.5)
                 {
-                    objectIndex = 330;
+                    objectIndex = 330; // Clay
                 }
                 else
                 {
                     if (Game1.random.NextDouble() < 0.25)
                     {
-                        objectIndex = 749;
+                        objectIndex = 749; // Omni Geode
                     }
                     else if (Game1.random.NextDouble() < 0.5)
                     {
                         var r = Game1.random.NextDouble();
                         if (r < 0.7)
                         {
-                            objectIndex = 535;
+                            objectIndex = 535; // Geode
                         }
-                        else if (r < 8.5)
+                        else if (r < 0.85)
                         {
-                            objectIndex = 537;
+                            objectIndex = 537; // Magma Geode
                         }
                         else
                         {
-                            objectIndex = 536;
+                            objectIndex = 536; // Frozen Geode
                         }
                     }
                 }
@@ -291,8 +286,8 @@ namespace Swim
 
         public static bool IsWearingScubaGear()
         {
-            bool tank = Game1.player.shirtItem.Value != null && Game1.player.shirtItem.Value.ItemId == ModEntry.scubaTankID.Value;
-            bool mask = Game1.player.hat.Value != null && Game1.player.hat.Value.ItemId == ModEntry.scubaMaskID.Value;
+            bool tank = Game1.player.shirtItem.Value?.ItemId == ModEntry.scubaTankID;
+            bool mask = Game1.player.hat.Value?.ItemId == ModEntry.scubaMaskID;
 
             return tank && mask;
         }
@@ -302,9 +297,9 @@ namespace Swim
             WaterTiles tiles = Game1.player.currentLocation.waterTiles;
             Point p = Game1.player.TilePoint;
 
-            if (!Game1.player.swimming.Value && Game1.player.currentLocation.map.GetLayer("Buildings")?.PickTile(new Location(p.X, p.Y) * Game1.tileSize, Game1.viewport.Size) != null)
+            // If they're not swimming, passable buildings (bridges) should not be in water, but if they are, they should.
+            if (!Game1.player.swimming.Value && (Game1.player.currentLocation.doesTileHaveProperty(p.X, p.Y, "Passable", "Buildings") != null))
             {
-                //Monitor.Log("Not in water");
                 return false;
             }
 
@@ -324,87 +319,7 @@ namespace Swim
                     )
                 );
 
-            //Monitor.Log(output ? "In water" : "Not in water");
             return output;
-        }
-
-        public static List<Vector2> GetTilesInDirection(int count, int direction)
-        {
-            List<Vector2> tiles = new List<Vector2>();
-            if (direction == 1)
-            {
-
-                for (int i = count; i > 0; i--)
-                {
-                    tiles.Add(Game1.player.TilePoint.ToVector2() + new Vector2(i, 0));
-                }
-
-            }
-
-            if (direction == 2)
-            {
-
-                for (int i = count; i > 0; i--)
-                {
-                    tiles.Add(Game1.player.TilePoint.ToVector2() + new Vector2(0, i));
-                }
-
-            }
-
-            if (direction == 3)
-            {
-
-                for (int i = count; i > 0; i--)
-                {
-                    tiles.Add(Game1.player.TilePoint.ToVector2() - new Vector2(i, 0));
-                }
-
-            }
-
-            if (direction == 0)
-            {
-
-                for (int i = count; i > 0; i--)
-                {
-                    tiles.Add(Game1.player.TilePoint.ToVector2() - new Vector2(0, i));
-                }
-
-            }
-
-            return tiles;
-
-        }
-
-        public static Vector2 GetNextTile()
-        {
-            int dir = Game1.player.FacingDirection;
-            if (dir == 1)
-            {
-
-                return Game1.player.Tile + new Vector2(1, 0);
-
-            }
-
-            if (dir == 2)
-            {
-
-                return Game1.player.Tile + new Vector2(0, 1);
-
-            }
-
-            if (dir == 3)
-            {
-
-                return Game1.player.Tile - new Vector2(1, 0);
-
-            }
-
-            if (dir == 0)
-            {
-
-                return Game1.player.Tile - new Vector2(0, 1);
-            }
-            return Vector2.Zero;
         }
 
         public static void MakeOxygenBar(int current, int max)
@@ -432,29 +347,6 @@ namespace Swim
                 }
             }
             ModEntry.OxygenBarTexture.Value.SetData(data);
-        }
-
-        public static string doesTileHaveProperty(Map map, int xTile, int yTile, string propertyName, string layerName)
-        {
-            PropertyValue property = null;
-            if (map != null && map.GetLayer(layerName) != null)
-            {
-                Tile tmp = map.GetLayer(layerName).PickTile(new Location(xTile * 64, yTile * 64), Game1.viewport.Size);
-                if (tmp != null)
-                {
-                    tmp.TileIndexProperties.TryGetValue(propertyName, out property);
-                }
-                if (property == null && tmp != null)
-                {
-                    map.GetLayer(layerName).PickTile(new Location(xTile * 64, yTile * 64), Game1.viewport.Size).Properties.TryGetValue(propertyName, out property);
-                }
-            }
-            if (property != null)
-            {
-                //Monitor.Log("Tile has property: " + property.ToString());
-                return property.ToString();
-            }
-            return null;
         }
 
         public static void ReadDiveMapData(DiveMapData data)
@@ -499,36 +391,23 @@ namespace Swim
             return false;
         }
 
-        public static bool IsTilePassable(GameLocation location, Location tileLocation, xTile.Dimensions.Rectangle viewport)
+        public static bool IsWaterTile(Point tilePos)
         {
-            PropertyValue passable = null;
-            Microsoft.Xna.Framework.Rectangle tileLocationRect = new Microsoft.Xna.Framework.Rectangle((int)tileLocation.X * 64, (int)tileLocation.Y * 64, 64, 64);
-            Tile tmp = location.map.GetLayer("Back").PickTile(new Location(tileLocation.X * 64, tileLocation.Y * 64), viewport.Size);
-            if (tmp != null)
+            return IsWaterTile(tilePos, Game1.player.currentLocation);
+        }
+
+        public static bool IsWaterTile(Point tilePos, GameLocation location)
+        {
+            if (location != null && location.waterTiles != null && tilePos.X >= 0 && tilePos.Y >= 0 && location.waterTiles.waterTiles.GetLength(0) > tilePos.X && location.waterTiles.waterTiles.GetLength(1) > tilePos.Y)
             {
-                tmp.TileIndexProperties.TryGetValue("Passable", out passable);
+                return location.waterTiles[tilePos.X, tilePos.Y];
             }
-            Tile tile = location.map.GetLayer("Buildings").PickTile(new Location(tileLocation.X * 64, tileLocation.Y * 64), viewport.Size);
-            if (location.largeTerrainFeatures is not null)
-            {
-                using (List<LargeTerrainFeature>.Enumerator enumerator = location.largeTerrainFeatures.GetEnumerator())
-                {
-                    while (enumerator.MoveNext())
-                    {
-                        if (enumerator.Current.getBoundingBox().Intersects(tileLocationRect))
-                        {
-                            return false;
-                        }
-                    }
-                }
-            }
-            Vector2 vLocation = new Vector2(tileLocation.X, tileLocation.Y);
-            if (location.terrainFeatures.TryGetValue(vLocation, out TerrainFeature feature) && feature != null && tileLocationRect.Intersects(feature.getBoundingBox()) && (!feature.isPassable(null) || (feature is HoeDirt && ((HoeDirt)feature).crop != null)))
-            {
-                return false;
-            }
-            bool result = passable == null && tile == null && tmp != null;
-            return result;
+            return false;
+        }
+
+        public static bool IsTilePassable(GameLocation location, Vector2 tileLocation)
+        {
+            return location.isTilePassable(tileLocation) && !location.IsTileOccupiedBy(tileLocation, CollisionMask.TerrainFeatures, CollisionMask.All);
         }
 
         public static bool isMouseButtonDown(KeybindList keybindList)
@@ -555,7 +434,7 @@ namespace Swim
 
             Point playerPosition = Game1.player.TilePoint;
 
-            string property = doesTileHaveProperty(location.Map, playerPosition.X, playerPosition.Y, "TouchAction", "Back");
+            string property = location.doesTileHaveProperty(playerPosition.X, playerPosition.Y, "TouchAction", "Back");
 
             if (property == "PoolEntrance" || property == "ChangeIntoSwimsuit")
             {
@@ -616,6 +495,22 @@ namespace Swim
             }
 
             return i18nDict;
+        }
+
+        public static string GetTranslation(string key)
+        {
+            return SwimDialog.TryGetTranslation(key, out string translation) ? translation : key;
+        }
+
+        public static SoundEffect LoadBreatheSound()
+        {
+            string filePath = Path.Combine(SHelper.DirectoryPath, "assets", "breathe.wav");
+            if (File.Exists(filePath))
+            {
+                return SoundEffect.FromStream(new FileStream(filePath, FileMode.Open));
+            }
+
+            return null;
         }
     }
 }

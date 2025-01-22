@@ -18,10 +18,19 @@ namespace ResourceStorage
 {
     public partial class ModEntry
     {
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="instance"></param>
+        /// <param name="id"></param>
+        /// <param name="amountToAdd"></param>
+        /// <param name="auto"></param>
+        /// <param name="notifyBetterCraftingIntegration"></param>
+        /// <returns> The amount it changed. </returns>
         public static long ModifyResourceLevel(Farmer instance, string id, int amountToAdd, bool auto = true, bool notifyBetterCraftingIntegration = true)
         {
             id = ItemRegistry.QualifyItemId(id);
-            if (id == null)
+            if (id is null)
             {
                 return 0;
             }
@@ -35,18 +44,20 @@ namespace ResourceStorage
             }
 
             if (auto && !CanAutoStore(id) && amountToAdd > 0)
+            {
                 return 0;
+            }
 
-            var newAmount = Math.Max(oldAmount + amountToAdd, 0);
+            long newAmount = Math.Max(oldAmount + amountToAdd, 0);
             if (newAmount != oldAmount)
             {
                 SMonitor.Log($"Modified {instance.Name}'s resource {id} from {oldAmount} to {newAmount}");
                 if (Config.ShowMessage)
                 {
-                    Object item = ItemRegistry.Create<Object>(id, (int)(newAmount - oldAmount));
+                    string itemName = ItemRegistry.GetDataOrErrorItem(id).DisplayName;
                     try
                     {
-                        var hm = new HUDMessage(string.Format(newAmount > oldAmount ? SHelper.Translation.Get("added-x-y") : SHelper.Translation.Get("removed-x-y"), (int)Math.Abs(newAmount - oldAmount), item.DisplayName), 1000) { whatType = newAmount > oldAmount ? 4 : 3 };
+                        var hm = new HUDMessage(string.Format(newAmount > oldAmount ? SHelper.Translation.Get("added-x-y") : SHelper.Translation.Get("removed-x-y"), (int)Math.Abs(newAmount - oldAmount), itemName), 1000) { whatType = newAmount > oldAmount ? 4 : 3 };
                         Game1.addHUDMessage(hm);
                     }
                     catch { }
@@ -65,9 +76,14 @@ namespace ResourceStorage
             }
 
             if (newAmount <= 0)
+            {
                 dict.Remove(id);
+
+            }
             else
+            {
                 dict[id] = newAmount;
+            }
 
             return newAmount - oldAmount;
         }
@@ -214,6 +230,12 @@ namespace ResourceStorage
 
         public static bool TryGetInventoryOwner(Inventory inventory, out Farmer farmer)
         {
+            if(inventory.IsLocalPlayerInventory)
+            {
+                farmer = Game1.player;
+                return true;
+            }
+
             foreach(Farmer f in Game1.getAllFarmers())
             {
                 if(ReferenceEquals(f.Items, inventory))
@@ -324,6 +346,10 @@ namespace ResourceStorage
             {
                 SMonitor.Log($"Saving resource dictionary for {farmer.Name}");
                 PerPlayerConfig.SaveConfigOption(farmer, dictKey, dict);
+            }
+            else
+            {
+                SMonitor.Log($"No resource dictionary for {farmer.Name}");
             }
         }
     }

@@ -9,14 +9,21 @@
     <Import_RootNamespace>Common</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)integrations\ContentPatcher\IContentPatcherAPI.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)integrations\CustomGiftLimits\ICustomGiftLimitsAPI.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Integrations\GenericModConfigMenu\IGenericModConfigMenuApi.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)integrations\IDs.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Integrations\LongerSeasons\ILongerSeasonsAPI.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Integrations\QuickSave\IQuickSaveAPI.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Multiplayer\MultiplayerSynced.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)multiplayer\MultiplayerSyncedDict.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Multiplayer\IMultiplayerSynced.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Multiplayer\MultiplayerSyncedGroup.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)utilities\HarmonyTools.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utilities\PerSaveConfig.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Utilities\PerPlayerConfig.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="$(MSBuildThisFileDirectory)Integrations\GenericModConfigMenu\" />
     <Folder Include="$(MSBuildThisFileDirectory)Multiplayer\" />
     <Folder Include="$(MSBuildThisFileDirectory)Utilities\" />
   </ItemGroup>

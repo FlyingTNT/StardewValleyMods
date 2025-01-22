@@ -1,0 +1,21 @@
+{
+  "GMCM_EnableMod_Name": "Enable Mod",
+  "GMCM_ExtendBerry_Name": "Extend Berry Seasons",
+  "GMCM_DistributeBirthdays_Name": "Distribute Birthdays",
+  "GMCM_AvoidBirthdayOverlap_Name": "Avoid Birthday Overlap",
+  "GMCM_DaysPerMonth_Name": "Days per Month",
+  "GMCM_MonthsPerSpring_Name": "Months per Spring",
+  "GMCM_MonthsPerSummer_Name": "Months per Summer",
+  "GMCM_MonthsPerFall_Name": "Months per Fall",
+  "GMCM_MonthsPerWinter_Name": "Months per Winter",
+  "GMCM_BillboardOptions_Title": "Advanced Billboard Options",
+  "GMCM_GetNumbersFromBillboard_Name": "Get Numbers from Billboard",
+  "GMCM_BillboardNumberWidth_Name": "Number Width",
+  "GMCM_BillboardNumberHeight_Name": "Number Height",
+  "GMCM_NumberOffsetX_Name": "{{number}} x Offset", // number is a number 0-9
+  "GMCM_NumberOffsetX_Description": "The x offset of {{number}} in the billboard texture. i.e. the number of pixels the number is right of where the numbers usually are in the date box.", // number is a number 0-9
+  "GMCM_NumberOffsetY_Name": "{{number}} y Offset", // number is a number 0-9
+  "GMCM_NumberOffsetY_Description": "The y offset of {{number}} in the billboard texture. i.e. the number of pixels the number is below where the numbers usually are in the date box.", // number is a number 0-9
+  "MultiplayerWarningNotInstalled": "Player {{playerName}} does not have Longer Seasons installed. They may experience errors when using days past 28.",
+  "MultiplayerWarningOldVersion": "Player {{playerName}} has an old version of Longer Seasons. Due to changes in the way data is synced, their config will not be automatically synced with yours. Please be sure that your configs match."
+}

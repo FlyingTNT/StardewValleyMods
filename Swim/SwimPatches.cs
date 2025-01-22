@@ -17,13 +17,12 @@ namespace Swim
     internal class SwimPatches
     {
         private static IMonitor SMonitor;
-        private static ModConfig Config;
+        private static ModConfig Config => ModEntry.Config;
         private static IModHelper SHelper;
 
-        public static void Initialize(IMonitor monitor, IModHelper helper, ModConfig config)
+        public static void Initialize(IMonitor monitor, IModHelper helper)
         {
             SMonitor = monitor;
-            Config = config;
             SHelper = helper;
         }
 
@@ -51,7 +50,10 @@ namespace Swim
                 if (__instance.exitLocation != null && __instance.exitLocation.Location.waterTiles != null && __instance.exitLocation.Location.isTileOnMap(Game1.player.positionBeforeEvent) && __instance.exitLocation.Location.waterTiles[(int)(Game1.player.positionBeforeEvent.X),(int)(Game1.player.positionBeforeEvent.Y)])
                 {
                     SMonitor.Log($"swimming again");
+
+                    #pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
                     ChangeAfterEvent();
+                    #pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
                 }
             }
             catch (Exception ex)
@@ -178,12 +180,6 @@ namespace Swim
             {
                 __state = __instance.bathingClothes.Value;
 
-                if(__instance.swimming.Value)
-                {
-                    __instance.bathingClothes.Value = true;
-                    return;
-                }
-
                 if (__instance.bathingClothes.Value && Config.AllowRunningWhileInSwimsuit)
                 {
                     __instance.bathingClothes.Value = false;
@@ -200,6 +196,11 @@ namespace Swim
             try
             {
                 __instance.bathingClothes.Value = __state;
+
+                if (__instance.swimming.Value)
+                {
+                    __instance.speed = __instance.running ? Config.SwimRunSpeed : Config.SwimSpeed;
+                }
             }
             catch (Exception ex)
             {
@@ -211,7 +212,7 @@ namespace Swim
         {
             try
             {
-                if (Game1.player.currentLocation != null && Game1.player.currentLocation.Name == "AbigailCave")
+                if (Game1.player.currentLocation?.Name == "AbigailCave")
                     return false;
             }
             catch (Exception ex)
@@ -222,7 +223,7 @@ namespace Swim
         }
 
 
-        public static void Wand_DoFunction_Prefix(ref Farmer who, ref bool __state)
+        public static void Wand_DoFunction_Prefix(Farmer who, ref bool __state)
         {
             if (who.bathingClothes.Value)
             {
@@ -230,36 +231,45 @@ namespace Swim
                 __state = true;
             }
         }
-        public static void Wand_DoFunction_Postfix(ref Farmer who, bool __state)
+        public static void Wand_DoFunction_Postfix(Farmer who, bool __state)
         {
             if(__state)
             {
                 who.bathingClothes.Value = true;
             }
         }
-        public static IEnumerable<CodeInstruction> Wand_DoFunction_Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
 
-            var codes = new List<CodeInstruction>(instructions);
+        public static void Utility_playerCanPlaceItemHere_Prefix(Farmer f, ref bool __state)
+        {
             try
             {
-                int start = 0;
-                for (int i = 0; i < codes.Count; i++)
+                if (Config.AllowActionsWhileInSwimsuit && f.bathingClothes.Value)
                 {
-                    if (codes[i].opcode == OpCodes.Ret)
-                    {
-                        start = i + 1;
-                        return codes.Skip(start).AsEnumerable();
-                    }
+                    f.bathingClothes.Value = false;
+                    __state = true;
                 }
             }
             catch (Exception ex)
             {
-                SMonitor.Log($"Failed in {nameof(Wand_DoFunction_Transpiler)}:\n{ex}", LogLevel.Error);
+                SMonitor.Log($"Failed in {nameof(Utility_playerCanPlaceItemHere_Prefix)}:\n{ex}", LogLevel.Error);
             }
-
-            return codes.AsEnumerable();
         }
+
+        public static void Utility_playerCanPlaceItemHere_Postfix(Farmer f, bool __state)
+        {
+            try
+            {
+                if (__state)
+                {
+                    f.bathingClothes.Value = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(Utility_playerCanPlaceItemHere_Postfix)}:\n{ex}", LogLevel.Error);
+            }
+        }
+
         public static void GameLocation_resetForPlayerEntry_Prefix(GameLocation __instance)
         {
             try
@@ -273,8 +283,7 @@ namespace Swim
                     else
                     {
                         __instance.mapPath.Value = "Maps\\CrystalCave";
-                        ModEntry.oldMariner.Value = new NPC(new AnimatedSprite("Characters\\Mariner", 0, 16, 32), new Vector2(10f, 7f) * 64f, 2, "Old Mariner", null);
-
+                        ModEntry.oldMariner = new NPC(new AnimatedSprite("Characters\\Mariner", 0, 16, 32), new Vector2(10f, 7f) * 64f, 2, "Old Mariner", null);
                     }
                     //__instance.updateMap();
                 }
@@ -292,7 +301,7 @@ namespace Swim
                 {
                     if (!Game1.player.mailReceived.Contains("SwimMod_Mariner_Completed"))
                     {
-                        ModEntry.oldMariner.Value.draw(b);
+                        ModEntry.oldMariner.draw(b);
                     }
                 }
             }
@@ -301,13 +310,13 @@ namespace Swim
                 SMonitor.Log($"Failed in {nameof(GameLocation_draw_Prefix)}:\n{ex}", LogLevel.Error);
             }
         }
-        public static bool GameLocation_isCollidingPosition_Prefix(GameLocation __instance, Microsoft.Xna.Framework.Rectangle position, xTile.Dimensions.Rectangle viewport, bool isFarmer, int damagesFarmer, bool glider, Character character, ref bool __result)
+        public static bool GameLocation_isCollidingPosition_Prefix(GameLocation __instance, Microsoft.Xna.Framework.Rectangle position, ref bool __result)
         {
             try
             {
                 if(__instance.Name == "Custom_ScubaCrystalCave")
                 {
-                    if (!Game1.player.mailReceived.Contains("SwimMod_Mariner_Completed") && ModEntry.oldMariner != null && position.Intersects(ModEntry.oldMariner.Value.GetBoundingBox()))
+                    if (!Game1.player.mailReceived.Contains("SwimMod_Mariner_Completed") && ModEntry.oldMariner != null && position.Intersects(ModEntry.oldMariner.GetBoundingBox()))
                     {
                         __result = true;
                         return false;
@@ -328,71 +337,13 @@ namespace Swim
                 {
                     if (!Game1.player.mailReceived.Contains("SwimMod_Mariner_Completed"))
                     {
-                        if (ModEntry.oldMariner != null)
-                        {
-                            ModEntry.oldMariner.Value.update(time, __instance);
-                        }
+                        ModEntry.oldMariner?.update(time, __instance);
                     }
                 }
             }
             catch (Exception ex)
             {
                 SMonitor.Log($"Failed in {nameof(GameLocation_UpdateWhenCurrentLocation_Postfix)}:\n{ex}", LogLevel.Error);
-            }
-        }
-
-        public static void GameLocation_performTouchAction_Prefix(string fullActionString)
-        {
-            try
-            {
-                string[] text = fullActionString.Split(new char[]
-                {
-                    ' '
-                });
-                GameLocation_performTouchAction_PrefixArray(text);
-            }
-            catch (Exception ex)
-            {
-                SMonitor.Log($"Failed in {nameof(GameLocation_performTouchAction_Prefix)}:\n{ex}", LogLevel.Error);
-            }
-        }
-        public static void GameLocation_performTouchAction_PrefixArray(string[] action)
-        {
-            try
-            {
-                string text = action[0];
-                if (text == "PoolEntrance")
-                {
-                    if (!Game1.player.swimming.Value)
-                    {
-                        Config.ReadyToSwim = false;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                SMonitor.Log($"Failed in {nameof(GameLocation_performTouchAction_PrefixArray)}:\n{ex}", LogLevel.Error);
-            }
-        }
-        public static void GameLocation_performTouchAction_Postfix(string fullActionString)
-        {
-            try
-            {
-                string text = fullActionString.Split(new char[]
-                {
-                    ' '
-                })[0];
-                if (text == "PoolEntrance")
-                {
-                    if (Game1.player.swimming.Value)
-                    {
-                        Config = SHelper.ReadConfig<ModConfig>();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                SMonitor.Log($"Failed in {nameof(GameLocation_performTouchAction_Postfix)}:\n{ex}", LogLevel.Error);
             }
         }
         public static void GameLocation_checkAction_Prefix(GameLocation __instance, Location tileLocation, xTile.Dimensions.Rectangle viewport, Farmer who)
@@ -403,7 +354,7 @@ namespace Swim
                 {
                     if (!who.mailReceived.Contains("SwimMod_Mariner_Completed"))
                     {
-                        if (ModEntry.oldMariner != null && ModEntry.oldMariner.Value.Tile.X == tileLocation.X && ModEntry.oldMariner.Value.Tile.Y == tileLocation.Y)
+                        if (ModEntry.oldMariner != null && ModEntry.oldMariner.Tile.X == tileLocation.X && ModEntry.oldMariner.Tile.Y == tileLocation.Y)
                         {
                             string playerTerm = Game1.content.LoadString("Strings\\Locations:Beach_Mariner_Player_" + (who.IsMale ? "Male" : "Female"));
 
@@ -428,19 +379,37 @@ namespace Swim
             }
             catch (Exception ex)
             {
-                SMonitor.Log($"Failed in {nameof(GameLocation_UpdateWhenCurrentLocation_Postfix)}:\n{ex}", LogLevel.Error);
+                SMonitor.Log($"Failed in {nameof(GameLocation_checkAction_Prefix)}:\n{ex}", LogLevel.Error);
             }
         }
-        public static void GameLocation_isCollidingPosition_Postfix(GameLocation __instance, ref bool __result, Microsoft.Xna.Framework.Rectangle position, xTile.Dimensions.Rectangle viewport, bool isFarmer, int damagesFarmer, bool glider, Character character, bool pathfinding, bool projectile = false, bool ignoreCharacterRequirement = false)
+        public static void GameLocation_isCollidingPosition_Postfix(GameLocation __instance, ref bool __result, Microsoft.Xna.Framework.Rectangle position, bool isFarmer, Character character)
         {
             try
             {
                 if (__result == false || !isFarmer || character?.Equals(Game1.player) != true || !Game1.player.swimming.Value || ModEntry.isUnderwater.Value || ModEntry.locationIsPool.Value)
                     return;
 
-                Vector2 next = SwimUtils.GetNextTile();
-                SMonitor.Log($"Checking collide {SwimUtils.doesTileHaveProperty(__instance.map, (int)next.X, (int)next.Y, "Water", "Back") != null}");
-                if ((int)next.X <= 0 || (int)next.Y <= 0 || __instance.Map.Layers[0].LayerWidth <= (int)next.X || __instance.Map.Layers[0].LayerHeight <= (int)next.Y || SwimUtils.doesTileHaveProperty(__instance.map, (int)next.X, (int)next.Y, "Water", "Back") != null)
+                int count = 0;
+
+                if(__instance.doesTileHaveProperty(position.Left / 64, position.Top / 64, "Water", "Back") != null)
+                {
+                    count++;
+                }
+                if(__instance.doesTileHaveProperty(position.Left / 64, position.Bottom / 64, "Water", "Back") != null)
+                {
+                    count++;
+                }
+                if (__instance.doesTileHaveProperty(position.Right / 64, position.Top / 64, "Water", "Back") != null)
+                {
+                    count++;
+                }
+                if (__instance.doesTileHaveProperty(position.Right / 64, position.Bottom / 64, "Water", "Back") != null)
+                {
+                    count++;
+                }
+
+                // If most corners are water tiles, ignore collision
+                if(count >= 3)
                 {
                     __result = false;
                 }

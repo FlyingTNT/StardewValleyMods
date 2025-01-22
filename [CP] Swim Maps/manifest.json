@@ -1,7 +1,7 @@
 ﻿{
     "Name": "Swim Mod Dive Maps",
     "Author": "aedenthorn",
-    "Version": "1.0.1",
+    "Version": "1.0.2",
     "Description": "Adds underwater maps.",
     "UniqueID": "FlyingTNT.SwimDiveMaps",
     "UpdateKeys": [ "Nexus:23169@DiveMaps" ],

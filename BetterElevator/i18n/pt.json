@@ -1,0 +1,10 @@
+{
+  "level-reached-x": "Andar mais fundo: {0}",
+  "enter-level": "Descer ao andar:",
+
+  // GMCM
+  "GMCM_Option_ModEnabled_Name": "Habilitar mod",
+  "GMCM_Option_ModKey_Name": "Chave do mod",
+  "GMCM_Option_Unrestricted_Name": "Irrestrito",
+  "GMCM_Option_Unrestricted_Tooltip": "Permite você ir a qualquer andar, mesmo aqueles que você não tenha ido ainda."
+}

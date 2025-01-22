@@ -31,6 +31,9 @@ namespace ResourceStorage.BetterCrafting
 
         public bool IsReadOnly => false;
 
+        /// <summary> This is not the main player's main inventory. </summary>
+        public bool IsLocalPlayerInventory { get => false; set { } }
+
         public void Add(Item item)
         {
             if (!ModEntry.CanStore(ItemRegistry.Create<Object>(item.QualifiedItemId)))
@@ -410,6 +413,42 @@ namespace ResourceStorage.BetterCrafting
             {
                 BetterCraftingIntegration.SMonitor.Log($"Failed in {nameof(NotifyOfChangeInResourceStorage)}:\n{ex}", LogLevel.Error);
             }
+        }
+
+        /// <returns> The amount removed. </returns>
+        public int Reduce(Item item, int count, bool reduceRemainderFromInventory = false)
+        {
+            // This is basically just lifted from Inventory's implementation
+            int index = -1;
+            if (index < 0)
+            {
+                index = IndexOf(item);
+            }
+            int remaining = count;
+            if (index > -1)
+            {
+                if (item.Stack < count)
+                {
+                    item.Stack -= count;
+                    return count;
+                }
+
+                items.RemoveAt(index);
+                remaining -= item.Stack;
+            }
+            else
+            {
+                BetterCraftingIntegration.SMonitor.Log($"Can't deduct item with ID '{item.QualifiedItemId}' from {(this.IsLocalPlayerInventory ? "the player's" : "this")} inventory because it's not in that inventory.");
+            }
+            if (reduceRemainderFromInventory && remaining > 0)
+            {
+                remaining -= ReduceId(item.QualifiedItemId, remaining);
+            }
+            if (remaining > 0)
+            {
+                return count - remaining;
+            }
+            return count;
         }
     }
 }

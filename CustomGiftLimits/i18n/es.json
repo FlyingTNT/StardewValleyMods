@@ -1,0 +1,16 @@
+{
+  // GMCM
+  "GMCM_Option_ModEnabled_Name": "Activar Mod",
+  "GMCM_Option_OrdinaryGiftsPerDay_Name": "Normal / Día",
+  "GMCM_Option_OrdinaryGiftsPerWeek_Name": "Normal / Semana",
+  "GMCM_Option_FriendGiftsPerDay_Name": "Amige / Día",
+  "GMCM_Option_FriendGiftsPerWeek_Name": "Amige / Semana",
+  "GMCM_Option_DatingGiftsPerDay_Name": "Novie / Día",
+  "GMCM_Option_DatingGiftsPerWeek_Name": "Novie / Semana",
+  "GMCM_Option_SpouseGiftsPerDay_Name": "Espose / Día",
+  "GMCM_Option_SpouseGiftsPerWeek_Name": "Espose / Semana",
+  "GMCM_Option_MaxedHeartsGiftsPerDay_Name": "Corazónes maximizados / Día",
+  "GMCM_Option_MaxedHeartsGiftsPerWeek_Name": "Corazónes maximizados / Semana",
+  "GMCM_Option_CompatibilityMode_Name": "Modo de compatibilidad",
+  "GMCM_Option_CompatibilityMode_Description": "Modificará los números de los regalos para que modificaciónes otras reconocen si se han alcanzado los límites, inclusto si no verifican los límites de esta modificación."
+}

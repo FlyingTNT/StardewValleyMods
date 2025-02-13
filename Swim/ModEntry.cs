@@ -12,26 +12,23 @@ using System.Collections.Generic;
 using System.Globalization;
 using Common.Integrations;
 using Rectangle = Microsoft.Xna.Framework.Rectangle;
-using System.IO;
-using System.Threading.Channels;
-using xTile;
 using StardewValley.Extensions;
+using StardewValley.Locations;
+using StardewValley.Minigames;
 
 namespace Swim
 {
     public class ModEntry : Mod
     {
-
         public static ModConfig Config { get; private set; }
         public static IMonitor SMonitor { get; private set; }
         public static IModHelper SHelper { get; private set; }
 
-        public static readonly PerScreen<Texture2D> OxygenBarTexture = new();
+        public static Texture2D OxygenBarTexture => SHelper.GameContent.Load<Texture2D>("FlyingTNT.Swim/OxygenBar");
         public const string scubaMaskID = "Swim_ScubaMask";
         public const string scubaFinsID = "Swim_ScubaFins";
         public const string scubaTankID = "Swim_ScubaTank";
-        public static readonly PerScreen<int> oxygen = new PerScreen<int>(() => 0);
-        public static readonly PerScreen<int> lastUpdateMs = new PerScreen<int>(() => 0);
+        private static readonly PerScreen<int> oxygen = new PerScreen<int>(() => 0);
         public static readonly PerScreen<bool> willSwim = new PerScreen<bool>(() => false);
         public static readonly PerScreen<bool> isUnderwater = new PerScreen<bool>(() => false);
         public static NPC oldMariner = null;
@@ -43,16 +40,15 @@ namespace Swim
 
         public static readonly PerScreen<List<Vector2>> bubbles = new PerScreen<List<Vector2>>(() => new List<Vector2>());
 
-        private string[] diveLocations = new string[] {
-            "Beach",
-            "Forest",
-            "Mountain",
-            "Custom_UnderwaterBeach",
-            "Custom_UnderwaterMountain",
-            "Custom_ScubaCave",
-            "Custom_ScubaAbigailCave",
-            "Custom_ScubaCrystalCave",
-        };
+        public static int Oxygen
+        {
+            get => oxygen.Value;
+
+            set
+            {
+                oxygen.Value = value;
+            }
+        }
 
         public override void Entry(IModHelper helper)
         {           
@@ -82,6 +78,7 @@ namespace Swim
             helper.Events.GameLoop.Saving += SwimHelperEvents.GameLoop_Saving;
             helper.Events.GameLoop.GameLaunched += SwimHelperEvents.GameLoop_GameLaunched;
             helper.Events.Input.ButtonPressed += SwimHelperEvents.Input_ButtonPressed;
+            helper.Events.Display.RenderingHud += SwimHelperEvents.Display_RenderingHud;
             helper.Events.Display.RenderedHud += SwimHelperEvents.Display_RenderedHud;
             helper.Events.Display.RenderedWorld += SwimHelperEvents.Display_RenderedWorld;
             helper.Events.Player.InventoryChanged += SwimHelperEvents.Player_InventoryChanged;
@@ -194,7 +191,7 @@ namespace Swim
                     ("(O)152", 25), // Seaweed
                     ("(O)153", 15), // Green Algae
                     ("(O)157", 20), // White Algae
-                    ("(O)327", 15), // Clam
+                    ("(O)372", 15), // Clam
                     ("(O)393", 10), // Coral
                     ("(O)397", 9), // Sea Urchin
                     ("(O)394", 3), // Rainbow Shell
@@ -289,6 +286,25 @@ namespace Swim
                         targetArea: new(28, 26, 8, 5),
                         PatchMapMode.Overlay
                         );*/
+                });
+            }
+            else if(e.NameWithoutLocale.IsEquivalentTo("FlyingTNT.Swim/OxygenBar"))
+            {
+                e.LoadFromModFile<Texture2D>("assets/O2Bar.png", AssetLoadPriority.Medium);
+            }
+            else if(e.NameWithoutLocale.IsEquivalentTo("Maps/Mountain"))
+            {
+                // At the bottom right of the Mountain lake, there is a pointless warp that takes the player out of bounds in the Town. We redirect that warp to take the player to the waterfall, like our warps.
+                // We replace it instead of removing it for the off chance that there is actually a reason it exists.
+                e.Edit(asset =>
+                {
+                    var properties = asset.AsMap()?.Data?.Properties;
+                    if (properties is null || !properties.TryGetValue("Warp", out string warpProperty))
+                    {
+                        return;
+                    }
+
+                    properties["Warp"] = warpProperty.Replace("85 41 Town 98 0", "85 41 Town 95 5");
                 });
             }
             else
@@ -487,6 +503,20 @@ namespace Swim
                 tooltip: () => SwimUtils.GetTranslation("GMCM-ScubaFinSpeed-Description"),
                 getValue: () => Config.ScubaFinSpeed,
                 setValue: value => Config.ScubaFinSpeed = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-OxygenBarXOffset-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-OxygenBarXOffset-Description"),
+                getValue: () => Config.OxygenBarXOffset,
+                setValue: value => Config.OxygenBarXOffset = value
+            );
+            configMenu.AddNumberOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-OxygenBarYOffset-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-OxygenBarYOffset-Description"),
+                getValue: () => Config.OxygenBarYOffset,
+                setValue: value => Config.OxygenBarYOffset = value
             );
             configMenu.AddNumberOption(
                 mod: ModManifest,

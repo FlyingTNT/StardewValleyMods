@@ -10,6 +10,7 @@ using System.Reflection;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework;
 using StardewModdingAPI.Events;
+using StardewValley.Locations;
 
 namespace Swim
 {
@@ -18,6 +19,10 @@ namespace Swim
         private static IMonitor SMonitor;
         private static ModConfig Config => ModEntry.Config;
         private static IModHelper SHelper;
+
+        private static Texture2D swimShadow => Game1.content.Load<Texture2D>("LooseSprites\\swimShadow");
+        public static int SwimTimer = 0;
+        public static int SwimShadowFrame = 0;
 
         public static void Initialize(IMonitor monitor, IModHelper helper)
         {
@@ -99,15 +104,22 @@ namespace Swim
             }
         }
 
-        internal static void FarmerRenderer_draw_Postfix(Farmer who, bool __state)
+        internal static void FarmerRenderer_draw_Postfix(SpriteBatch b, Farmer who, bool __state)
         {
             try
             {
+                // I want to implement this eventually, but is isn't working completely right rn.
+                /*
+                if (who.swimming.Value && !FarmerRenderer.isDrawingForUI)
+                {
+                    b.Draw(swimShadow, Game1.GlobalToLocal(Game1.viewport, who.Position + new Vector2(0f, who.Sprite.SpriteHeight / 4 * 4)), new Rectangle(SwimShadowFrame * 16, 0, 16, 16), Color.White, 0f, Vector2.Zero, 4f, SpriteEffects.None, 0f);
+                }
+                */
+
                 if (__state)
                 {
                     who.swimming.Value = true;
                 }
-
             }
             catch (Exception ex)
             {

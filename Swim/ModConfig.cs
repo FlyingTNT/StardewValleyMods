@@ -53,6 +53,8 @@ namespace Swim
         public int SwimRunSpeed { get; set; }
         public int ScubaFinSpeed { get; set; }
         public bool DebuffMinerals { get; set; }
+        public int OxygenBarXOffset { get; set; }
+        public int OxygenBarYOffset {  get; set; }
 
         public ModConfig()
         {
@@ -110,6 +112,9 @@ namespace Swim
             SwimSpeed = Farmer.walkingSpeed;
             SwimRunSpeed = Farmer.runningSpeed - 1;
             ScubaFinSpeed = 2;
+
+            OxygenBarXOffset = 0;
+            OxygenBarYOffset = 0;
         }
     }
 }

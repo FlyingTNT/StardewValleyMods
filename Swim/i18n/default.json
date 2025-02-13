@@ -126,5 +126,9 @@
   "GMCM-MinOceanChests-Name": "MinOceanChests",
   "GMCM-MinOceanChests-Description": "Sets minimal quantity that can be found underwater.",
   "GMCM-MaxOceanChests-Name": "MaxOceanChests",
-  "GMCM-MaxOceanChests-Description": "Sets maximal quantity that can be found underwater."
+  "GMCM-MaxOceanChests-Description": "Sets maximal quantity that can be found underwater.",
+  "GMCM-OxygenBarXOffset-Name": "OxygenBarXOffset",
+  "GMCM-OxygenBarXOffset-Description": "The X (left/right) offset of the oxygen bar. Increasing it by 4 moves it right by 1 pixel.",
+  "GMCM-OxygenBarYOffset-Name": "OxygenBarYOffset",
+  "GMCM-OxygenBarYOffset-Description": "The Y (up/down) offset of the oxygen bar. Increasing it by 4 moves it down by 1 pixel."
 }

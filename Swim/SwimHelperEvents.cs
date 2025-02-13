@@ -84,10 +84,6 @@ namespace Swim
 
                 Game1.player.doEmote(9);
             }
-            if (Game1.player.swimming.Value)
-            {
-                //SwimMaps.SwitchToWaterTiles(e.NewLocation);
-            }
 
             // We don't allow swimming in the night market, so we need to make sure the bridge is fixed so that they can't get softlocked on the right island.
             // This would happen if they swam in thru the river and then jumped out on that island
@@ -125,18 +121,16 @@ namespace Swim
         {
             foreach (var l in Game1.locations)
             {
-                for (int i = l.characters.Count - 1; i >= 0; i--)
-                {
-                    if (l.characters[i] is Fishie or BigFishie or SeaCrab or AbigailMetalHead)
-                        l.characters.RemoveAt(i);
-                }
+                l.characters.RemoveWhere(character => character is Fishie or BigFishie or SeaCrab or AbigailMetalHead);
             }
         }
 
         public static void GameLoop_SaveLoaded(object sender, SaveLoadedEventArgs e)
         {
             if (!SwimUtils.IsWearingScubaGear() && Config.SwimSuitAlways && !Config.NoAutoSwimSuit)
+            {
                 Game1.player.changeIntoSwimsuit();
+            }
 
             // load scuba gear ids
             if (DataLoader.Boots(Game1.content).ContainsKey("Swim_ScubaFins"))
@@ -211,24 +205,33 @@ namespace Swim
             }
         }
 
+        /// <summary>
+        /// Drawing the oxygen bar as necessary. We do this in Rendering so that the base game's bars are drawn on top and this mod does not cover up their hover text.
+        /// We also use high event priority to make sure that our bars are drawn under Survivalistic's so that we don't cover up their hover text.
+        /// </summary>
+        [EventPriority(EventPriority.High)] 
+        public static void Display_RenderingHud(object sender, RenderingHudEventArgs args)
+        {
+            if (ModEntry.Oxygen < SwimUtils.MaxOxygen() && Config.ShowOxygenBar && Game1.displayHUD)
+            {
+                SwimUtils.DrawOxygenBar();
+            }
+        }
+
         public static void Display_RenderedHud(object sender, RenderedHudEventArgs e)
         {
             if (Game1.player.currentLocation.Name == "Custom_ScubaAbigailCave")
             {
                 if (abigailTicks.Value > 0 && abigailTicks.Value < 30 * 5)
                 {
+                    // The Prairie King infographic
                     e.SpriteBatch.Draw(Game1.mouseCursors, new Vector2(Game1.viewport.Width, Game1.viewport.Height) / 2 - new Vector2(78, 31) / 2, new Rectangle?(new Rectangle(353, 1649, 78, 31)), new Color(255, 255, 255, abigailTicks.Value > 30 * 3 ? (int)Math.Round(255 * (abigailTicks.Value - 90) / 60f) : 255), 0f, Vector2.Zero, 3f, SpriteEffects.None, 0.99f);
                 }
-                if (abigailTicks.Value > 0 && abigailTicks.Value < 80000 / 16 && Config.ShowOxygenBar)
-                    SwimUtils.MakeOxygenBar((80000 / 16) - abigailTicks.Value, 80000 / 16);
-                e.SpriteBatch.Draw(ModEntry.OxygenBarTexture.Value, new Vector2((int)Math.Round(Game1.viewport.Width * 0.13f), 100), Color.White);
+                if (abigailTicks.Value > 0)
+                {
+                    SwimUtils.DrawProgressBar(e.SpriteBatch, Math.Max((80000 / 16) - abigailTicks.Value, 0), 80000 / 16);
+                }
                 return;
-            }
-            int maxOx = SwimUtils.MaxOxygen();
-            if (ModEntry.oxygen.Value < maxOx && Config.ShowOxygenBar)
-            {
-                SwimUtils.MakeOxygenBar(ModEntry.oxygen.Value, maxOx);
-                e.SpriteBatch.Draw(ModEntry.OxygenBarTexture.Value, new Vector2((int)Math.Round(Game1.viewport.Width * 0.13f), 100), Color.White);
             }
         }
 
@@ -276,7 +279,7 @@ namespace Swim
                 SwimMaps.AddScubaChest(Game1.getLocationFromName("Custom_ScubaCave"), new Vector2(10, 14), "ScubaMask");
             }
             ModEntry.marinerQuestionsWrongToday.Value = false;
-            ModEntry.oxygen.Value = SwimUtils.MaxOxygen();
+            ModEntry.Oxygen = SwimUtils.MaxOxygen();
 
             if (!Context.IsMainPlayer)
             {
@@ -497,10 +500,13 @@ namespace Swim
                 AbigailCaveTick();
             }
 
-            if (Game1.activeClickableMenu is null)
+            if(e.IsMultipleOf(4))
             {
-                SwimUtils.updateOxygenValue();
+                AnimationManager.SwimShadowFrame++;
+                AnimationManager.SwimShadowFrame %= 10;
             }
+
+            SwimUtils.updateOxygenValue();
 
             if (SwimUtils.IsWearingScubaGear())
             {
@@ -546,7 +552,9 @@ namespace Swim
                     else
                     {
                         if (!Config.SwimSuitAlways)
+                        {
                             Game1.player.changeOutOfSwimSuit();
+                        }
                     }
                     return;
                 }
@@ -555,7 +563,9 @@ namespace Swim
             }
 
             if (!SwimUtils.CanSwimHere())
+            {
                 return;
+            }
 
             if (!Context.IsPlayerFree)
             {
@@ -589,6 +599,10 @@ namespace Swim
                 // The direction to the right/left of the facing direction
                 int rightDirection = (Game1.player.FacingDirection + 1) % 4;
                 int leftDirection = (Game1.player.FacingDirection - 1) % 4;
+                if(leftDirection < 0)
+                {
+                    leftDirection += 4;
+                }
 
                 // Try to jump diagonally to the right
                 if (TryToJumpInDirection(Game1.player.Tile + Utility.DirectionsTileVectors[rightDirection], Game1.player.FacingDirection, true))
@@ -1073,9 +1087,9 @@ namespace Swim
                 return false;
             }
 
-            if (Game1.player.position.Y > Game1.viewport.Y + Game1.viewport.Height - 16)
+            if (Game1.player.position.Y > Game1.viewport.Y + Game1.viewport.Height - 32)
             {
-                Game1.player.position.Value = new Vector2(Game1.player.position.X, Game1.viewport.Y + Game1.viewport.Height - 17);
+                Game1.player.position.Value = new Vector2(Game1.player.position.X, Game1.viewport.Y + Game1.viewport.Height - 33);
                 if (dm != null)
                 {
                     SMonitor.Log($"Trying to warp from ({edgePos.X}, {edgePos.Y})");
@@ -1112,9 +1126,9 @@ namespace Swim
                     }
                 }
             }
-            else if (Game1.player.position.X > Game1.viewport.X + Game1.viewport.Width - 32)
+            else if (Game1.player.position.X > Game1.viewport.X + Game1.viewport.Width - 48)
             {
-                Game1.player.position.Value = new Vector2(Game1.viewport.X + Game1.viewport.Width - 33, Game1.player.position.Y);
+                Game1.player.position.Value = new Vector2(Game1.viewport.X + Game1.viewport.Width - 49, Game1.player.position.Y);
 
                 if (dm != null)
                 {

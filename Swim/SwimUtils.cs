@@ -1,19 +1,17 @@
-﻿using Microsoft.Xna.Framework;
+﻿using Common.Integrations;
+using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewModdingAPI.Utilities;
 using StardewValley;
+using StardewValley.Extensions;
 using StardewValley.Locations;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using xTile;
-using xTile.Dimensions;
-using xTile.ObjectModel;
-using xTile.Tiles;
 
 namespace Swim
 {
@@ -132,7 +130,6 @@ namespace Swim
             return ModEntry.diveMaps.ContainsKey(name) && ModEntry.diveMaps[name].Features.Contains("Underwater");
         }
 
-        // Replaces myButtonDown because this is what that variable really did
         public static bool isSafeToTryJump()
         {
             // Null checks
@@ -171,21 +168,26 @@ namespace Swim
         private static readonly PerScreen<bool> surfacing = new PerScreen<bool>();
         public static void updateOxygenValue()
         {
+            if(Game1.activeClickableMenu is not null || !Context.IsPlayerFree || Game1.player.freezePause > 0)
+            {
+                return;
+            }
+
             if (ModEntry.isUnderwater.Value)
             {
-                if (ModEntry.oxygen.Value >= 0)
+                if (ModEntry.Oxygen >= 0)
                 {
                     if (!IsWearingScubaGear())
-                        ModEntry.oxygen.Value--;
+                        ModEntry.Oxygen--;
                     else
                     {
-                        if (ModEntry.oxygen.Value < MaxOxygen())
-                            ModEntry.oxygen.Value++;
-                        if (ModEntry.oxygen.Value < MaxOxygen())
-                            ModEntry.oxygen.Value++;
+                        if (ModEntry.Oxygen < MaxOxygen())
+                            ModEntry.Oxygen++;
+                        if (ModEntry.Oxygen < MaxOxygen())
+                            ModEntry.Oxygen++;
                     }
                 }
-                if (ModEntry.oxygen.Value < 0 && !surfacing.Value)
+                if (ModEntry.Oxygen < 0 && !surfacing.Value)
                 {
                     surfacing.Value = true;
                     Game1.playSound("pullItemFromWater");
@@ -196,10 +198,10 @@ namespace Swim
             else
             {
                 surfacing.Value = false;
-                if (ModEntry.oxygen.Value < MaxOxygen())
-                    ModEntry.oxygen.Value++;
-                if (ModEntry.oxygen.Value < MaxOxygen())
-                    ModEntry.oxygen.Value++;
+                if (ModEntry.Oxygen < MaxOxygen())
+                    ModEntry.Oxygen++;
+                if (ModEntry.Oxygen < MaxOxygen())
+                    ModEntry.Oxygen++;
             }
         }
 
@@ -322,22 +324,92 @@ namespace Swim
             return output;
         }
 
-        public static void MakeOxygenBar(int current, int max)
+        /// <summary>
+        /// Draws the oxygen bar in the bottom right, by the HP and stamina bars. 
+        /// 
+        /// Most of this is taken from Game1.drawHUD()
+        /// </summary>
+        public static void DrawOxygenBar()
         {
-            ModEntry.OxygenBarTexture.Value = new Texture2D(Game1.graphics.GraphicsDevice, (int)Math.Round(Game1.viewport.Width * 0.74f), 30);
-            Color[] data = new Color[ModEntry.OxygenBarTexture.Value.Width * ModEntry.OxygenBarTexture.Value.Height];
-            ModEntry.OxygenBarTexture.Value.GetData(data);
+            // Note that oxygen is a function of stamina, so some references to stamina are used where it is easier
+            int oxygen = ModEntry.Oxygen;
+            int maxOxygen = MaxOxygen();
+            const float staminaModifier = 0.625f;
+            float modifier = staminaModifier / Config.OxygenMult;
+            Vector2 topOfBar = new(Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Right - 48 - 8 - 64, Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Bottom - 224 - 16 - (int)((Game1.player.MaxStamina - 270) * staminaModifier));
+            topOfBar = OffsetOxygenBarPosition(topOfBar);
+            if (Game1.isOutdoorMapSmallerThanViewport())
+            {
+                topOfBar.X = Math.Min(topOfBar.X, -Game1.viewport.X + Game1.currentLocation.map.Layers[0].LayerWidth * 64 - 48);
+            }
+            Game1.spriteBatch.Draw(ModEntry.OxygenBarTexture, topOfBar, new(0, 0, 12, 16), Color.White, 0f, Vector2.Zero, 4f, SpriteEffects.None, 1f);
+            Game1.spriteBatch.Draw(ModEntry.OxygenBarTexture, new Rectangle((int)topOfBar.X, (int)(topOfBar.Y + 64f), 48, Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Bottom - 64 - 16 - (int)(topOfBar.Y + 64f - 8f)), new(0, 16, 12, 16), Color.White);
+            Game1.spriteBatch.Draw(ModEntry.OxygenBarTexture, new Vector2(topOfBar.X, topOfBar.Y + 224f + ((Game1.player.MaxStamina - 270) * staminaModifier) - 64f), new(0, 40, 12, 16), Color.White, 0f, Vector2.Zero, 4f, SpriteEffects.None, 1f);
+            Rectangle r = new((int)topOfBar.X + 12, (int)topOfBar.Y + 16 + 32 + (int)(maxOxygen * modifier) - (int)(Math.Max(0f, oxygen) * modifier), 24, (int)(oxygen * modifier) - 1);
+            Color c = GetBlueToGrayLerpColor(oxygen / (float)maxOxygen);
+            Game1.spriteBatch.Draw(Game1.staminaRect, r, c);
+            r.Height = 4;
+            c.R = (byte)Math.Max(0, c.R - 50);
+            c.G = (byte)Math.Max(0, c.G - 50);
+            Game1.spriteBatch.Draw(Game1.staminaRect, r, c);
+
+            float mouseXDiff = Game1.getOldMouseX() - topOfBar.X;
+            float mouseYDiff = Game1.getOldMouseY() - topOfBar.Y;
+            if (mouseXDiff >= 0 && mouseYDiff >= 0 && mouseXDiff < 48 && mouseYDiff < 224f + ((Game1.player.MaxStamina - 270) * staminaModifier))
+            {
+                Game1.drawWithBorder((int)Math.Max(0f, oxygen) + "/" + maxOxygen, Color.Black * 0f, Color.White, topOfBar + new Vector2(0f - Game1.dialogueFont.MeasureString("999/999").X - 16f - (float)(Game1.showingHealth ? 64 : 0), 64f));
+            }
+        }
+
+        /// <summary>
+        /// Offsets the oxygen bar position for mod compatibility. 
+        /// </summary>
+        private static Vector2 OffsetOxygenBarPosition(Vector2 topLeftCorner)
+        {
+            topLeftCorner.X += Config.OxygenBarXOffset;
+            if(Config.OxygenBarYOffset < 0) // Putting it below where it is messes up the math and I don't care to make it work
+            {
+                topLeftCorner.Y += Config.OxygenBarYOffset;
+            }
+
+            if(Game1.showingHealthBar || Game1.showingHealth)
+            {
+                topLeftCorner.X -= 56;
+            }
+
+            if(SHelper.ModRegistry.IsLoaded(IDs.Survivalistic))
+            {
+                // Survivalistic adds two bars, so we move the oxygen bar left two bars' width
+                topLeftCorner.X -= 55 + 60;
+            }
+
+            return topLeftCorner;
+        }
+
+        private static Color GetBlueToGrayLerpColor(float power)
+        {
+            return new Color(50, 50, (int)((power >= 0.5f) ? 255 : 50 + (power * (2 * (255 - 50)) + 50)));
+        }
+
+        /// <summary>
+        /// Draws a bar across the top of the screen (the old oxygen bar)
+        /// </summary>
+        public static void DrawProgressBar(SpriteBatch b, int current, int max)
+        {
+            Texture2D texture = new Texture2D(Game1.graphics.GraphicsDevice, (int)Math.Round(Game1.viewport.Width * 0.74f), 30);
+            Color[] data = new Color[texture.Width * texture.Height];
+            texture.GetData(data);
             for (int i = 0; i < data.Length; i++)
             {
-                if (i <= ModEntry.OxygenBarTexture.Value.Width || i % ModEntry.OxygenBarTexture.Value.Width == ModEntry.OxygenBarTexture.Value.Width - 1)
+                if (i <= texture.Width || i % texture.Width == texture.Width - 1)
                 {
                     data[i] = new Color(0.5f, 1f, 0.5f);
                 }
-                else if (data.Length - i < ModEntry.OxygenBarTexture.Value.Width || i % ModEntry.OxygenBarTexture.Value.Width == 0)
+                else if (data.Length - i < texture.Width || i % texture.Width == 0)
                 {
                     data[i] = new Color(0, 0.5f, 0);
                 }
-                else if ((i % ModEntry.OxygenBarTexture.Value.Width) / (float)ModEntry.OxygenBarTexture.Value.Width < (float)current / (float)max)
+                else if ((i % texture.Width) / (float)texture.Width < (float)current / (float)max)
                 {
                     data[i] = Color.GhostWhite;
                 }
@@ -346,7 +418,8 @@ namespace Swim
                     data[i] = Color.Black;
                 }
             }
-            ModEntry.OxygenBarTexture.Value.SetData(data);
+            texture.SetData(data);
+            b.Draw(texture, new Vector2((int)Math.Round(Game1.viewport.Width * 0.13f), 100), Color.White);
         }
 
         public static void ReadDiveMapData(DiveMapData data)

@@ -89,7 +89,7 @@
             "EdgeWarps":[
                 {
                     "ThisMapEdge":"Right",
-                    "FirstTile": 39,
+                    "FirstTile": 37,
                     "LastTile": 48,
                     "DestinationHorizontal": false,
                     "OtherMapIndex": 0,
@@ -103,7 +103,7 @@
                     "LastTile": 119,
                     "DestinationHorizontal": false,
                     "OtherMapIndex": 0,
-                    "OtherMapFirstTile": 14,
+                    "OtherMapFirstTile": 8,
                     "OtherMapLastTile": 26,
                     "OtherMapName":"Beach",
                 },
@@ -174,7 +174,7 @@
             "EdgeWarps":[
                 {
                     "ThisMapEdge":"Bottom",
-                    "FirstTile": 62,
+                    "FirstTile": 61,
                     "LastTile": 85,
                     "DestinationHorizontal": true,
                     "OtherMapIndex": 5,
@@ -189,12 +189,12 @@
             "EdgeWarps":[
                 {
                     "ThisMapEdge":"Bottom",
-                    "FirstTile": 88,
-                    "LastTile": 92,
+                    "FirstTile": 87,
+                    "LastTile": 93,
                     "DestinationHorizontal": true,
                     "OtherMapIndex": 0,
                     "OtherMapFirstTile": 57,
-                    "OtherMapLastTile": 62,
+                    "OtherMapLastTile": 61,
                     "OtherMapName":"Beach",
                 },
                 {
@@ -209,7 +209,7 @@
                 },
                 {
                     "ThisMapEdge":"Left",
-                    "FirstTile": 95,
+                    "FirstTile": 94,
                     "LastTile": 104,
                     "DestinationHorizontal": false,
                     "OtherMapIndex": 119,

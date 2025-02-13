@@ -1,9 +1,9 @@
 ﻿using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
-using Netcode;
 using StardewModdingAPI;
 using StardewValley;
+using StardewValley.Locations;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -382,36 +382,78 @@ namespace Swim
                 SMonitor.Log($"Failed in {nameof(GameLocation_checkAction_Prefix)}:\n{ex}", LogLevel.Error);
             }
         }
+
+        /// <summary>
+        /// We pertty much completely override the collision detection while the player is swimming in order to 
+        /// </summary>
         public static void GameLocation_isCollidingPosition_Postfix(GameLocation __instance, ref bool __result, Microsoft.Xna.Framework.Rectangle position, bool isFarmer, Character character)
         {
             try
             {
-                if (__result == false || !isFarmer || character?.Equals(Game1.player) != true || !Game1.player.swimming.Value || ModEntry.isUnderwater.Value || ModEntry.locationIsPool.Value)
+                if (!isFarmer || character?.Equals(Game1.player) != true || !Game1.player.swimming.Value || ModEntry.isUnderwater.Value || ModEntry.locationIsPool.Value)
                     return;
 
-                int count = 0;
+                // Because the shape of the hitbox is weird, we offset it so that it makes sense visually and prevents the player from clipping into things.
+                int top = (int)Math.Round((position.Top - 48) / 64f, MidpointRounding.AwayFromZero);
+                int right = (int)Math.Round((position.Right - 16) / 64f, MidpointRounding.AwayFromZero);
+                int bottom = (int)Math.Round((position.Bottom - 16) / 64f, MidpointRounding.AwayFromZero);
+                int left = (int)Math.Round((position.Left - 48) / 64f, MidpointRounding.AwayFromZero);
 
-                if(__instance.doesTileHaveProperty(position.Left / 64, position.Top / 64, "Water", "Back") != null)
+                int inWaterCount = 0;
+                int outOfBoundsCount = 0;
+
+                // Count the number of corners out of bounds
+                if (!__instance.isTileOnMap(left, top))
                 {
-                    count++;
+                    outOfBoundsCount++;
                 }
-                if(__instance.doesTileHaveProperty(position.Left / 64, position.Bottom / 64, "Water", "Back") != null)
+                if (!__instance.isTileOnMap(left, bottom))
                 {
-                    count++;
+                    outOfBoundsCount++;
                 }
-                if (__instance.doesTileHaveProperty(position.Right / 64, position.Top / 64, "Water", "Back") != null)
+                if (!__instance.isTileOnMap(right, top))
                 {
-                    count++;
+                    outOfBoundsCount++;
                 }
-                if (__instance.doesTileHaveProperty(position.Right / 64, position.Bottom / 64, "Water", "Back") != null)
+                if (!__instance.isTileOnMap(right, bottom))
                 {
-                    count++;
+                    outOfBoundsCount++;
                 }
 
-                // If most corners are water tiles, ignore collision
-                if(count >= 3)
+                // Count the number of corners in the water
+                if (__instance.doesTileHaveProperty(left, top, "Water", "Back") is not null)
                 {
-                    __result = false;
+                    inWaterCount++;
+                }
+                if(__instance.doesTileHaveProperty(left, bottom, "Water", "Back") is not null)
+                {
+                    inWaterCount++;
+                }
+                if (__instance.doesTileHaveProperty(right, top, "Water", "Back") is not null)
+                {
+                    inWaterCount++;
+                }
+                if (__instance.doesTileHaveProperty(right, bottom, "Water", "Back") is not null)
+                {
+                    inWaterCount++;
+                }
+
+                // We want to let the player go a little OOB so that warps work, but we want at least two corners to be in water (and in bounds) so they cant go all the way out. We need more than one corner to be in water to prevent the player from being able to swim onto land
+                // and possibly get stuck in places where the border between water and land goes our of bounds.
+                if (outOfBoundsCount is 1 or 2 && inWaterCount > 1)
+                {
+                    __result = false; // Don't collide
+                    return;
+                }
+
+                // If all corners are in water, don't collide. Otherwise, do.
+                if (inWaterCount == 4)
+                {
+                    __result = false; // Don't collide
+                }
+                else
+                {
+                    __result = true; // Collide
                 }
             }
             catch (Exception ex)
@@ -419,6 +461,10 @@ namespace Swim
                 SMonitor.Log($"Failed in {nameof(GameLocation_isCollidingPosition_Postfix)}:\n{ex}", LogLevel.Error);
             }
         }
+
+        /// <summary>
+        /// sinkDebris is used when dropping items into water to make them dissappear. This postfix instead drops them into the relevant underwater map if applicable.
+        /// </summary>
         public static void GameLocation_sinkDebris_Postfix(GameLocation __instance, bool __result, Debris debris, Vector2 chunkTile, Vector2 chunkPosition)
         {
             try
@@ -426,67 +472,69 @@ namespace Swim
                 if (__result == false || !Game1.IsMasterGame || !SwimUtils.DebrisIsAnItem(debris))
                     return;
 
-                if(debris.item != null)
-                    SMonitor.Log($"Sinking debris: {debris.itemId.Value} ({debris.item.Name})");
-
-                if (ModEntry.diveMaps.ContainsKey(__instance.Name) && ModEntry.diveMaps[__instance.Name].DiveLocations.Count > 0)
+                if (debris.item != null)
                 {
-                    Point pos = new Point((int)chunkTile.X, (int)chunkTile.Y);
-                    Location loc = new Location(pos.X, pos.Y);
+                    SMonitor.Log($"Sinking debris: {debris.itemId.Value} ({debris.item.Name})");
+                }
 
-                    DiveMap dm = ModEntry.diveMaps[__instance.Name];
-                    DiveLocation diveLocation = null;
-                    foreach (DiveLocation dl in dm.DiveLocations)
+                if (!ModEntry.diveMaps.ContainsKey(__instance.Name) || ModEntry.diveMaps[__instance.Name].DiveLocations.Count == 0)
+                {
+                    return;
+                }
+
+                Point pos = new Point((int)chunkTile.X, (int)chunkTile.Y);
+                Location loc = new Location(pos.X, pos.Y);
+
+                DiveMap dm = ModEntry.diveMaps[__instance.Name];
+                DiveLocation diveLocation = null;
+                foreach (DiveLocation dl in dm.DiveLocations)
+                {
+                    if (dl.GetRectangle().X == -1 || dl.GetRectangle().Contains(loc))
                     {
-                        if (dl.GetRectangle().X == -1 || dl.GetRectangle().Contains(loc))
-                        {
-                            diveLocation = dl;
-                            break;
-                        }
+                        diveLocation = dl;
+                        break;
+                    }
+                }
+
+                if (diveLocation == null)
+                {
+                    SMonitor.Log($"sink debris: No dive destination for this point on this map");
+                    return;
+                }
+
+                if (Game1.getLocationFromName(diveLocation.OtherMapName) is not GameLocation otherLocation)
+                {
+                    SMonitor.Log($"sink debris: Can't find destination map named {diveLocation.OtherMapName}", LogLevel.Warn);
+                    return;
+                }
+
+                foreach (Chunk chunk in debris.Chunks)
+                {
+                    if (chunk.position.Value != chunkPosition)
+                    {
+                        continue;
                     }
 
-                    if (diveLocation == null)
+                    SMonitor.Log($"sink debris: creating copy of debris {debris.debrisType} item {debris.item != null} on {diveLocation.OtherMapName}");
+
+                    if (debris.debrisType.Value != Debris.DebrisType.ARCHAEOLOGY && debris.debrisType.Value != Debris.DebrisType.OBJECT && chunk.randomOffset % 2 != 0)
                     {
-                        SMonitor.Log($"sink debris: No dive destination for this point on this map");
-                        return;
+                        SMonitor.Log($"sink debris: non-item debris");
+                        break;
                     }
 
-                    if (Game1.getLocationFromName(diveLocation.OtherMapName) == null)
+                    Debris newDebris;
+                    Vector2 newTile = diveLocation.OtherMapPos == null ? chunkTile : new Vector2(diveLocation.OtherMapPos.X, diveLocation.OtherMapPos.Y);
+                    Vector2 newPos = new Vector2(newTile.X * Game1.tileSize, newTile.Y * Game1.tileSize);
+                    if (debris.item != null)
                     {
-                        SMonitor.Log($"sink debris: Can't find destination map named {diveLocation.OtherMapName}", LogLevel.Warn);
-                        return;
+                        newDebris = Game1.createItemDebris(debris.item, newPos, Game1.random.Next(4), otherLocation);
                     }
-
-                    
-                    foreach(Chunk chunk in debris.Chunks)
+                    else
                     {
-
-                        if(chunk.position.Value == chunkPosition)
-                        {
-                            SMonitor.Log($"sink debris: creating copy of debris {debris.debrisType} item {debris.item != null} on {diveLocation.OtherMapName}");
-
-                            if (debris.debrisType.Value != Debris.DebrisType.ARCHAEOLOGY && debris.debrisType.Value != Debris.DebrisType.OBJECT && chunk.randomOffset % 2 != 0)
-                            {
-                                SMonitor.Log($"sink debris: non-item debris");
-                                break;
-                            }
-
-                            Debris newDebris;
-                            Vector2 newTile = diveLocation.OtherMapPos == null ? chunkTile : new Vector2(diveLocation.OtherMapPos.X, diveLocation.OtherMapPos.Y);
-                            Vector2 newPos = new Vector2(newTile.X * Game1.tileSize, newTile.Y * Game1.tileSize);
-                            if (debris.item != null)
-                            {
-                                newDebris = Game1.createItemDebris(debris.item, newPos, Game1.random.Next(4), Game1.getLocationFromName(diveLocation.OtherMapName));
-                            }
-                            else
-                            {
-                                Game1.createItemDebris(ItemRegistry.Create(debris.itemId.Value, 1, debris.itemQuality, false), newPos, Game1.random.Next(4), Game1.getLocationFromName(diveLocation.OtherMapName));
-                            }
-                            break; 
-                        }
+                        Game1.createItemDebris(ItemRegistry.Create(debris.itemId.Value, 1, debris.itemQuality, false), newPos, Game1.random.Next(4), otherLocation);
                     }
-
-
+                    break;
                 }
             }
             catch (Exception ex)

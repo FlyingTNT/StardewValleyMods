@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="104" height="50" tilewidth="16" tileheight="16" infinite="0" nextlayerid="7" nextobjectid="1">
  <properties>
+  <property name="AreWaterReflectionsEnabled" type="bool" value="false"/>
   <property name="ForceSpawnForageables" type="bool" value="true"/>
   <property name="Music" value="shaneTheme"/>
   <property name="Warp" value="38 -1 Town 54 108 39 -1 Town 54 108 40 -1 Town 54 108"/>

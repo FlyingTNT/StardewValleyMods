@@ -99,7 +99,7 @@
                 },
                 {
                     "ThisMapEdge":"Right",
-                    "FirstTile": 106,
+                    "FirstTile": 103,
                     "LastTile": 119,
                     "DestinationHorizontal": false,
                     "OtherMapIndex": 0,

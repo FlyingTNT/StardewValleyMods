@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <map version="1.10" tiledversion="1.10.2" orientation="orthogonal" renderorder="right-down" width="135" height="41" tilewidth="16" tileheight="16" infinite="0" nextlayerid="11" nextobjectid="1">
  <properties>
+  <property name="AreWaterReflectionsEnabled" type="bool" value="false"/>
   <property name="Music" value="starshoot"/>
   <property name="Warp" value="29 6 Tent 2 5 14 41 Town 81 0 15 41 Town 81 0 16 41 Town 81 0 54 4 Mine 18 13 9 -1 Railroad 29 59 10 -1 Railroad 29 59 -1 12 Backwoods 49 14 -1 13 Backwoods 49 14 -1 14 Backwoods 49 14 103 15 Mine 67 17"/>
  </properties>

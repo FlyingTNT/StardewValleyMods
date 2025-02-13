@@ -80,7 +80,7 @@ namespace Swim
             BubbleMult = 1;
 
             AllowActionsWhileInSwimsuit = true;
-            AllowRunningWhileInSwimsuit = true;
+            AllowRunningWhileInSwimsuit = false;
 
             AddFishies = true;
             AddCrabs = true;

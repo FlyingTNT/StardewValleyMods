@@ -336,7 +336,7 @@ namespace Swim
             int maxOxygen = MaxOxygen();
             const float staminaModifier = 0.625f;
             float modifier = staminaModifier / Config.OxygenMult;
-            Vector2 topOfBar = new(Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Right - 48 - 8 - 64, Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Bottom - 224 - 16 - (int)((Game1.player.MaxStamina - 270) * staminaModifier));
+            Vector2 topOfBar = new(Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Right - 48 - 64, Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Bottom - 224 - 16 - (int)((Game1.player.MaxStamina - 270) * staminaModifier));
             topOfBar = OffsetOxygenBarPosition(topOfBar);
             if (Game1.isOutdoorMapSmallerThanViewport())
             {

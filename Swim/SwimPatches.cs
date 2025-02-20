@@ -47,7 +47,7 @@ namespace Swim
             try
             {
                 SMonitor.Log($"exiting event");
-                if (__instance.exitLocation != null && __instance.exitLocation.Location.waterTiles != null && __instance.exitLocation.Location.isTileOnMap(Game1.player.positionBeforeEvent) && __instance.exitLocation.Location.waterTiles[(int)(Game1.player.positionBeforeEvent.X),(int)(Game1.player.positionBeforeEvent.Y)])
+                if (__instance.exitLocation != null && SwimUtils.IsValidJumpLocation(Game1.player.positionBeforeEvent))
                 {
                     SMonitor.Log($"swimming again");
 

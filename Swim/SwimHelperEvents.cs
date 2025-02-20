@@ -582,7 +582,7 @@ namespace Swim
                 Vector2 baseSpot = new(MathF.Round(Game1.player.Tile.X, MidpointRounding.AwayFromZero), MathF.Round(Game1.player.Tile.Y, MidpointRounding.AwayFromZero));
 
                 // Jump to the current tile if valid
-                if(IsValidJumpLocation(baseSpot))
+                if(SwimUtils.IsValidJumpLocation(baseSpot))
                 {
                     //SMonitor.Log("Base");
                     DoJump(baseSpot);
@@ -775,7 +775,7 @@ namespace Swim
 
             do
             {
-                if(IsValidJumpLocation(location))
+                if(SwimUtils.IsValidJumpLocation(location))
                 {
                     jumpLocation = location;
                     break;
@@ -794,31 +794,6 @@ namespace Swim
             }
 
             return false;
-        }
-
-        private static bool IsValidJumpLocation(Vector2 location)
-        {
-            if(!Game1.player.currentLocation.isTileOnMap(location))
-            {
-                return false;
-            }
-
-            bool jumpToLand = Game1.player.swimming.Value;
-            bool isWater = SwimUtils.IsWaterTile(location);
-            if(jumpToLand == isWater)
-            {
-                return false;
-            }
-
-            if(jumpToLand)
-            {
-                return SwimUtils.IsTilePassable(Game1.player.currentLocation, location);
-            }
-            else
-            {
-                Tile tile = Game1.player.currentLocation.map?.GetLayer("Buildings")?.PickTile(new Location((int)location.X * Game1.tileSize, (int)location.Y * Game1.tileSize), Game1.viewport.Size);
-                return tile is null || tile.TileIndex == 76;
-            }
         }
 
         private static void DoJump(Vector2 toLocation, int direction = -1)

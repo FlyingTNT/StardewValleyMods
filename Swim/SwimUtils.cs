@@ -12,6 +12,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using xTile.Dimensions;
+using xTile.Tiles;
 
 namespace Swim
 {
@@ -584,6 +586,33 @@ namespace Swim
             }
 
             return null;
+        }
+
+        public static bool IsValidJumpLocation(Vector2 position, GameLocation location = null)
+        {
+            location ??= Game1.player.currentLocation;
+
+            if (!location.isTileOnMap(position))
+            {
+                return false;
+            }
+
+            bool jumpToLand = Game1.player.swimming.Value;
+            bool isWater = IsWaterTile(position);
+            if (jumpToLand == isWater)
+            {
+                return false;
+            }
+
+            if (jumpToLand)
+            {
+                return IsTilePassable(location, position);
+            }
+            else
+            {
+                Tile tile = location.map?.GetLayer("Buildings")?.PickTile(new Location((int)position.X * Game1.tileSize, (int)position.Y * Game1.tileSize), Game1.viewport.Size);
+                return tile is null || tile.TileIndex == 76;
+            }
         }
     }
 }

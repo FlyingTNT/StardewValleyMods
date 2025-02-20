@@ -237,6 +237,8 @@ namespace Swim
 
         public static void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
+            ModEntry.IsGemIslesLoaded = SHelper.ModRegistry.IsLoaded("aedenthorn.GemIsles");
+
             var quickSaveApi = SHelper.ModRegistry.GetApi<IQuickSaveAPI>(IDs.QuickSave);
             if(quickSaveApi is not null)
             {
@@ -1048,6 +1050,10 @@ namespace Swim
 
         public static bool tryToWarp()
         {
+            if(Game1.isWarping)
+            {
+                return false;
+            }
             DiveMap dm = null;
             Point edgePos = Game1.player.TilePoint;
 
@@ -1062,9 +1068,9 @@ namespace Swim
                 return false;
             }
 
-            if (Game1.player.position.Y > Game1.viewport.Y + Game1.viewport.Height - 32)
+            if (Game1.player.position.Y > Game1.viewport.Y + Game1.viewport.Height - 16)
             {
-                Game1.player.position.Value = new Vector2(Game1.player.position.X, Game1.viewport.Y + Game1.viewport.Height - 33);
+                Game1.player.position.Value = new Vector2(Game1.player.position.X, Game1.viewport.Y + Game1.viewport.Height - 17);
                 if (dm != null)
                 {
                     SMonitor.Log($"Trying to warp from ({edgePos.X}, {edgePos.Y})");
@@ -1101,9 +1107,9 @@ namespace Swim
                     }
                 }
             }
-            else if (Game1.player.position.X > Game1.viewport.X + Game1.viewport.Width - 48)
+            else if (Game1.player.position.X > Game1.viewport.X + Game1.viewport.Width - 32)
             {
-                Game1.player.position.Value = new Vector2(Game1.viewport.X + Game1.viewport.Width - 49, Game1.player.position.Y);
+                Game1.player.position.Value = new Vector2(Game1.viewport.X + Game1.viewport.Width - 33, Game1.player.position.Y);
 
                 if (dm != null)
                 {

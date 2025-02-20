@@ -13,8 +13,6 @@ using System.Globalization;
 using Common.Integrations;
 using Rectangle = Microsoft.Xna.Framework.Rectangle;
 using StardewValley.Extensions;
-using StardewValley.Locations;
-using StardewValley.Minigames;
 
 namespace Swim
 {
@@ -39,6 +37,7 @@ namespace Swim
         public static readonly Dictionary<string, DiveMap> diveMaps = new Dictionary<string, DiveMap>();
 
         public static readonly PerScreen<List<Vector2>> bubbles = new PerScreen<List<Vector2>>(() => new List<Vector2>());
+        public static bool IsGemIslesLoaded = false;
 
         public static int Oxygen
         {

@@ -345,9 +345,9 @@ namespace Swim
                 topOfBar.X = Math.Min(topOfBar.X, -Game1.viewport.X + Game1.currentLocation.map.Layers[0].LayerWidth * 64 - 48);
             }
             Game1.spriteBatch.Draw(ModEntry.OxygenBarTexture, topOfBar, new(0, 0, 12, 16), Color.White, 0f, Vector2.Zero, 4f, SpriteEffects.None, 1f);
-            Game1.spriteBatch.Draw(ModEntry.OxygenBarTexture, new Rectangle((int)topOfBar.X, (int)(topOfBar.Y + 64f), 48, Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Bottom - 64 - 16 - (int)(topOfBar.Y + 64f - 8f)), new(0, 16, 12, 16), Color.White);
+            Game1.spriteBatch.Draw(ModEntry.OxygenBarTexture, new Microsoft.Xna.Framework.Rectangle((int)topOfBar.X, (int)(topOfBar.Y + 64f), 48, Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Bottom - 64 - 16 - (int)(topOfBar.Y + 64f - 8f)), new(0, 16, 12, 16), Color.White);
             Game1.spriteBatch.Draw(ModEntry.OxygenBarTexture, new Vector2(topOfBar.X, topOfBar.Y + 224f + ((Game1.player.MaxStamina - 270) * staminaModifier) - 64f), new(0, 40, 12, 16), Color.White, 0f, Vector2.Zero, 4f, SpriteEffects.None, 1f);
-            Rectangle r = new((int)topOfBar.X + 12, (int)topOfBar.Y + 16 + 32 + (int)(maxOxygen * modifier) - (int)(Math.Max(0f, oxygen) * modifier), 24, (int)(oxygen * modifier) - 1);
+            Microsoft.Xna.Framework.Rectangle r = new((int)topOfBar.X + 12, (int)topOfBar.Y + 16 + 32 + (int)(maxOxygen * modifier) - (int)(Math.Max(0f, oxygen) * modifier), 24, (int)(oxygen * modifier) - 1);
             Color c = GetBlueToGrayLerpColor(oxygen / (float)maxOxygen);
             Game1.spriteBatch.Draw(Game1.staminaRect, r, c);
             r.Height = 4;

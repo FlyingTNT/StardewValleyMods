@@ -13,6 +13,7 @@ using System.Globalization;
 using Common.Integrations;
 using Rectangle = Microsoft.Xna.Framework.Rectangle;
 using StardewValley.Extensions;
+using StardewValley.Locations;
 
 namespace Swim
 {
@@ -164,6 +165,11 @@ namespace Swim
                original: AccessTools.Method(typeof(Utility), nameof(Utility.playerCanPlaceItemHere)),
                prefix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.Utility_playerCanPlaceItemHere_Prefix)),
                postfix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.Utility_playerCanPlaceItemHere_Postfix))
+            );
+
+            harmony.Patch(
+               original: AccessTools.Method(typeof(IslandSouth), nameof(IslandSouth.performTouchAction), new Type[] { typeof(string[]), typeof(Vector2)}),
+               prefix: new HarmonyMethod(typeof(SwimPatches), nameof(SwimPatches.IslandSouth_performTouchAction_Prefix))
             );
 
             AnimationManager.Patch(harmony);

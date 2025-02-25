@@ -47,7 +47,7 @@ namespace Swim
             try
             {
                 SMonitor.Log($"exiting event");
-                if (__instance.exitLocation != null && SwimUtils.IsValidJumpLocation(Game1.player.positionBeforeEvent))
+                if (__instance.exitLocation != null && __instance.exitLocation.Location is not null && SwimUtils.IsAllowedSwimLocation(__instance.exitLocation.Location) && SwimUtils.IsValidJumpLocation(Game1.player.positionBeforeEvent))
                 {
                     SMonitor.Log($"swimming again");
 
@@ -541,6 +541,34 @@ namespace Swim
             {
                 SMonitor.Log($"Failed in {nameof(GameLocation_sinkDebris_Postfix)}:\n{ex}", LogLevel.Error);
             }
+        }
+
+        /// <summary>
+        /// Prevents the player from triggering the dialogue to take the boat back from Ginger Island if they're swimming.
+        /// 
+        /// Taking the boat otherwise leads to both complications after they warp and complications while warping if the Gem Isles mod is installed
+        /// </summary>
+        public static bool IslandSouth_performTouchAction_Prefix(string[] action)
+        {
+            try
+            {
+                if (ArgUtility.Get(action, 0) != "LeaveIsland")
+                {
+                    return true;
+                }
+
+                if (Game1.player.swimming.Value)
+                {
+                    SMonitor.Log("Preventing IslandSouth touch action");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(IslandSouth_performTouchAction_Prefix)}:\n{ex}", LogLevel.Error);
+            }
+
+            return true;
         }
     }
 }

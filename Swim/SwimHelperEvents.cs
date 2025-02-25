@@ -93,6 +93,21 @@ namespace Swim
             }
 
             ModEntry.locationIsPool.Value = false;
+            if(e.NewLocation is BathHousePool)
+            {
+                ModEntry.locationIsPool.Value = true;
+            }
+
+            // Maybe implement this in the future. This scenario would only not be caught by the swimming on land check if the player warped directly from swimming to the bathhouse, which isn't possible without commands.
+            /*
+            if(e.Player.swimming.Value && SwimUtils.IsValidJumpLocation(e.Player.Tile, e.NewLocation))
+            {
+                e.Player.swimming.Value = false;
+                if(!Config.SwimSuitAlways && e.Player.bathingClothes.Value)
+                {
+                    e.Player.bathingClothes.Value = false;
+                }
+            }*/
         }
 
         public static void Player_InventoryChanged(object sender, InventoryChangedEventArgs e)
@@ -368,7 +383,7 @@ namespace Swim
                 return;
             }
 
-            if(Game1.player.currentLocation is BathHousePool || ModEntry.locationIsPool.Value)
+            if(ModEntry.locationIsPool.Value)
             {
                 return;
             }

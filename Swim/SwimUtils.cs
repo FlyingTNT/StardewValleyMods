@@ -500,12 +500,18 @@ namespace Swim
             return debris.debrisType.Value == Debris.DebrisType.OBJECT || debris.debrisType.Value == Debris.DebrisType.ARCHAEOLOGY || debris.debrisType.Value == Debris.DebrisType.RESOURCE || debris.item != null;
         }
 
-        internal static bool CanSwimHere()
+        public static bool IsAllowedSwimLocation(GameLocation location)
+        {
+            return (Config.SwimIndoors || location.IsOutdoors) && location is not VolcanoDungeon or BoatTunnel or BathHousePool;
+        }
+
+        public static bool CanSwimHere()
         {
             GameLocation location = Game1.player.currentLocation;
-            bool result = (!Config.SwimIndoors || location.IsOutdoors) && location is not VolcanoDungeon && location is not BoatTunnel && !ModEntry.locationIsPool.Value;
-            if (!result)
+            if (!IsAllowedSwimLocation(location) || ModEntry.locationIsPool.Value)
+            {
                 return false;
+            }
 
             Point playerPosition = Game1.player.TilePoint;
 

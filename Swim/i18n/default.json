@@ -60,7 +60,9 @@
   "GMCM-EnableClickToSwim-Name": "EnableClickToSwim",
   "GMCM-EnableClickToSwim-Description": "Enables or Disables ability to manual jump to the water (by clicking certain key).",
   "GMCM-SwimRestoresVitals-Name": "SwimRestoresVitals",
-  "GMCM-SwimRestoresVitals-Description": "If set's true, your HP and Energy will restore while you're swimming (like in the Bath).",
+  "GMCM-SwimRestoresVitals-Description": "If enabled, your HP and Energy will restore while you're swimming (like in the Bath).",
+  "GMCM-SwimIndoors-Name": "SwimIndoors",
+  "GMCM-SwimIndoors-Description": "If enabled, will allow swimming in places designated by the game as indoors like the mine.",
   // Keybinds
   "GMCM-Keybinds-PageName": "Keybinds",
   "GMCM-SwimKey-Name": "Toggle Auto-Swimming",

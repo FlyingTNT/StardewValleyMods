@@ -33,6 +33,8 @@ namespace Swim
         public static NPC oldMariner = null;
         public static readonly PerScreen<bool> marinerQuestionsWrongToday = new PerScreen<bool>(() => false);
         public static readonly PerScreen<Random> myRand = new PerScreen<Random>(() => new Random());
+
+        /// <summary> Whether the current location uses the PoolEntry touch action to manage swimming. Most of this mod is disabled if this is true. </summary>
         public static readonly PerScreen<bool> locationIsPool = new PerScreen<bool>(() => false);
 
         public static readonly Dictionary<string, DiveMap> diveMaps = new Dictionary<string, DiveMap>();
@@ -407,6 +409,13 @@ namespace Swim
                 tooltip: () => SwimUtils.GetTranslation("GMCM-SwimRestoresVitals-Description"),
                 getValue: () => Config.SwimRestoresVitals,
                 setValue: value => Config.SwimRestoresVitals = value
+            );
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SwimUtils.GetTranslation("GMCM-SwimIndoors-Name"),
+                tooltip: () => SwimUtils.GetTranslation("GMCM-SwimIndoors-Description"),
+                getValue: () => Config.SwimIndoors,
+                setValue: value => Config.SwimIndoors = value
             );
 
             configMenu.AddPageLink(

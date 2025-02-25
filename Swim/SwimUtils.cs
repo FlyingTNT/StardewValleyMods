@@ -502,7 +502,7 @@ namespace Swim
 
         public static bool IsAllowedSwimLocation(GameLocation location)
         {
-            return (Config.SwimIndoors || location.IsOutdoors) && location is not VolcanoDungeon or BoatTunnel or BathHousePool;
+            return (Config.SwimIndoors || location.IsOutdoors) && location is not VolcanoDungeon or BoatTunnel or BathHousePool && !(location is MineShaft mineshaft && mineshaft.mineLevel == 100);
         }
 
         public static bool CanSwimHere()

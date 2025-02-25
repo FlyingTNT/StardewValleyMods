@@ -508,7 +508,7 @@ namespace Swim
         public static bool CanSwimHere()
         {
             GameLocation location = Game1.player.currentLocation;
-            if (!IsAllowedSwimLocation(location) || ModEntry.locationIsPool.Value)
+            if (!IsAllowedSwimLocation(location) || ModEntry.LocationProhibitsSwimming)
             {
                 return false;
             }

@@ -23,10 +23,12 @@ namespace Swim
         public static IMonitor SMonitor { get; private set; }
         public static IModHelper SHelper { get; private set; }
 
-        public static Texture2D OxygenBarTexture => SHelper.GameContent.Load<Texture2D>("FlyingTNT.Swim/OxygenBar");
         public const string scubaMaskID = "Swim_ScubaMask";
         public const string scubaFinsID = "Swim_ScubaFins";
         public const string scubaTankID = "Swim_ScubaTank";
+        public const string ProhibitSwimmingMapPropertyKey = "ProhibitSwimming";
+
+        public static Texture2D OxygenBarTexture => SHelper.GameContent.Load<Texture2D>("FlyingTNT.Swim/OxygenBar");
         private static readonly PerScreen<int> oxygen = new PerScreen<int>(() => 0);
         public static readonly PerScreen<bool> willSwim = new PerScreen<bool>(() => false);
         public static readonly PerScreen<bool> isUnderwater = new PerScreen<bool>(() => false);
@@ -36,6 +38,9 @@ namespace Swim
 
         /// <summary> Whether the current location uses the PoolEntry touch action to manage swimming. Most of this mod is disabled if this is true. </summary>
         public static readonly PerScreen<bool> locationIsPool = new PerScreen<bool>(() => false);
+        public static readonly PerScreen<bool> locationProhibitsSwimming = new PerScreen<bool>(() => false);
+
+        public static bool LocationProhibitsSwimming => locationIsPool.Value || locationProhibitsSwimming.Value;
 
         public static readonly Dictionary<string, DiveMap> diveMaps = new Dictionary<string, DiveMap>();
 

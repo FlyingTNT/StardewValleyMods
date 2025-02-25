@@ -98,6 +98,12 @@ namespace Swim
                 ModEntry.locationIsPool.Value = true;
             }
 
+            ModEntry.locationProhibitsSwimming.Value = e.NewLocation?.Map?.Properties?.ContainsKey(ModEntry.ProhibitSwimmingMapPropertyKey) ?? false;
+            if(ModEntry.locationProhibitsSwimming.Value)
+            {
+                SMonitor.Log($"{e.NewLocation.Name} is prohibiting swimming.");
+            }
+
             // Maybe implement this in the future. This scenario would only not be caught by the swimming on land check if the player warped directly from swimming to the bathhouse, which isn't possible without commands.
             /*
             if(e.Player.swimming.Value && SwimUtils.IsValidJumpLocation(e.Player.Tile, e.NewLocation))

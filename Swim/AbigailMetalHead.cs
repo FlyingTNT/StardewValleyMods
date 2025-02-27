@@ -32,7 +32,9 @@ namespace Swim
         {
             objectsToDrop.Clear();
             if(currentLocation.characters.Contains(this))
+            {
                 currentLocation.characters.Remove(this);
+            }
             return 1000;
         }
         public override List<Item> getExtraDropItems()

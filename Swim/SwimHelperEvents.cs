@@ -3,7 +3,6 @@ using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Audio;
 using Microsoft.Xna.Framework.Graphics;
-using Netcode;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewModdingAPI.Utilities;
@@ -16,9 +15,7 @@ using StardewValley.Objects;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using xTile;
 using xTile.Dimensions;
-using xTile.Tiles;
 using Rectangle = Microsoft.Xna.Framework.Rectangle;
 
 namespace Swim
@@ -29,24 +26,24 @@ namespace Swim
         private static ModConfig Config => ModEntry.Config;
         private static IModHelper SHelper;
 
+        // Jumping variables
         public static readonly PerScreen<bool> isJumping = new PerScreen<bool>(() => false);
+        public static readonly PerScreen<bool> willSwim = new PerScreen<bool>(() => false);
         public static readonly PerScreen<Vector2> startJumpLoc = new PerScreen<Vector2>();
         public static readonly PerScreen<Vector2> endJumpLoc = new PerScreen<Vector2>();
         public static readonly PerScreen<ulong> lastJump = new PerScreen<ulong>(() => 0);
+
+        // Abigail game variables
         public static readonly PerScreen<ulong> lastProjectile = new PerScreen<ulong>(() => 0);
         public static readonly PerScreen<int> abigailTicks = new PerScreen<int>();
         public static readonly PerScreen<int> ticksUnderwater = new PerScreen<int>(() => 0);
         public static readonly PerScreen<int> ticksWearingScubaGear = new PerScreen<int>(() => 0);
-        public static readonly PerScreen<int> bubbleOffset = new PerScreen<int>(() => 0);
-        private static readonly PerScreen<int> lastBreatheSound = new(() => 0);
-        public static readonly SButton[] abigailShootButtons = new SButton[] {
-            SButton.Left,
-            SButton.Right,
-            SButton.Up,
-            SButton.Down
-        };
 
+        // Misc variables
         internal static Texture2D bubbleTexture => SHelper.GameContent.Load<Texture2D>("LooseSprites/temporary_sprites_1");
+        public static readonly PerScreen<int> bubbleOffset = new PerScreen<int>(() => 0);
+        public static readonly PerScreen<List<Vector2>> bubbles = new PerScreen<List<Vector2>>(() => new List<Vector2>());
+        private static readonly PerScreen<int> lastBreatheSound = new(() => 0);
 
         public static void Initialize(IMonitor monitor, IModHelper helper)
         {
@@ -66,9 +63,9 @@ namespace Swim
                 abigailTicks.Value = 0;
                 e.NewLocation.characters.Clear();
 
-
                 Game1.player.changeOutOfSwimSuit();
 
+                // Make the pllayer wear a cowboy hat as long as they have space in their inventory to store their current hat
                 if(Game1.player.hat.Value is null)
                 {
                     Game1.player.hat.Value = new Hat("0");
@@ -119,7 +116,9 @@ namespace Swim
         public static void Player_InventoryChanged(object sender, InventoryChangedEventArgs e)
         {
             if (e.Player != Game1.player)
+            {
                 return;
+            }
 
             if (!Game1.player.mailReceived.Contains("ScubaTank") && e.Added?.FirstOrDefault()?.ItemId == ModEntry.scubaTankID)
             {
@@ -194,6 +193,9 @@ namespace Swim
             }
         }
 
+        /// <summary>
+        /// Drawing bubbles when underwater
+        /// </summary>
         public static void Display_RenderedWorld(object sender, RenderedWorldEventArgs e)
         {
             if (ModEntry.isUnderwater.Value && SwimUtils.IsMapUnderwater(Game1.player.currentLocation.Name))
@@ -201,26 +203,26 @@ namespace Swim
                 if ((ticksUnderwater.Value % 100 / Math.Min(100, Config.BubbleMult)) - bubbleOffset.Value == 0)
                 {
                     Game1.playSound("tinyWhip");
-                    ModEntry.bubbles.Value.Add(new Vector2(Game1.player.position.X + Game1.random.Next(-24, 25), Game1.player.position.Y - 96));
-                    if (ModEntry.bubbles.Value.Count > 100)
+                    bubbles.Value.Add(new Vector2(Game1.player.position.X + Game1.random.Next(-24, 25), Game1.player.position.Y - 96));
+                    if (bubbles.Value.Count > 100)
                     {
-                        ModEntry.bubbles.Value = ModEntry.bubbles.Value.Skip(1).ToList();
+                        bubbles.Value.RemoveAt(0);
                     }
                     bubbleOffset.Value = Game1.random.Next(30 / Math.Min(100, Config.BubbleMult));
                 }
 
-                for (int k = 0; k < ModEntry.bubbles.Value.Count; k++)
+                for (int k = 0; k < bubbles.Value.Count; k++)
                 {
-                    ModEntry.bubbles.Value[k] = new Vector2(ModEntry.bubbles.Value[k].X, ModEntry.bubbles.Value[k].Y - 2);
+                    bubbles.Value[k] = new Vector2(bubbles.Value[k].X, bubbles.Value[k].Y - 2);
                 }
 
-                foreach (Vector2 v in ModEntry.bubbles.Value)
+                foreach (Vector2 v in bubbles.Value)
                 {
                     e.SpriteBatch.Draw(bubbleTexture, v + new Vector2((float)Math.Sin(ticksUnderwater.Value / 20f) * 10f - Game1.viewport.X, -Game1.viewport.Y), new Rectangle?(new Rectangle(132, 20, 8, 8)), new Color(1, 1, 1, 0.5f), 0f, Vector2.Zero, 4f, SpriteEffects.None, 0.001f);
                 }
                 ticksUnderwater.Value++;
             }
-            else
+            else if(ticksUnderwater.Value > 0)
             {
                 ticksUnderwater.Value = 0;
             }
@@ -233,7 +235,7 @@ namespace Swim
         [EventPriority(EventPriority.High)] 
         public static void Display_RenderingHud(object sender, RenderingHudEventArgs args)
         {
-            if (ModEntry.Oxygen < SwimUtils.MaxOxygen() && Config.ShowOxygenBar && Game1.displayHUD)
+            if (Config.ShowOxygenBar && Game1.displayHUD && ModEntry.Oxygen < SwimUtils.MaxOxygen())
             {
                 SwimUtils.DrawOxygenBar();
             }
@@ -258,8 +260,6 @@ namespace Swim
 
         public static void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
-            ModEntry.IsGemIslesLoaded = SHelper.ModRegistry.IsLoaded("aedenthorn.GemIsles");
-
             var quickSaveApi = SHelper.ModRegistry.GetApi<IQuickSaveAPI>(IDs.QuickSave);
             if(quickSaveApi is not null)
             {
@@ -426,14 +426,18 @@ namespace Swim
             {
                 IClickableMenu menu = Game1.activeClickableMenu;
                 if (menu == null || menu.GetType() != typeof(DialogueBox))
+                {
                     return;
+                }
 
                 DialogueBox db = menu as DialogueBox;
                 int resp = db.selectedResponse;
                 List<Response> resps = db.responses.ToList();
 
                 if (resp < 0 || resps == null || resp >= resps.Count || resps[resp] == null)
+                {
                     return;
+                }
                 Game1.player.currentLocation.lastQuestionKey = "";
 
                 SwimDialog.OldMarinerDialogue(resps[resp].responseKey);
@@ -443,7 +447,12 @@ namespace Swim
 
         public static void Input_ButtonsChanged(object sender, ButtonsChangedEventArgs e)
         {
-            if (Config.DiveKey.JustPressed() && Game1.activeClickableMenu == null && Context.IsPlayerFree && Context.CanPlayerMove && ModEntry.diveMaps.ContainsKey(Game1.player.currentLocation.Name) && ModEntry.diveMaps[Game1.player.currentLocation.Name].DiveLocations.Count > 0)
+            if(Game1.activeClickableMenu is not null)
+            {
+                return;
+            }
+
+            if (Config.DiveKey.JustPressed() && Context.IsPlayerFree && Context.CanPlayerMove && ModEntry.diveMaps.TryGetValue(Game1.player.currentLocation.Name, out DiveMap diveMap) && diveMap.DiveLocations.Count > 0)
             {
                 SMonitor.Log("Trying to dive!");
                 Point pos = Game1.player.TilePoint;
@@ -455,9 +464,8 @@ namespace Swim
                     return;
                 }
 
-                DiveMap dm = ModEntry.diveMaps[Game1.player.currentLocation.Name];
                 DiveLocation diveLocation = null;
-                foreach (DiveLocation dl in dm.DiveLocations)
+                foreach (DiveLocation dl in diveMap.DiveLocations)
                 {
                     if (dl.GetRectangle().X == -1 || dl.GetRectangle().Contains(loc))
                     {
@@ -483,7 +491,7 @@ namespace Swim
                 return;
             }
 
-            if (Config.SwimKey.JustPressed() && Game1.activeClickableMenu == null && (!Game1.player.swimming.Value || !Config.ReadyToSwim) && !isJumping.Value)
+            if (Config.SwimKey.JustPressed() && (!Game1.player.swimming.Value || !Config.ReadyToSwim) && !isJumping.Value)
             {
                 Config.ReadyToSwim = !Config.ReadyToSwim;
                 SHelper.WriteConfig(Config);
@@ -491,16 +499,21 @@ namespace Swim
                 return;
             }
 
-            if (Config.SwimSuitKey.JustPressed() && Game1.activeClickableMenu == null)
+            if (Config.SwimSuitKey.JustPressed())
             {
                 Config.SwimSuitAlways = !Config.SwimSuitAlways;
                 SHelper.WriteConfig(Config);
                 if (!Game1.player.swimming.Value)
                 {
                     if (!Config.SwimSuitAlways)
+                    {
                         Game1.player.changeOutOfSwimSuit();
+
+                    }
                     else
+                    {
                         Game1.player.changeIntoSwimsuit();
+                    }
                 }
                 return;
             }
@@ -514,7 +527,9 @@ namespace Swim
         public static void GameLoop_UpdateTicked(object sender, UpdateTickedEventArgs e)
         {
             if (Game1.player.currentLocation is null || Game1.player is null || !Game1.displayFarmer || Game1.player.position is null)
+            {
                 return;
+            }
 
             ModEntry.isUnderwater.Value = SwimUtils.IsMapUnderwater(Game1.player.currentLocation.Name);
 
@@ -529,7 +544,7 @@ namespace Swim
                 AnimationManager.SwimShadowFrame %= 10;
             }
 
-            SwimUtils.updateOxygenValue();
+            SwimUtils.UpdateOxygenValue();
 
             if (SwimUtils.IsWearingScubaGear())
             {
@@ -567,7 +582,7 @@ namespace Swim
                 {
                     Game1.player.position.Value = endJumpLoc.Value;
                     isJumping.Value = false;
-                    if (ModEntry.willSwim.Value)
+                    if (willSwim.Value)
                     {
                         Game1.player.currentLocation.playSound("waterSlosh");
                         Game1.player.swimming.Value = true;
@@ -595,7 +610,7 @@ namespace Swim
                 return;
             }
 
-            if (Game1.player.swimming.Value && tryToWarp()) // Returns true if it is warping
+            if (Game1.player.swimming.Value && TryToWarp()) // Returns true if it is warping
                 return;
 
             if (Game1.player.swimming.Value && !SwimUtils.IsInWater() && !isJumping.Value)
@@ -704,7 +719,9 @@ namespace Swim
                     }
                 }
                 else if (!Game1.player.bathingClothes.Value && !Config.NoAutoSwimSuit)
+                {
                     Game1.player.changeIntoSwimsuit();
+                }
 
 
                 if (Game1.player.boots.Value != null && Game1.player.boots.Value.ItemId == ModEntry.scubaFinsID)
@@ -724,7 +741,7 @@ namespace Swim
                 }
             }
 
-            if(!SwimUtils.isSafeToTryJump())
+            if(!SwimUtils.IsSafeToTryJump())
             {
                 return;
             }
@@ -733,8 +750,8 @@ namespace Swim
 
             bool didJump = TryToJumpInDirection(Game1.player.Tile, direction); // Try to jump in the direction the player is facing
 
-            // If we didn't just jump, 
-            if (!didJump && Config.ManualJumpButton.IsDown() && SwimUtils.isMouseButtonDown(Config.ManualJumpButton) && Config.EnableClickToSwim)
+            // If we didn't just jump, try to jump in the direction of the cursor if 
+            if (!didJump && Config.ManualJumpButton.IsDown() && SwimUtils.IsMouseButtonDown(Config.ManualJumpButton) && Config.EnableClickToSwim)
             {
                 try
                 {
@@ -760,7 +777,7 @@ namespace Swim
                 }
                 catch
                 {
-                    // Assiming this happens when the game can't get the mouse position
+                    // Assuming this happens when the game can't get the mouse position
                     SMonitor.Log("Error in manual direction calculation!");
                 }
             }
@@ -829,7 +846,7 @@ namespace Swim
             //Monitor.Value.Log("got swim location");
             if (Game1.player.swimming.Value)
             {
-                ModEntry.willSwim.Value = false;
+                willSwim.Value = false;
                 Game1.player.swimming.Value = false;
                 Game1.player.freezePause = Config.JumpTimeInMilliseconds;
                 Game1.player.currentLocation.playSound("dwop");
@@ -837,9 +854,11 @@ namespace Swim
             }
             else
             {
-                ModEntry.willSwim.Value = true;
+                willSwim.Value = true;
                 if (!SwimUtils.IsWearingScubaGear() && !Config.NoAutoSwimSuit)
+                {
                     Game1.player.changeIntoSwimsuit();
+                }
 
                 Game1.player.freezePause = Config.JumpTimeInMilliseconds;
                 Game1.player.currentLocation.playSound("dwop");
@@ -872,152 +891,20 @@ namespace Swim
                 AccessTools.Field(location.characters.GetType(), "OnValueRemoved").SetValue(location.characters, null);
             }
 
-            Vector2 v = Vector2.Zero;
-            float yrt = (float)(1 / Math.Sqrt(2));
-            if (SHelper.Input.IsDown(SButton.Up) || SHelper.Input.IsDown(SButton.RightThumbstickUp))
+            if(Game1.player.millisecondsPlayed - lastProjectile.Value > 350)
             {
-                if (SHelper.Input.IsDown(SButton.Right) || SHelper.Input.IsDown(SButton.RightThumbstickRight))
-                    v = new Vector2(yrt, -yrt);
-                else if (SHelper.Input.IsDown(SButton.Left) || SHelper.Input.IsDown(SButton.RightThumbstickLeft))
-                    v = new Vector2(-yrt, -yrt);
-                else
-                    v = new Vector2(0, -1);
-            }
-            else if (SHelper.Input.IsDown(SButton.Down) || SHelper.Input.IsDown(SButton.RightThumbstickDown))
-            {
-                if (SHelper.Input.IsDown(SButton.Right) || SHelper.Input.IsDown(SButton.RightThumbstickRight))
-                    v = new Vector2(yrt, yrt);
-                else if (SHelper.Input.IsDown(SButton.Left) || SHelper.Input.IsDown(SButton.RightThumbstickLeft))
-                    v = new Vector2(-yrt, yrt);
-                else
-                    v = new Vector2(0, 1);
-            }
-            else if (SHelper.Input.IsDown(SButton.Right) || SHelper.Input.IsDown(SButton.RightThumbstickDown))
-                v = new Vector2(1, 0);
-            else if (SHelper.Input.IsDown(SButton.Left) || SHelper.Input.IsDown(SButton.RightThumbstickLeft))
-                v = new Vector2(-1, 0);
-            else if (SHelper.Input.IsDown(SButton.MouseLeft))
-            {
-                float x = Game1.viewport.X + Game1.getOldMouseX() - Game1.player.position.X;
-                float y = Game1.viewport.Y + Game1.getOldMouseY() - Game1.player.position.Y;
-                float dx = Math.Abs(x);
-                float dy = Math.Abs(y);
-                if (y < 0)
-                {
-                    if (x > 0)
-                    {
-                        if (dy > dx)
-                        {
-                            if (dy - dx > dy / 2)
-                                v = new Vector2(0, -1);
-                            else
-                                v = new Vector2(yrt, -yrt);
-
-                        }
-                        else
-                        {
-                            if (dx - dy > x / 2)
-                                v = new Vector2(1, 0);
-                            else
-                                v = new Vector2(yrt, -yrt);
-                        }
-                    }
-                    else
-                    {
-                        if (dy > dx)
-                        {
-                            if (dy - dx > dy / 2)
-                                v = new Vector2(0, -1);
-                            else
-                                v = new Vector2(-yrt, -yrt);
-
-                        }
-                        else
-                        {
-                            if (dx - dy > x / 2)
-                                v = new Vector2(-1, 0);
-                            else
-                                v = new Vector2(-yrt, -yrt);
-                        }
-                    }
-                }
-                else
-                {
-                    if (x > 0)
-                    {
-                        if (dy > dx)
-                        {
-                            if (dy - dx > dy / 2)
-                                v = new Vector2(0, 1);
-                            else
-                                v = new Vector2(yrt, yrt);
-
-                        }
-                        else
-                        {
-                            if (dx - dy > x / 2)
-                                v = new Vector2(1, 0);
-                            else
-                                v = new Vector2(yrt, yrt);
-                        }
-                    }
-                    else
-                    {
-                        if (dy > dx)
-                        {
-                            if (dy - dx > dy / 2)
-                                v = new Vector2(0, -1);
-                            else
-                                v = new Vector2(-yrt, yrt);
-
-                        }
-                        else
-                        {
-                            if (dx - dy > x / 2)
-                                v = new Vector2(-1, 0);
-                            else
-                                v = new Vector2(-yrt, yrt);
-                        }
-                    }
-                }
-            }
-
-            if (v != Vector2.Zero && Game1.player.millisecondsPlayed - lastProjectile.Value > 350)
-            {
-                location.projectiles.Add(new AbigailProjectile(1, 3, 0, 0, 0, v.X * 6, v.Y * 6, new Vector2(Game1.player.StandingPixel.X - 24, Game1.player.StandingPixel.Y - 48), "Cowboy_monsterDie", null, "Cowboy_gunshot", false, true, location, Game1.player, shotItemId: "(O)382"));
-                lastProjectile.Value = Game1.player.millisecondsPlayed;
-                Game1.player.faceDirection(SwimUtils.GetDirection(0, 0, v.X, v.Y));
-            }
-
-            foreach (SButton button in abigailShootButtons)
-            {
-                if (SHelper.Input.IsDown(button))
-                {
-                    switch (button)
-                    {
-                        case SButton.Up:
-                            break;
-                        case SButton.Right:
-                            v = new Vector2(1, 0);
-                            break;
-                        case SButton.Down:
-                            v = new Vector2(0, 1);
-                            break;
-                        default:
-                            v = new Vector2(-1, 0);
-                            break;
-                    }
-                }
+                TryAbigailShoot();
             }
 
             abigailTicks.Value++;
             if (abigailTicks.Value > 80000 / 16f)
             {
-                if (location.characters.ToList().FindAll((n) => (n is Monster)).Count > 0)
+                if (location.characters.Any(c => c is Monster))
+                {
                     return;
+                }
 
                 abigailTicks.Value = -1;
-                Game1.player.hat.Value = null;
                 Game1.stopMusicTrack(StardewValley.GameData.MusicContext.Default);
 
                 if (!Game1.player.mailReceived.Contains("ScubaFins"))
@@ -1069,7 +956,101 @@ namespace Swim
             }
         }
 
-        public static bool tryToWarp()
+        private static void TryAbigailShoot()
+        {
+            bool up = false, down = false, left = false, right = false;
+
+            if (Game1.options.gamepadControls)
+            {
+                // Right thumb stick and dpad
+                up = SHelper.Input.IsDown(SButton.RightThumbstickUp) || SHelper.Input.IsDown(SButton.DPadUp);
+                down = SHelper.Input.IsDown(SButton.RightThumbstickDown) || SHelper.Input.IsDown(SButton.DPadDown);
+                left = SHelper.Input.IsDown(SButton.RightThumbstickLeft) || SHelper.Input.IsDown(SButton.DPadLeft);
+                right = SHelper.Input.IsDown(SButton.RightThumbstickRight) || SHelper.Input.IsDown(SButton.DPadRight);
+            }
+            else
+            {
+                if (SHelper.Input.IsDown(SButton.MouseLeft))
+                {
+                    // Set the direction they're clicking in
+                    float x = Game1.viewport.X + Game1.getOldMouseX() - Game1.player.position.X;
+                    float y = Game1.viewport.Y + Game1.getOldMouseY() - Game1.player.position.Y;
+                    float dx = Math.Abs(x);
+                    float dy = Math.Abs(y);
+                    bool vertical = dy > dx;
+                    bool u = y <= 0;
+                    bool r = x >= 0;
+                    bool diagonal = vertical ? (dx > dy / 2) : (dy > dx / 2);
+
+                    if (vertical)
+                    {
+                        up = u;
+                        down = !u;
+
+                        if (diagonal)
+                        {
+                            right = r;
+                            left = !r;
+                        }
+                    }
+                    else
+                    {
+                        right = r;
+                        left = !r;
+
+                        if (diagonal)
+                        {
+                            up = u;
+                            down = !u;
+                        }
+                    }
+                }
+                else
+                {
+                    // Arrow keys
+                    up = SHelper.Input.IsDown(SButton.Up);
+                    down = SHelper.Input.IsDown(SButton.Down);
+                    left = SHelper.Input.IsDown(SButton.Left);
+                    right = SHelper.Input.IsDown(SButton.Right);
+
+                    // If they are pressing the action button (like 'e'), set they way they're facing
+                    if (Game1.isOneOfTheseKeysDown(Game1.input.GetKeyboardState(), Game1.options.actionButton))
+                    {
+                        switch (Game1.player.FacingDirection)
+                        {
+                            case Game1.up:
+                                up = true;
+                                break;
+                            case Game1.down:
+                                down = true;
+                                break;
+                            case Game1.left:
+                                left = true;
+                                break;
+                            case Game1.right:
+                                right = true;
+                                break;
+                        }
+                    }
+                }
+            }
+
+            Vector2 velocity = Vector2.Zero;
+
+            if (up || down || left || right)
+            {
+                float magnitude = (up || down) && (left || right) ? (float)(1 / Math.Sqrt(2)) : 1;
+
+                velocity.Y = up ? -magnitude : down ? magnitude : 0;
+                velocity.X = right ? magnitude : left ? -magnitude : 0;
+
+                Game1.player.currentLocation.projectiles.Add(new AbigailProjectile(1, 3, 0, 0, 0, velocity.X * 6, velocity.Y * 6, new Vector2(Game1.player.StandingPixel.X - 24, Game1.player.StandingPixel.Y - 48), "Cowboy_monsterDie", null, "Cowboy_gunshot", false, true, Game1.player.currentLocation, Game1.player, shotItemId: "(O)382"));
+                lastProjectile.Value = Game1.player.millisecondsPlayed;
+                Game1.player.faceDirection(SwimUtils.GetDirection(0, 0, velocity.X, velocity.Y));
+            }
+        }
+
+        public static bool TryToWarp()
         {
             if(Game1.isWarping)
             {

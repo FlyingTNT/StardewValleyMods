@@ -644,8 +644,10 @@ namespace Swim
 
         public static void RemoveWaterTiles(GameLocation l)
         {
-            if (l == null || l.map == null)
+            if (l?.map is null)
+            {
                 return;
+            }
             Map map = l.map;
             //Layer back = map.RequireLayer("Back");
             for (int x = 0; x < map.Layers[0].LayerWidth; x++)

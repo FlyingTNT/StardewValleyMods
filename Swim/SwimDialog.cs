@@ -82,7 +82,9 @@ namespace Swim
                 while (true)
                 {
                     if (!TryGetTranslation($"SwimMod_Mariner_Question_{i}", out string _))
+                    {
                         break;
+                    }
                     MarinerQuestions.Add(i++);
                 }
             }
@@ -109,7 +111,9 @@ namespace Swim
             while (true)
             {
                 if (!TryGetTranslation($"SwimMod_Mariner_Question_{qi}_{i}", out string r))
+                {
                     break;
+                }
                 string str = r.Split('#')[0];
                 SMonitor.Log(str);
 
@@ -133,19 +137,18 @@ namespace Swim
 
         internal static bool TryGetTranslation(string key, out string translation)
         {
-            bool hasCPTranslation = GetTranslationDictionary().TryGetValue(key, out var translation1);
+            bool hasCPTranslation = GetTranslationDictionary().TryGetValue(key, out translation);
 
             if (hasCPTranslation)
             {
-                translation = translation1;
                 return true;
             }
 
-            Translation translation2 = SHelper.Translation.Get(key);
+            Translation helperTranslation = SHelper.Translation.Get(key);
 
-            translation = translation2;
+            translation = helperTranslation;
 
-            return translation2.HasValue();
+            return helperTranslation.HasValue();
         }
 
         private static Dictionary<string, string> GetTranslationDictionary()

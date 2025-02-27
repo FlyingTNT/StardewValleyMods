@@ -22,6 +22,7 @@ namespace Swim
         private static IMonitor SMonitor;
         private static ModConfig Config => ModEntry.Config;
         private static IModHelper SHelper;
+
         public static Dictionary<string, string> seaMonsterSounds = new Dictionary<string, string>() {
             {"A","dialogueCharacter"},
             {"B","grunt"},
@@ -57,6 +58,7 @@ namespace Swim
             SHelper = helper;
         }
 
+        #region Warping
         public static Point GetEdgeWarpDestination(int idxPos, EdgeWarp edge)
         {
             try
@@ -83,11 +85,13 @@ namespace Swim
             }
             return Point.Zero;
         }
+        #endregion
 
+        #region Diving
         public static void DiveTo(DiveLocation diveLocation)
         {
             DivePosition dp = diveLocation.OtherMapPos;
-            if (dp == null)
+            if (dp is null)
             {
                 SMonitor.Log($"Diving to existing tile position");
                 Point pos = Game1.player.TilePoint;
@@ -106,7 +110,7 @@ namespace Swim
 
             if (!IsMapUnderwater(Game1.player.currentLocation.Name))
             {
-                ModEntry.bubbles.Value.Clear();
+                SwimHelperEvents.bubbles.Value.Clear();
             }
             else
             {
@@ -122,17 +126,136 @@ namespace Swim
             return map.isTileOnMap(location) && (!map.IsTileBlockedBy(location, CollisionMask.Buildings, CollisionMask.Buildings) || IsWaterTile(location, map)) && map.getTileIndexAt((int)location.X, (int)location.Y, "Back") != -1;
         }
 
+        public static bool IsMapUnderwater(string name)
+        {
+            return ModEntry.diveMaps.ContainsKey(name) && ModEntry.diveMaps[name].Features.Contains("Underwater");
+        }
+        #endregion
+
+        #region Oxygen
         public static int MaxOxygen()
         {
             return Game1.player.MaxStamina * Math.Max(1, Config.OxygenMult);
         }
 
-        public static bool IsMapUnderwater(string name)
+        public static void UpdateOxygenValue()
         {
-            return ModEntry.diveMaps.ContainsKey(name) && ModEntry.diveMaps[name].Features.Contains("Underwater");
+            if (Game1.activeClickableMenu is not null || !Context.IsPlayerFree || Game1.player.freezePause > 0)
+            {
+                return;
+            }
+
+            if (ModEntry.isUnderwater.Value)
+            {
+                if (ModEntry.Oxygen >= 0)
+                {
+                    if (!IsWearingScubaGear())
+                    {
+                        ModEntry.Oxygen--;
+                    }
+                    else
+                    {
+                        RegenerateOxygen();
+                    }
+                }
+                if (ModEntry.Oxygen < 0 && !ModEntry.surfacing.Value)
+                {
+                    ModEntry.surfacing.Value = true;
+                    Game1.playSound("pullItemFromWater");
+                    DiveLocation diveLocation = ModEntry.diveMaps[Game1.player.currentLocation.Name].DiveLocations.Last();
+                    DiveTo(diveLocation);
+                }
+            }
+            else
+            {
+                ModEntry.surfacing.Value = false;
+                RegenerateOxygen();
+            }
         }
 
-        public static bool isSafeToTryJump()
+        private static void RegenerateOxygen()
+        {
+            if (ModEntry.Oxygen < MaxOxygen())
+            {
+                ModEntry.Oxygen++;
+
+                if (ModEntry.Oxygen < MaxOxygen())
+                {
+                    ModEntry.Oxygen++;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Draws the oxygen bar in the bottom right, by the HP and stamina bars. 
+        /// 
+        /// Most of this is taken from Game1.drawHUD()
+        /// </summary>
+        public static void DrawOxygenBar()
+        {
+            // Note that oxygen is a function of stamina, so some references to stamina are used where it is easier
+            int oxygen = ModEntry.Oxygen;
+            int maxOxygen = MaxOxygen();
+            const float staminaModifier = 0.625f;
+            float modifier = staminaModifier / Config.OxygenMult;
+            Vector2 topOfBar = new(Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Right - 48 - 64, Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Bottom - 224 - 16 - (int)((Game1.player.MaxStamina - 270) * staminaModifier));
+            topOfBar = OffsetOxygenBarPosition(topOfBar);
+            if (Game1.isOutdoorMapSmallerThanViewport())
+            {
+                topOfBar.X = Math.Min(topOfBar.X, -Game1.viewport.X + Game1.currentLocation.map.Layers[0].LayerWidth * 64 - 48);
+            }
+            Game1.spriteBatch.Draw(ModEntry.OxygenBarTexture, topOfBar, new(0, 0, 12, 16), Color.White, 0f, Vector2.Zero, 4f, SpriteEffects.None, 1f);
+            Game1.spriteBatch.Draw(ModEntry.OxygenBarTexture, new Microsoft.Xna.Framework.Rectangle((int)topOfBar.X, (int)(topOfBar.Y + 64f), 48, Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Bottom - 64 - 16 - (int)(topOfBar.Y + 64f - 8f)), new(0, 16, 12, 16), Color.White);
+            Game1.spriteBatch.Draw(ModEntry.OxygenBarTexture, new Vector2(topOfBar.X, topOfBar.Y + 224f + ((Game1.player.MaxStamina - 270) * staminaModifier) - 64f), new(0, 40, 12, 16), Color.White, 0f, Vector2.Zero, 4f, SpriteEffects.None, 1f);
+            Microsoft.Xna.Framework.Rectangle r = new((int)topOfBar.X + 12, (int)topOfBar.Y + 16 + 32 + (int)(maxOxygen * modifier) - (int)(Math.Max(0f, oxygen) * modifier), 24, (int)(oxygen * modifier) - 1);
+            Color c = GetBlueToGrayLerpColor(oxygen / (float)maxOxygen);
+            Game1.spriteBatch.Draw(Game1.staminaRect, r, c);
+            r.Height = 4;
+            c.R = (byte)Math.Max(0, c.R - 50);
+            c.G = (byte)Math.Max(0, c.G - 50);
+            Game1.spriteBatch.Draw(Game1.staminaRect, r, c);
+
+            float mouseXDiff = Game1.getOldMouseX() - topOfBar.X;
+            float mouseYDiff = Game1.getOldMouseY() - topOfBar.Y;
+            if (mouseXDiff >= 0 && mouseYDiff >= 0 && mouseXDiff < 48 && mouseYDiff < 224f + ((Game1.player.MaxStamina - 270) * staminaModifier))
+            {
+                Game1.drawWithBorder((int)Math.Max(0f, oxygen) + "/" + maxOxygen, Color.Black * 0f, Color.White, topOfBar + new Vector2(0f - Game1.dialogueFont.MeasureString("999/999").X - 16f - (float)(Game1.showingHealth ? 64 : 0), 64f));
+            }
+        }
+
+        /// <summary>
+        /// Offsets the oxygen bar position for mod compatibility. 
+        /// </summary>
+        private static Vector2 OffsetOxygenBarPosition(Vector2 topLeftCorner)
+        {
+            topLeftCorner.X += Config.OxygenBarXOffset;
+            if (Config.OxygenBarYOffset < 0) // Putting it below where it is messes up the math and I don't care to make it work
+            {
+                topLeftCorner.Y += Config.OxygenBarYOffset;
+            }
+
+            if (Game1.showingHealthBar || Game1.showingHealth)
+            {
+                topLeftCorner.X -= 56;
+            }
+
+            if (SHelper.ModRegistry.IsLoaded(IDs.Survivalistic))
+            {
+                // Survivalistic adds two bars, so we move the oxygen bar left two bars' width
+                topLeftCorner.X -= 55 + 60;
+            }
+
+            return topLeftCorner;
+        }
+
+        private static Color GetBlueToGrayLerpColor(float power)
+        {
+            return new Color(50, 50, (int)((power >= 0.5f) ? 255 : 50 + (power * (2 * (255 - 50)) + 50)));
+        }
+        #endregion
+
+        #region Jumping
+        public static bool IsSafeToTryJump()
         {
             // Null checks
             if (Game1.player?.currentLocation?.waterTiles == null)
@@ -167,46 +290,38 @@ namespace Swim
             return true;
         }
 
-        private static readonly PerScreen<bool> surfacing = new PerScreen<bool>();
-        public static void updateOxygenValue()
+        /// <summary>
+        /// Gets whether the player can jump to the given position.
+        /// </summary>
+        public static bool IsValidJumpLocation(Vector2 position, GameLocation location = null)
         {
-            if(Game1.activeClickableMenu is not null || !Context.IsPlayerFree || Game1.player.freezePause > 0)
+            location ??= Game1.player.currentLocation;
+
+            if (!location.isTileOnMap(position))
             {
-                return;
+                return false;
             }
 
-            if (ModEntry.isUnderwater.Value)
+            bool jumpToLand = Game1.player.swimming.Value;
+            bool isWater = IsWaterTile(position);
+            if (jumpToLand == isWater)
             {
-                if (ModEntry.Oxygen >= 0)
-                {
-                    if (!IsWearingScubaGear())
-                        ModEntry.Oxygen--;
-                    else
-                    {
-                        if (ModEntry.Oxygen < MaxOxygen())
-                            ModEntry.Oxygen++;
-                        if (ModEntry.Oxygen < MaxOxygen())
-                            ModEntry.Oxygen++;
-                    }
-                }
-                if (ModEntry.Oxygen < 0 && !surfacing.Value)
-                {
-                    surfacing.Value = true;
-                    Game1.playSound("pullItemFromWater");
-                    DiveLocation diveLocation = ModEntry.diveMaps[Game1.player.currentLocation.Name].DiveLocations.Last();
-                    DiveTo(diveLocation);
-                }
+                return false;
+            }
+
+            if (jumpToLand)
+            {
+                return IsTilePassable(location, position);
             }
             else
             {
-                surfacing.Value = false;
-                if (ModEntry.Oxygen < MaxOxygen())
-                    ModEntry.Oxygen++;
-                if (ModEntry.Oxygen < MaxOxygen())
-                    ModEntry.Oxygen++;
+                Tile tile = location.map?.GetLayer("Buildings")?.PickTile(new Location((int)position.X * Game1.tileSize, (int)position.Y * Game1.tileSize), Game1.viewport.Size);
+                return tile is null || tile.TileIndex == 76;
             }
         }
+        #endregion
 
+        #region Unused
         public static int CheckForBuriedItem(Farmer who)
         {
             int objectIndex = 330; // Clay
@@ -287,7 +402,21 @@ namespace Swim
             }
             return objectIndex;
         }
+        public static async void SeaMonsterSay(string speech)
+        {
+            foreach (char c in speech)
+            {
+                string s = c.ToString().ToUpper();
+                if (seaMonsterSounds.ContainsKey(s))
+                {
+                    Game1.playSound("junimoMeep1", (seaMonsterSounds.Keys.ToList().IndexOf(s) / 26) * 2 - 1);
+                }
+                await Task.Delay(100);
+            }
+        }
+        #endregion
 
+        #region Player State
         public static bool IsWearingScubaGear()
         {
             bool tank = Game1.player.shirtItem.Value?.ItemId == ModEntry.scubaTankID;
@@ -325,74 +454,71 @@ namespace Swim
 
             return output;
         }
+        #endregion
 
-        /// <summary>
-        /// Draws the oxygen bar in the bottom right, by the HP and stamina bars. 
-        /// 
-        /// Most of this is taken from Game1.drawHUD()
-        /// </summary>
-        public static void DrawOxygenBar()
+        #region Location State
+        public static bool IsAllowedSwimLocation(GameLocation location)
         {
-            // Note that oxygen is a function of stamina, so some references to stamina are used where it is easier
-            int oxygen = ModEntry.Oxygen;
-            int maxOxygen = MaxOxygen();
-            const float staminaModifier = 0.625f;
-            float modifier = staminaModifier / Config.OxygenMult;
-            Vector2 topOfBar = new(Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Right - 48 - 64, Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Bottom - 224 - 16 - (int)((Game1.player.MaxStamina - 270) * staminaModifier));
-            topOfBar = OffsetOxygenBarPosition(topOfBar);
-            if (Game1.isOutdoorMapSmallerThanViewport())
-            {
-                topOfBar.X = Math.Min(topOfBar.X, -Game1.viewport.X + Game1.currentLocation.map.Layers[0].LayerWidth * 64 - 48);
-            }
-            Game1.spriteBatch.Draw(ModEntry.OxygenBarTexture, topOfBar, new(0, 0, 12, 16), Color.White, 0f, Vector2.Zero, 4f, SpriteEffects.None, 1f);
-            Game1.spriteBatch.Draw(ModEntry.OxygenBarTexture, new Microsoft.Xna.Framework.Rectangle((int)topOfBar.X, (int)(topOfBar.Y + 64f), 48, Game1.graphics.GraphicsDevice.Viewport.GetTitleSafeArea().Bottom - 64 - 16 - (int)(topOfBar.Y + 64f - 8f)), new(0, 16, 12, 16), Color.White);
-            Game1.spriteBatch.Draw(ModEntry.OxygenBarTexture, new Vector2(topOfBar.X, topOfBar.Y + 224f + ((Game1.player.MaxStamina - 270) * staminaModifier) - 64f), new(0, 40, 12, 16), Color.White, 0f, Vector2.Zero, 4f, SpriteEffects.None, 1f);
-            Microsoft.Xna.Framework.Rectangle r = new((int)topOfBar.X + 12, (int)topOfBar.Y + 16 + 32 + (int)(maxOxygen * modifier) - (int)(Math.Max(0f, oxygen) * modifier), 24, (int)(oxygen * modifier) - 1);
-            Color c = GetBlueToGrayLerpColor(oxygen / (float)maxOxygen);
-            Game1.spriteBatch.Draw(Game1.staminaRect, r, c);
-            r.Height = 4;
-            c.R = (byte)Math.Max(0, c.R - 50);
-            c.G = (byte)Math.Max(0, c.G - 50);
-            Game1.spriteBatch.Draw(Game1.staminaRect, r, c);
-
-            float mouseXDiff = Game1.getOldMouseX() - topOfBar.X;
-            float mouseYDiff = Game1.getOldMouseY() - topOfBar.Y;
-            if (mouseXDiff >= 0 && mouseYDiff >= 0 && mouseXDiff < 48 && mouseYDiff < 224f + ((Game1.player.MaxStamina - 270) * staminaModifier))
-            {
-                Game1.drawWithBorder((int)Math.Max(0f, oxygen) + "/" + maxOxygen, Color.Black * 0f, Color.White, topOfBar + new Vector2(0f - Game1.dialogueFont.MeasureString("999/999").X - 16f - (float)(Game1.showingHealth ? 64 : 0), 64f));
-            }
+            return (Config.SwimIndoors || location.IsOutdoors) && location is not VolcanoDungeon or BoatTunnel or BathHousePool && !(location is MineShaft mineshaft && mineshaft.mineLevel == 100);
         }
 
-        /// <summary>
-        /// Offsets the oxygen bar position for mod compatibility. 
-        /// </summary>
-        private static Vector2 OffsetOxygenBarPosition(Vector2 topLeftCorner)
+        public static bool CanSwimHere()
         {
-            topLeftCorner.X += Config.OxygenBarXOffset;
-            if(Config.OxygenBarYOffset < 0) // Putting it below where it is messes up the math and I don't care to make it work
+            GameLocation location = Game1.player.currentLocation;
+            if (!IsAllowedSwimLocation(location) || ModEntry.LocationProhibitsSwimming)
             {
-                topLeftCorner.Y += Config.OxygenBarYOffset;
+                return false;
             }
 
-            if(Game1.showingHealthBar || Game1.showingHealth)
+            Point playerPosition = Game1.player.TilePoint;
+
+            string property = location.doesTileHaveProperty(playerPosition.X, playerPosition.Y, "TouchAction", "Back");
+
+            if (property == "PoolEntrance" || property == "ChangeIntoSwimsuit")
             {
-                topLeftCorner.X -= 56;
+                SMonitor.Log("The current tile is a pool entrance! Disabling swimming in this location.");
+                ModEntry.locationIsPool.Value = true;
+                return false;
             }
 
-            if(SHelper.ModRegistry.IsLoaded(IDs.Survivalistic))
-            {
-                // Survivalistic adds two bars, so we move the oxygen bar left two bars' width
-                topLeftCorner.X -= 55 + 60;
-            }
-
-            return topLeftCorner;
+            return true;
         }
 
-        private static Color GetBlueToGrayLerpColor(float power)
+        public static bool IsWaterTile(Vector2 tilePos)
         {
-            return new Color(50, 50, (int)((power >= 0.5f) ? 255 : 50 + (power * (2 * (255 - 50)) + 50)));
+            return IsWaterTile(tilePos, Game1.player.currentLocation);
         }
 
+        public static bool IsWaterTile(Vector2 tilePos, GameLocation location)
+        {
+            if (location != null && location.waterTiles != null && tilePos.X >= 0 && tilePos.Y >= 0 && location.waterTiles.waterTiles.GetLength(0) > tilePos.X && location.waterTiles.waterTiles.GetLength(1) > tilePos.Y)
+            {
+                return location.waterTiles[(int)tilePos.X, (int)tilePos.Y];
+            }
+            return false;
+        }
+
+        public static bool IsWaterTile(Point tilePos)
+        {
+            return IsWaterTile(tilePos, Game1.player.currentLocation);
+        }
+
+        public static bool IsWaterTile(Point tilePos, GameLocation location)
+        {
+            if (location != null && location.waterTiles != null && tilePos.X >= 0 && tilePos.Y >= 0 && location.waterTiles.waterTiles.GetLength(0) > tilePos.X && location.waterTiles.waterTiles.GetLength(1) > tilePos.Y)
+            {
+                return location.waterTiles[tilePos.X, tilePos.Y];
+            }
+            return false;
+        }
+
+        public static bool IsTilePassable(GameLocation location, Vector2 tileLocation)
+        {
+            return location.isTilePassable(tileLocation) && !location.IsTileOccupiedBy(tileLocation, CollisionMask.TerrainFeatures, CollisionMask.All);
+        }
+        #endregion
+
+        #region Mod-Specific Utilities
         /// <summary>
         /// Draws a bar across the top of the screen (the old oxygen bar)
         /// </summary>
@@ -439,138 +565,20 @@ namespace Swim
                 }
             }
         }
-        public static async void SeaMonsterSay(string speech)
-        {
-            foreach (char c in speech)
-            {
-                string s = c.ToString().ToUpper();
-                if (seaMonsterSounds.ContainsKey(s))
-                {
-                    Game1.playSound("junimoMeep1", (seaMonsterSounds.Keys.ToList().IndexOf(s) / 26) * 2 - 1);
-                }
-                await Task.Delay(100);
-            }
-        }
-
-        public static bool IsWaterTile(Vector2 tilePos)
-        {
-            return IsWaterTile(tilePos, Game1.player.currentLocation);
-        }
-
-        public static bool IsWaterTile(Vector2 tilePos, GameLocation location)
-        {
-            if (location != null && location.waterTiles != null && tilePos.X >= 0 && tilePos.Y >= 0 && location.waterTiles.waterTiles.GetLength(0) > tilePos.X && location.waterTiles.waterTiles.GetLength(1) > tilePos.Y)
-            {
-                return location.waterTiles[(int)tilePos.X, (int)tilePos.Y];
-            }
-            return false;
-        }
-
-        public static bool IsWaterTile(Point tilePos)
-        {
-            return IsWaterTile(tilePos, Game1.player.currentLocation);
-        }
-
-        public static bool IsWaterTile(Point tilePos, GameLocation location)
-        {
-            if (location != null && location.waterTiles != null && tilePos.X >= 0 && tilePos.Y >= 0 && location.waterTiles.waterTiles.GetLength(0) > tilePos.X && location.waterTiles.waterTiles.GetLength(1) > tilePos.Y)
-            {
-                return location.waterTiles[tilePos.X, tilePos.Y];
-            }
-            return false;
-        }
-
-        public static bool IsTilePassable(GameLocation location, Vector2 tileLocation)
-        {
-            return location.isTilePassable(tileLocation) && !location.IsTileOccupiedBy(tileLocation, CollisionMask.TerrainFeatures, CollisionMask.All);
-        }
-
-        public static bool isMouseButtonDown(KeybindList keybindList)
-        {
-            if(keybindList.GetKeybindCurrentlyDown() is not Keybind keybind)
-                return false;
-
-            if (keybind.Buttons.Length == 0)
-                return false;
-
-            return keybind.Buttons[0] == SButton.MouseLeft || keybind.Buttons[0] == SButton.MouseRight || keybind.Buttons[0] == SButton.MouseMiddle || keybind.Buttons[0] == SButton.MouseX1 || keybind.Buttons[0] == SButton.MouseX2;
-        }
-        public static bool DebrisIsAnItem(Debris debris)
-        {
-            return debris.debrisType.Value == Debris.DebrisType.OBJECT || debris.debrisType.Value == Debris.DebrisType.ARCHAEOLOGY || debris.debrisType.Value == Debris.DebrisType.RESOURCE || debris.item != null;
-        }
-
-        public static bool IsAllowedSwimLocation(GameLocation location)
-        {
-            return (Config.SwimIndoors || location.IsOutdoors) && location is not VolcanoDungeon or BoatTunnel or BathHousePool && !(location is MineShaft mineshaft && mineshaft.mineLevel == 100);
-        }
-
-        public static bool CanSwimHere()
-        {
-            GameLocation location = Game1.player.currentLocation;
-            if (!IsAllowedSwimLocation(location) || ModEntry.LocationProhibitsSwimming)
-            {
-                return false;
-            }
-
-            Point playerPosition = Game1.player.TilePoint;
-
-            string property = location.doesTileHaveProperty(playerPosition.X, playerPosition.Y, "TouchAction", "Back");
-
-            if (property == "PoolEntrance" || property == "ChangeIntoSwimsuit")
-            {
-                SMonitor.Log("The current tile is a pool entrance! Disabling swimming in this location.");
-                ModEntry.locationIsPool.Value = true;
-                return false;
-            }
-
-            return true;
-        }
 
         /// <summary>
-        /// Gets the direction of one point relative to another.
-        /// 
-        /// Point 1 is the starting point, and point 2 the endpoint.
-        /// Returns a cardinal direction using Stardew Valley's direction system (0 is up, 1 right, 2 down, and 3 left)
+        /// Gets a key -> translated string dictionary of all the strings in out i18n
         /// </summary>
-        /// <param name="x1">The x coordinate of the first point.</param>
-        /// <param name="y1">The y coordinate of the first point.</param>
-        /// <param name="x2">The x coordinate of the second point.</param>
-        /// <param name="y2">The y coordinate of the second point.</param>
-        /// <returns>A cardinal direction using Stardew Valley's direction system (0 is up, 1 right, 2 down, and 3 left)</returns>
-        public static int GetDirection(float x1, float y1, float x2, float y2)
-        {
-            if (Math.Abs(x1 - x2) > Math.Abs(y1 - y2))
-            {
-                if (x2 - x1 > 0)
-                {
-                    return 1; // Right
-                }
-                else
-                {
-                    return 3; // Left
-                }
-            }
-            else
-            {
-                if (y2 - y1 > 0)
-                {
-                    return 2; // Down
-                }
-                else
-                {
-                    return 0; // Up
-                }
-            }
-        }
-
+        /// <remarks>
+        /// We use this to allow our i18n strings to be patchable by other mods.
+        /// </remarks>
         public static Dictionary<string, string> Geti18nDict()
         {
             IEnumerable<Translation> translations = SHelper.Translation.GetTranslations();
 
             Dictionary<string, string> i18nDict = new Dictionary<string, string>();
 
-            foreach(Translation translation in translations)
+            foreach (Translation translation in translations)
             {
                 i18nDict.Add(translation.Key, translation);
             }
@@ -593,32 +601,60 @@ namespace Swim
 
             return null;
         }
+        #endregion
 
-        public static bool IsValidJumpLocation(Vector2 position, GameLocation location = null)
+        #region Misc
+        public static bool IsMouseButtonDown(KeybindList keybindList)
         {
-            location ??= Game1.player.currentLocation;
-
-            if (!location.isTileOnMap(position))
+            if(keybindList.GetKeybindCurrentlyDown() is not Keybind keybind)
             {
                 return false;
             }
 
-            bool jumpToLand = Game1.player.swimming.Value;
-            bool isWater = IsWaterTile(position);
-            if (jumpToLand == isWater)
-            {
-                return false;
-            }
+            // I'm not the biggest fan of this but I don't know how I would do any better.
+            return keybind.Buttons.Any(button => button is SButton.MouseLeft or SButton.MouseRight or SButton.MouseMiddle or SButton.MouseX1 or SButton.MouseX2);
+        }
+        public static bool DebrisIsAnItem(Debris debris)
+        {
+            return debris.debrisType.Value == Debris.DebrisType.OBJECT || debris.debrisType.Value == Debris.DebrisType.ARCHAEOLOGY || debris.debrisType.Value == Debris.DebrisType.RESOURCE || debris.item != null;
+        }
 
-            if (jumpToLand)
+        /// <summary>
+        /// Gets the direction of one point relative to another.
+        /// 
+        /// Point 1 is the starting point, and point 2 the endpoint.
+        /// Returns a cardinal direction using Stardew Valley's direction system (0 is up, 1 right, 2 down, and 3 left)
+        /// </summary>
+        /// <param name="x1">The x coordinate of the first point.</param>
+        /// <param name="y1">The y coordinate of the first point.</param>
+        /// <param name="x2">The x coordinate of the second point.</param>
+        /// <param name="y2">The y coordinate of the second point.</param>
+        /// <returns>A cardinal direction using Stardew Valley's direction system (0 is up, 1 right, 2 down, and 3 left)</returns>
+        public static int GetDirection(float x1, float y1, float x2, float y2)
+        {
+            if (Math.Abs(x1 - x2) > Math.Abs(y1 - y2))
             {
-                return IsTilePassable(location, position);
+                if (x2 - x1 > 0)
+                {
+                    return Game1.right;
+                }
+                else
+                {
+                    return Game1.left;
+                }
             }
             else
             {
-                Tile tile = location.map?.GetLayer("Buildings")?.PickTile(new Location((int)position.X * Game1.tileSize, (int)position.Y * Game1.tileSize), Game1.viewport.Size);
-                return tile is null || tile.TileIndex == 76;
+                if (y2 - y1 > 0)
+                {
+                    return Game1.down;
+                }
+                else
+                {
+                    return Game1.up;
+                }
             }
         }
+        #endregion
     }
 }

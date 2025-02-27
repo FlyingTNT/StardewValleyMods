@@ -26,6 +26,7 @@ namespace Swim
             SHelper = helper;
         }
 
+        #region Bathing Clothes Patches
         internal static void GameLocation_StartEvent_Postfix()
         {
             try
@@ -34,7 +35,9 @@ namespace Swim
                 {
                     Game1.player.swimming.Value = false;
                     if (!Config.SwimSuitAlways)
+                    {
                         Game1.player.changeOutOfSwimSuit();
+                    }
                 }
             }
             catch (Exception ex)
@@ -69,7 +72,117 @@ namespace Swim
             Game1.player.swimming.Value = true;
         }
 
+        /// <summary>
+        /// Makes it so the player can do things like use tools while in the swimsuit, if so configured.
+        /// </summary>
+        public static void Farmer_changeIntoSwimsuit_Postfix(Farmer __instance)
+        {
+            try
+            {
+                if (Config.AllowActionsWhileInSwimsuit)
+                {
+                    __instance.canOnlyWalk = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(Farmer_changeIntoSwimsuit_Postfix)}:\n{ex}", LogLevel.Error);
+            }
+        }
 
+        public static void Farmer_setRunning_Prefix(Farmer __instance, ref bool __state)
+        {
+            try
+            {
+                __state = __instance.bathingClothes.Value;
+
+                if (__instance.bathingClothes.Value && Config.AllowRunningWhileInSwimsuit)
+                {
+                    __instance.bathingClothes.Value = false;
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(Farmer_setRunning_Prefix)}:\n{ex}", LogLevel.Error);
+            }
+        }
+        public static void Farmer_setRunning_Postfix(Farmer __instance, bool __state)
+        {
+            try
+            {
+                __instance.bathingClothes.Value = __state;
+
+                if (__instance.swimming.Value)
+                {
+                    __instance.speed = __instance.running ? Config.SwimRunSpeed : Config.SwimSpeed;
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(Farmer_setRunning_Postfix)}:\n{ex}", LogLevel.Error);
+            }
+        }
+
+        public static void Wand_DoFunction_Prefix(Farmer who, ref bool __state)
+        {
+            if (who.bathingClothes.Value)
+            {
+                who.bathingClothes.Value = false;
+                __state = true;
+            }
+        }
+        public static void Wand_DoFunction_Postfix(Farmer who, bool __state)
+        {
+            if (__state)
+            {
+                who.bathingClothes.Value = true;
+            }
+        }
+
+        /// <summary>
+        /// Makes it so the player can place items while in the swimsuit, if so configured.
+        /// </summary>
+        public static void Utility_playerCanPlaceItemHere_Prefix(Farmer f, ref bool __state)
+        {
+            try
+            {
+                if (Config.AllowActionsWhileInSwimsuit && f.bathingClothes.Value)
+                {
+                    f.bathingClothes.Value = false;
+                    __state = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(Utility_playerCanPlaceItemHere_Prefix)}:\n{ex}", LogLevel.Error);
+            }
+        }
+
+        public static void Utility_playerCanPlaceItemHere_Postfix(Farmer f, bool __state)
+        {
+            try
+            {
+                if (__state)
+                {
+                    f.bathingClothes.Value = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(Utility_playerCanPlaceItemHere_Postfix)}:\n{ex}", LogLevel.Error);
+            }
+        }
+
+        #endregion
+
+        #region Swim Restoring Vitals Patches
+        /// <summary>
+        /// This along with the postfix implements the swim restoring health and stamina logic. This is removed from the base method in the transpiler.
+        /// </summary>
+        /// <remarks>
+        /// We pull this out so we can enable it outside if the bathhouse if so configured.
+        /// </remarks>
         public static void Farmer_updateCommon_Prefix(Farmer __instance)
         {
             try
@@ -91,6 +204,10 @@ namespace Swim
                 SMonitor.Log($"Failed in {nameof(Farmer_updateCommon_Prefix)}:\n{ex}", LogLevel.Error);
             }
         }
+
+        /// <summary>
+        /// See prefix.
+        /// </summary>
         public static void Farmer_updateCommon_Postfix(Farmer __instance)
         {
             try
@@ -160,60 +277,20 @@ namespace Swim
 
             return codes.AsEnumerable();
         }
+        #endregion
 
-        public static void Farmer_changeIntoSwimsuit_Postfix(Farmer __instance)
-        {
-            try
-            {
-                if(Config.AllowActionsWhileInSwimsuit)
-                    __instance.canOnlyWalk = false;
-            }
-            catch (Exception ex)
-            {
-                SMonitor.Log($"Failed in {nameof(Farmer_changeIntoSwimsuit_Postfix)}:\n{ex}", LogLevel.Error);
-            }
-        }
-        
-        public static void Farmer_setRunning_Prefix(Farmer __instance, ref bool __state)
-        {
-            try
-            {
-                __state = __instance.bathingClothes.Value;
-
-                if (__instance.bathingClothes.Value && Config.AllowRunningWhileInSwimsuit)
-                {
-                    __instance.bathingClothes.Value = false;
-                    return;
-                }
-            }
-            catch (Exception ex)
-            {
-                SMonitor.Log($"Failed in {nameof(Farmer_setRunning_Prefix)}:\n{ex}", LogLevel.Error);
-            }
-        }
-        public static void Farmer_setRunning_Postfix(Farmer __instance, bool __state)
-        {
-            try
-            {
-                __instance.bathingClothes.Value = __state;
-
-                if (__instance.swimming.Value)
-                {
-                    __instance.speed = __instance.running ? Config.SwimRunSpeed : Config.SwimSpeed;
-                }
-            }
-            catch (Exception ex)
-            {
-                SMonitor.Log($"Failed in {nameof(Farmer_setRunning_Postfix)}:\n{ex}", LogLevel.Error);
-            }
-        }
-
+        #region Custom Location Patches
+        /// <summary>
+        /// Prevents drawing the toolbar in the AbigailCave
+        /// </summary>
         public static bool Toolbar_draw_Prefix()
         {
             try
             {
                 if (Game1.player.currentLocation?.Name == "AbigailCave")
+                {
                     return false;
+                }
             }
             catch (Exception ex)
             {
@@ -222,71 +299,25 @@ namespace Swim
             return true;
         }
 
-
-        public static void Wand_DoFunction_Prefix(Farmer who, ref bool __state)
-        {
-            if (who.bathingClothes.Value)
-            {
-                who.bathingClothes.Value = false;
-                __state = true;
-            }
-        }
-        public static void Wand_DoFunction_Postfix(Farmer who, bool __state)
-        {
-            if(__state)
-            {
-                who.bathingClothes.Value = true;
-            }
-        }
-
-        public static void Utility_playerCanPlaceItemHere_Prefix(Farmer f, ref bool __state)
-        {
-            try
-            {
-                if (Config.AllowActionsWhileInSwimsuit && f.bathingClothes.Value)
-                {
-                    f.bathingClothes.Value = false;
-                    __state = true;
-                }
-            }
-            catch (Exception ex)
-            {
-                SMonitor.Log($"Failed in {nameof(Utility_playerCanPlaceItemHere_Prefix)}:\n{ex}", LogLevel.Error);
-            }
-        }
-
-        public static void Utility_playerCanPlaceItemHere_Postfix(Farmer f, bool __state)
-        {
-            try
-            {
-                if (__state)
-                {
-                    f.bathingClothes.Value = true;
-                }
-            }
-            catch (Exception ex)
-            {
-                SMonitor.Log($"Failed in {nameof(Utility_playerCanPlaceItemHere_Postfix)}:\n{ex}", LogLevel.Error);
-            }
-        }
-
         public static void GameLocation_resetForPlayerEntry_Prefix(GameLocation __instance)
         {
             try
             {
-                if(__instance.Name == "Custom_ScubaCrystalCave")
+                if(__instance.Name != "Custom_ScubaCrystalCave")
                 {
-                    if (Game1.player.mailReceived.Contains("SwimMod_Mariner_Completed"))
-                    {
-                        __instance.mapPath.Value = "Maps\\CrystalCaveDark";
-                    }
-                    else
-                    {
-                        __instance.mapPath.Value = "Maps\\CrystalCave";
-                        ModEntry.oldMariner = new NPC(new AnimatedSprite("Characters\\Mariner", 0, 16, 32), new Vector2(10f, 7f) * 64f, 2, "Old Mariner", null);
-                    }
-                    //__instance.updateMap();
+                    return;
                 }
+
+                if (Game1.player.mailReceived.Contains("SwimMod_Mariner_Completed"))
+                {
+                    __instance.mapPath.Value = "Maps\\CrystalCaveDark";
+                }
+                else
+                {
+                    __instance.mapPath.Value = "Maps\\CrystalCave";
+                    ModEntry.oldMariner = new NPC(new AnimatedSprite("Characters\\Mariner", 0, 16, 32), new Vector2(10f, 7f) * 64f, 2, "Old Mariner", null);
+                }
+                //__instance.updateMap();
             }
             catch (Exception ex)
             {
@@ -297,12 +328,14 @@ namespace Swim
         {
             try
             {
-                if(__instance.Name == "Custom_ScubaCrystalCave")
+                if(__instance.Name != "Custom_ScubaCrystalCave")
                 {
-                    if (!Game1.player.mailReceived.Contains("SwimMod_Mariner_Completed"))
-                    {
-                        ModEntry.oldMariner.draw(b);
-                    }
+                    return;
+                }
+
+                if (!Game1.player.mailReceived.Contains("SwimMod_Mariner_Completed"))
+                {
+                    ModEntry.oldMariner.draw(b);
                 }
             }
             catch (Exception ex)
@@ -314,13 +347,15 @@ namespace Swim
         {
             try
             {
-                if(__instance.Name == "Custom_ScubaCrystalCave")
+                if(__instance.Name != "Custom_ScubaCrystalCave")
                 {
-                    if (!Game1.player.mailReceived.Contains("SwimMod_Mariner_Completed") && ModEntry.oldMariner != null && position.Intersects(ModEntry.oldMariner.GetBoundingBox()))
-                    {
-                        __result = true;
-                        return false;
-                    }
+                    return true; ;
+                }
+
+                if (!Game1.player.mailReceived.Contains("SwimMod_Mariner_Completed") && ModEntry.oldMariner != null && position.Intersects(ModEntry.oldMariner.GetBoundingBox()))
+                {
+                    __result = true;
+                    return false;
                 }
             }
             catch (Exception ex)
@@ -333,12 +368,14 @@ namespace Swim
         {
             try
             {
-                if (__instance.Name == "Custom_ScubaCrystalCave")
+                if (__instance.Name != "Custom_ScubaCrystalCave")
                 {
-                    if (!Game1.player.mailReceived.Contains("SwimMod_Mariner_Completed"))
-                    {
-                        ModEntry.oldMariner?.update(time, __instance);
-                    }
+                    return;
+                }
+
+                if (!Game1.player.mailReceived.Contains("SwimMod_Mariner_Completed"))
+                {
+                    ModEntry.oldMariner?.update(time, __instance);
                 }
             }
             catch (Exception ex)
@@ -346,34 +383,38 @@ namespace Swim
                 SMonitor.Log($"Failed in {nameof(GameLocation_UpdateWhenCurrentLocation_Postfix)}:\n{ex}", LogLevel.Error);
             }
         }
-        public static void GameLocation_checkAction_Prefix(GameLocation __instance, Location tileLocation, xTile.Dimensions.Rectangle viewport, Farmer who)
+        public static void GameLocation_checkAction_Prefix(GameLocation __instance, Location tileLocation, Farmer who)
         {
             try
             {
-                if (__instance.Name == "Custom_ScubaCrystalCave")
+                if (__instance.Name != "Custom_ScubaCrystalCave")
                 {
-                    if (!who.mailReceived.Contains("SwimMod_Mariner_Completed"))
-                    {
-                        if (ModEntry.oldMariner != null && ModEntry.oldMariner.Tile.X == tileLocation.X && ModEntry.oldMariner.Tile.Y == tileLocation.Y)
-                        {
-                            string playerTerm = Game1.content.LoadString("Strings\\Locations:Beach_Mariner_Player_" + (who.IsMale ? "Male" : "Female"));
+                    return;
+                }
 
-                            if (ModEntry.marinerQuestionsWrongToday.Value)
-                            {
-                                SwimDialog.TryGetTranslation("SwimMod_Mariner_Wrong_Today", out string preface);
-                                Game1.drawObjectDialogue(string.Format(preface, playerTerm));
-                            }
-                            else
-                            {
-                                Response[] answers = new Response[]
-                                {
-                                new Response("SwimMod_Mariner_Questions_Yes", Game1.content.LoadString("Strings\\Lexicon:QuestionDialogue_Yes")),
-                                new Response("SwimMod_Mariner_Questions_No", Game1.content.LoadString("Strings\\Lexicon:QuestionDialogue_No"))
-                                };
-                                SwimDialog.TryGetTranslation(Game1.player.mailReceived.Contains("SwimMod_Mariner_Already") ? "SwimMod_Mariner_Questions_Old" : "SwimMod_Mariner_Questions", out string preface);
-                                __instance.createQuestionDialogue(Game1.parseText(string.Format(preface, playerTerm)), answers, "SwimMod_Mariner_Questions");
-                            }
-                        }
+                if (who.mailReceived.Contains("SwimMod_Mariner_Completed"))
+                {
+                    return;
+                }
+
+                if (ModEntry.oldMariner != null && ModEntry.oldMariner.Tile.X == tileLocation.X && ModEntry.oldMariner.Tile.Y == tileLocation.Y)
+                {
+                    string playerTerm = Game1.content.LoadString("Strings\\Locations:Beach_Mariner_Player_" + (who.IsMale ? "Male" : "Female"));
+
+                    if (ModEntry.marinerQuestionsWrongToday.Value)
+                    {
+                        SwimDialog.TryGetTranslation("SwimMod_Mariner_Wrong_Today", out string preface);
+                        Game1.drawObjectDialogue(string.Format(preface, playerTerm));
+                    }
+                    else
+                    {
+                        Response[] answers = new Response[]
+                        {
+                        new Response("SwimMod_Mariner_Questions_Yes", Game1.content.LoadString("Strings\\Lexicon:QuestionDialogue_Yes")),
+                        new Response("SwimMod_Mariner_Questions_No", Game1.content.LoadString("Strings\\Lexicon:QuestionDialogue_No"))
+                        };
+                        SwimDialog.TryGetTranslation(Game1.player.mailReceived.Contains("SwimMod_Mariner_Already") ? "SwimMod_Mariner_Questions_Old" : "SwimMod_Mariner_Questions", out string preface);
+                        __instance.createQuestionDialogue(Game1.parseText(string.Format(preface, playerTerm)), answers, "SwimMod_Mariner_Questions");
                     }
                 }
             }
@@ -382,6 +423,7 @@ namespace Swim
                 SMonitor.Log($"Failed in {nameof(GameLocation_checkAction_Prefix)}:\n{ex}", LogLevel.Error);
             }
         }
+        #endregion
 
         /// <summary>
         /// We pertty much completely override the collision detection while the player is swimming in order to 
@@ -391,7 +433,9 @@ namespace Swim
             try
             {
                 if (!isFarmer || character?.Equals(Game1.player) != true || !Game1.player.swimming.Value || ModEntry.isUnderwater.Value || ModEntry.locationIsPool.Value)
+                {
                     return;
+                }
 
                 // Because the shape of the hitbox is weird, we offset it so that it makes sense visually and prevents the player from clipping into things.
                 int top = (int)Math.Round((position.Top - 48) / 64f, MidpointRounding.AwayFromZero);
@@ -470,7 +514,9 @@ namespace Swim
             try
             {
                 if (__result == false || !Game1.IsMasterGame || !SwimUtils.DebrisIsAnItem(debris))
+                {
                     return;
+                }
 
                 if (debris.item != null)
                 {

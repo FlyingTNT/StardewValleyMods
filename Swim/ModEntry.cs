@@ -23,30 +23,30 @@ namespace Swim
         public static IMonitor SMonitor { get; private set; }
         public static IModHelper SHelper { get; private set; }
 
+        // Constants
         public const string scubaMaskID = "Swim_ScubaMask";
         public const string scubaFinsID = "Swim_ScubaFins";
         public const string scubaTankID = "Swim_ScubaTank";
         public const string ProhibitSwimmingMapPropertyKey = "ProhibitSwimming";
 
-        public static Texture2D OxygenBarTexture => SHelper.GameContent.Load<Texture2D>("FlyingTNT.Swim/OxygenBar");
-        private static readonly PerScreen<int> oxygen = new PerScreen<int>(() => 0);
-        public static readonly PerScreen<bool> willSwim = new PerScreen<bool>(() => false);
-        public static readonly PerScreen<bool> isUnderwater = new PerScreen<bool>(() => false);
-        public static NPC oldMariner = null;
-        public static readonly PerScreen<bool> marinerQuestionsWrongToday = new PerScreen<bool>(() => false);
-        public static readonly PerScreen<Random> myRand = new PerScreen<Random>(() => new Random());
-
+        // Location variables
         /// <summary> Whether the current location uses the PoolEntry touch action to manage swimming. Most of this mod is disabled if this is true. </summary>
         public static readonly PerScreen<bool> locationIsPool = new PerScreen<bool>(() => false);
         public static readonly PerScreen<bool> locationProhibitsSwimming = new PerScreen<bool>(() => false);
-
         public static bool LocationProhibitsSwimming => locationIsPool.Value || locationProhibitsSwimming.Value;
 
+        // Data variables
+        public static NPC oldMariner = null;
         public static readonly Dictionary<string, DiveMap> diveMaps = new Dictionary<string, DiveMap>();
+        public static Texture2D OxygenBarTexture => SHelper.GameContent.Load<Texture2D>("FlyingTNT.Swim/OxygenBar");
+        public static readonly PerScreen<Random> myRand = new PerScreen<Random>(() => new Random());
 
-        public static readonly PerScreen<List<Vector2>> bubbles = new PerScreen<List<Vector2>>(() => new List<Vector2>());
-        public static bool IsGemIslesLoaded = false;
+        // Player state variables
 
+        public static PerScreen<bool> isUnderwater { get; } = new PerScreen<bool>(() => false);
+        public static readonly PerScreen<bool> surfacing = new PerScreen<bool>();
+        public static readonly PerScreen<bool> marinerQuestionsWrongToday = new PerScreen<bool>(() => false);
+        private static readonly PerScreen<int> oxygen = new PerScreen<int>(() => 0);
         public static int Oxygen
         {
             get => oxygen.Value;
@@ -68,7 +68,9 @@ namespace Swim
             helper.Events.GameLoop.GameLaunched += SetupModConfig;
 
             if (!Config.EnableMod)
+            {
                 return;
+            }
 
             SwimPatches.Initialize(Monitor, helper);
             SwimDialog.Initialize(Monitor, helper);

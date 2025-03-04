@@ -689,7 +689,7 @@ namespace Swim
 
         public override object GetApi()
         {
-            return new SwimModApi(Monitor, this);
+            return new SwimModApi();
         }
     }
 }

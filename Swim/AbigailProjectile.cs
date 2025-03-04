@@ -1,10 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
-using Newtonsoft.Json.Linq;
 using StardewValley;
 using StardewValley.Monsters;
-using StardewValley.Network;
 using StardewValley.Projectiles;
-using StardewValley.TerrainFeatures;
 
 namespace Swim
 {
@@ -13,9 +10,8 @@ namespace Swim
         private string myCollisionSound;
         private bool myExplode;
 
-        public AbigailProjectile(int damageToFarmer, int ParentSheetIndex, int bouncesTillDestruct, int tailLength, float rotationVelocity, float xVelocity, float yVelocity, Vector2 startingPosition, string collisionSound, string bounceSound, string firingSound, bool explode, bool damagesMonsters = false, GameLocation location = null, Character firer = null, onCollisionBehavior collisionBehavior = null, string shotItemId = null) : base(damageToFarmer, ParentSheetIndex, bouncesTillDestruct, tailLength, rotationVelocity, xVelocity, yVelocity, startingPosition, collisionSound, bounceSound, firingSound, explode, true, location, firer, collisionBehavior, shotItemId)
+        public AbigailProjectile(int damageToFarmer, int ParentSheetIndex, int bouncesTillDestruct, int tailLength, float rotationVelocity, float xVelocity, float yVelocity, Vector2 startingPosition, string collisionSound, string bounceSound, string firingSound, bool explode, GameLocation location = null, Character firer = null, onCollisionBehavior collisionBehavior = null, string shotItemId = null) : base(damageToFarmer, ParentSheetIndex, bouncesTillDestruct, tailLength, rotationVelocity, xVelocity, yVelocity, startingPosition, collisionSound, bounceSound, firingSound, explode, true, location, firer, collisionBehavior, shotItemId)
         {
-            IgnoreLocationCollision = true;
             myCollisionSound = collisionSound;
             myExplode = explode;
         }
@@ -25,6 +21,7 @@ namespace Swim
             if (n is Monster)
             {
                 location.characters.Remove(n);
+                location.projectiles.Remove(this);
                 return;
             }
         }
@@ -70,12 +67,12 @@ namespace Swim
             {
                 Game1.createRadialDebris(location, "TileSheets\\Projectiles", sourceRect, 4, (int)position.X + 32, (int)position.Y + 32, 12, (int)(position.Y / 64f) + 1);
             }
-            if (myCollisionSound != null && !myCollisionSound.Equals(""))
+            if (!string.IsNullOrEmpty(myCollisionSound))
             {
                 location.playSound(myCollisionSound);
             }
+            // The game only checks destroyMe when the DoDamage function is called, and this projectile bypasses that and just removes the enemies, so this has no effect.
             destroyMe = true;
-
         }
     }
 }

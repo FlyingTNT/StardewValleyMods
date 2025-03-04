@@ -1044,7 +1044,7 @@ namespace Swim
                 velocity.Y = up ? -magnitude : down ? magnitude : 0;
                 velocity.X = right ? magnitude : left ? -magnitude : 0;
 
-                Game1.player.currentLocation.projectiles.Add(new AbigailProjectile(1, 3, 0, 0, 0, velocity.X * 6, velocity.Y * 6, new Vector2(Game1.player.StandingPixel.X - 24, Game1.player.StandingPixel.Y - 48), "Cowboy_monsterDie", null, "Cowboy_gunshot", false, true, Game1.player.currentLocation, Game1.player, shotItemId: "(O)382"));
+                Game1.player.currentLocation.projectiles.Add(new AbigailProjectile(1, 3, 0, 0, 0, velocity.X * 6, velocity.Y * 6, new Vector2(Game1.player.StandingPixel.X - 24, Game1.player.StandingPixel.Y - 48), "Cowboy_monsterDie", null, "Cowboy_gunshot", false, Game1.player.currentLocation, Game1.player, shotItemId: "(O)382"));
                 lastProjectile.Value = Game1.player.millisecondsPlayed;
                 Game1.player.faceDirection(SwimUtils.GetDirection(0, 0, velocity.X, velocity.Y));
             }

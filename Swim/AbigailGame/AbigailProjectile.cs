@@ -3,7 +3,7 @@ using StardewValley;
 using StardewValley.Monsters;
 using StardewValley.Projectiles;
 
-namespace Swim
+namespace Swim.AbigailGame
 {
     public class AbigailProjectile : BasicProjectile
     {
@@ -29,8 +29,8 @@ namespace Swim
         {
             Rectangle sourceRect = GetSourceRect();
             int whichDebris = 12;
-            
-            if(itemId.Value != null)
+
+            if (itemId.Value != null)
             {
                 sourceRect.X += 28;
                 sourceRect.Y += 28;
@@ -58,7 +58,7 @@ namespace Swim
                         break;
                 }
             }
-            
+
             if (itemId.Value != null)
             {
                 Game1.createRadialDebris(location, whichDebris, (int)(position.X + 32f) / 64, (int)(position.Y + 32f) / 64, 6, false, -1, false);

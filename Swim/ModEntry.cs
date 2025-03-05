@@ -14,6 +14,7 @@ using Common.Integrations;
 using Rectangle = Microsoft.Xna.Framework.Rectangle;
 using StardewValley.Extensions;
 using StardewValley.Locations;
+using Swim.AbigailGame;
 
 namespace Swim
 {
@@ -78,6 +79,7 @@ namespace Swim
             SwimHelperEvents.Initialize(Monitor, helper);
             SwimUtils.Initialize(Monitor, helper);
             AnimationManager.Initialize(Monitor, helper);
+            SwimAbigailGame.Initialize(Monitor, helper);
 
             helper.Events.GameLoop.UpdateTicked += SwimHelperEvents.GameLoop_UpdateTicked;
             helper.Events.GameLoop.OneSecondUpdateTicked += SwimHelperEvents.GameLoop_OneSecondUpdateTicked;

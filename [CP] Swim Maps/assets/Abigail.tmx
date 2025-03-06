@@ -226,7 +226,7 @@
  <objectgroup id="2" name="Back"/>
  <layer id="3" name="Buildings" width="18" height="19">
   <data encoding="base64" compression="zlib">
-   eJzjYWRg4KESLmHAjZEBLjXI5pALRs2hvzmUgsFqzmAL5+FsDjXKDWpgagEAhTUZNQ==
+   eJzjYWRg4KESLmHAjZEBLjXI5pALRs2hvzmUgsFqzmAL5+FsDqXlBhfD4MIAiMsZsw==
   </data>
  </layer>
  <objectgroup id="4" name="Buildings"/>

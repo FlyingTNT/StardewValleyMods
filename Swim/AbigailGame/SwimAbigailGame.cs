@@ -14,6 +14,8 @@ namespace Swim.AbigailGame
 {
     public static class SwimAbigailGame
     {
+        private const int gameTicks = 80000;
+
         public static readonly PerScreen<ulong> lastProjectile = new PerScreen<ulong>(() => 0);
         public static readonly PerScreen<int> abigailTicks = new PerScreen<int>();
 
@@ -49,6 +51,7 @@ namespace Swim.AbigailGame
             }
 
             Game1.player.doEmote(9);
+            RemoveExitPool(location);
         }
 
         public static void DrawHud(SpriteBatch b)
@@ -60,12 +63,17 @@ namespace Swim.AbigailGame
             }
             if (abigailTicks.Value > 0)
             {
-                SwimUtils.DrawProgressBar(b, Math.Max((80000 / 16) - abigailTicks.Value, 0), 80000 / 16);
+                SwimUtils.DrawProgressBar(b, Math.Max((gameTicks / 16) - abigailTicks.Value, 0), gameTicks / 16);
             }
         }
 
         public static void GameTick()
         {
+            if(Game1.paused || Game1.freezeControls)
+            {
+                return;
+            }
+
             GameLocation location = Game1.player.currentLocation;
 
             Game1.player.CurrentToolIndex = Game1.player.Items.Count;
@@ -93,7 +101,7 @@ namespace Swim.AbigailGame
             }
 
             abigailTicks.Value++;
-            if (abigailTicks.Value > 80000 / 16f)
+            if (abigailTicks.Value > gameTicks / 16f)
             {
                 if (location.characters.Any(c => c is Monster))
                 {
@@ -109,19 +117,7 @@ namespace Swim.AbigailGame
                     SwimMaps.AddScubaChest(location, new Vector2(8, 8), "ScubaFins");
                 }
 
-                location.setMapTile(8, 16, 91, "Buildings", "desert-new");
-                location.setMapTile(9, 16, 92, "Buildings", "desert-new");
-                location.setTileProperty(9, 16, "Back", "Water", "T");
-                location.setMapTile(10, 16, 93, "Buildings", "desert-new");
-                location.setMapTile(8, 17, 107, "Buildings", "desert-new");
-                location.setMapTile(9, 17, 108, "Back", "desert-new");
-                location.setTileProperty(9, 17, "Back", "Water", "T");
-                location.removeTile(9, 17, "Buildings");
-                location.setMapTile(10, 17, 109, "Buildings", "desert-new");
-                location.setMapTile(8, 18, 139, "Buildings", "desert-new");
-                location.setMapTile(9, 18, 140, "Buildings", "desert-new");
-                location.setMapTile(10, 18, 141, "Buildings", "desert-new");
-                SwimMaps.AddWaterTiles(location);
+                AddExitPool(location);
             }
             else
             {
@@ -244,6 +240,50 @@ namespace Swim.AbigailGame
                 lastProjectile.Value = Game1.player.millisecondsPlayed;
                 Game1.player.faceDirection(SwimUtils.GetDirection(0, 0, velocity.X, velocity.Y));
             }
+        }
+
+        private static void AddExitPool(GameLocation location)
+        {
+            // Creates the pool
+            location.setMapTile(8, 16, 91, "Buildings", "desert-new");
+            location.setMapTile(9, 16, 92, "Buildings", "desert-new");
+            location.setMapTile(10, 16, 93, "Buildings", "desert-new");
+            location.setMapTile(8, 17, 107, "Buildings", "desert-new");
+            location.removeTile(9, 17, "Buildings");
+            location.setMapTile(10, 17, 109, "Buildings", "desert-new");
+            location.setMapTile(8, 18, 139, "Buildings", "desert-new");
+            location.setMapTile(9, 18, 140, "Buildings", "desert-new");
+            location.setMapTile(10, 18, 141, "Buildings", "desert-new");
+            for(int i = 8; i <= 10; i++)
+            {
+                for(int j = 16; j <= 18; j++)
+                {
+                    location.setMapTile(i, j, 108, "Back", "desert-new");
+                    location.setTileProperty(i, j, "Back", "Water", "I"); // "I" property to disable the water effect because the desert tiles don't play nice with it.
+                }
+            }
+            SwimMaps.AddWaterTiles(location);
+        }
+
+        private static void RemoveExitPool(GameLocation location)
+        {
+            for (int i = 8; i <= 10; i++)
+            {
+                for (int j = 16; j <= 18; j++)
+                {
+                    location.removeTileProperty(i, j, "Back", "Water");
+                    location.removeMapTile(i, j, "Back");
+                    location.removeMapTile(i, j, "Buildings");
+                }
+            }
+            SwimMaps.AddWaterTiles(location);
+
+            location.setMapTile(8, 16, 97, "Back", "desert-new");
+            location.setMapTile(9, 16, 97, "Back", "desert-new");
+            location.setMapTile(10, 16, 97, "Back", "desert-new");
+            location.setMapTile(8, 17, 267, "Buildings", "desert-new");
+            location.setMapTile(9, 17, 267, "Buildings", "desert-new");
+            location.setMapTile(10, 17, 267, "Buildings", "desert-new");
         }
     }
 }

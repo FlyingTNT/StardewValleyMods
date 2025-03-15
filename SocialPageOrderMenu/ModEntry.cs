@@ -16,7 +16,6 @@ using System.Reflection;
 using System.Reflection.Emit;
 using static StardewValley.Menus.SocialPage;
 using SocialPageOrderRedux.UI;
-using Leclair.Stardew.BetterGameMenu;
 
 namespace SocialPageOrderRedux
 {
@@ -195,6 +194,20 @@ namespace SocialPageOrderRedux
         {
             CustomGiftLimitsAPI = SHelper.ModRegistry.GetApi<ICustomGiftLimitsAPI>(IDs.CustomGiftLimits);
             BetterGameMenuAPI = SHelper.ModRegistry.GetApi<IBetterGameMenuApi>(IDs.BetterGameMenu);
+
+            if(BetterGameMenuAPI is not null)
+            {
+                BetterGameMenuAPI.OnTabChanged(BetterGameMenuChangeTab);
+                BetterGameMenuAPI.OnMenuCreated(BetterGameMenuMenuCreated);
+
+                // Add the receiveLeftClick patches to BetterGameMenu. These just set a flag when the method is entered and left that makes it so the filter being selected does not make readyToClose on the SocialPage be false.
+                // This is necessary because BetterGameMenu (and the base game) checks readyToClose before changing tabs, so without this it would not be possible to click on another tab when the filter is selected.
+                var harmony = new Harmony(ModManifest.UniqueID);
+                harmony.Patch(AccessTools.Method(BetterGameMenuAPI.GetMenuType(), nameof(IClickableMenu.receiveLeftClick)), // The Better Game Menu left click has necessarily the same name as IClickableMenu.receiveLeftClick
+                    prefix: new HarmonyMethod(typeof(ModEntry), nameof(GameMenu_receiveLeftClick_Prefix)),
+                    postfix: new HarmonyMethod(typeof(ModEntry), nameof(GameMenu_receiveLeftClick_Postfix))
+                );
+            }
 
             // get Generic Mod Config Menu's API (if it's installed)
             var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>(IDs.GMCM);
@@ -422,6 +435,21 @@ namespace SocialPageOrderRedux
         #endregion
 
         #region SOCIAL_PAGE_SETUP_PATCHES
+
+        /// <summary>
+        /// Prevents a null error due to the order that BetterGameMenu events fire relative to our patches.
+        /// </summary>
+        public static void BetterGameMenuMenuCreated(IClickableMenu menu)
+        {
+            try
+            {
+                InitElements();
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(BetterGameMenuMenuCreated)}: {ex}", LogLevel.Error);
+            }
+        }
 
         public static void SocialPage_Constructor_Postfix(SocialPage __instance)
         {
@@ -705,6 +733,39 @@ namespace SocialPageOrderRedux
             {
                 filterField.Value.Selected = false;
             }
+        }
+
+        public static void BetterGameMenuChangeTab(ITabChangedEvent e)
+        {
+            try
+            {
+                if (BetterGameMenuAPI.ActivePage is SocialPage page)
+                {
+                    if (Config.UseButton)
+                    {
+                        // __instance.tabs[GameMenu.inventoryTab].leftNeighborID = buttonId; I do not believe it is possible to set the neighbors of the tabs with BetterGameMenu. Check for updates in case it becomes possible.
+                    }
+
+                    if (Config.UseFilter && filterField.Value is not null && !Game1.options.gamepadControls)
+                        filterField.Value.Selected = Config.SearchBarAutoFocus;
+
+                    // I don't think this is necessary, but I'm not removing it because it also isn't hurting anything.
+                    ApplyFilter(page);
+                    if (Game1.options.SnappyMenus)
+                    {
+                        page.snapToDefaultClickableComponent();
+                    }
+                }
+                else
+                {
+                    filterField.Value.Selected = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(BetterGameMenuChangeTab)}: {ex}", LogLevel.Error);
+            }
+
         }
 
         #endregion
@@ -1049,7 +1110,7 @@ namespace SocialPageOrderRedux
 
         public static int GetButtonX(SocialPage page)
         {
-            return page.xPositionOnScreen + buttonXOffset + Config.ButtonOffsetX;
+            return page.xPositionOnScreen + buttonXOffset + Config.ButtonOffsetX + (BetterGameMenuAPI is null ? 0 : -16);
         }
 
         public static int GetButtonY(SocialPage page)

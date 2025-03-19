@@ -741,11 +741,6 @@ namespace SocialPageOrderRedux
             {
                 if (BetterGameMenuAPI.ActivePage is SocialPage page)
                 {
-                    if (Config.UseButton)
-                    {
-                        // __instance.tabs[GameMenu.inventoryTab].leftNeighborID = buttonId; I do not believe it is possible to set the neighbors of the tabs with BetterGameMenu. Check for updates in case it becomes possible.
-                    }
-
                     if (Config.UseFilter && filterField.Value is not null && !Game1.options.gamepadControls)
                         filterField.Value.Selected = Config.SearchBarAutoFocus;
 
@@ -1173,7 +1168,7 @@ namespace SocialPageOrderRedux
 
             button.Value ??= new ClickableTextureComponent(Rectangle.Empty, Game1.mouseCursors, buttonTextureSource, 4, false)
                 {
-                    rightNeighborID = GameMenu.region_inventoryTab,
+                    rightNeighborID = ClickableComponent.SNAP_AUTOMATIC,
                     myID = buttonId
                 };
 
@@ -1191,7 +1186,8 @@ namespace SocialPageOrderRedux
                             ApplyFilter(page, true);
                     })
                 {
-                    myID = talkedId
+                    myID = talkedId,
+                    rightNeighborID = 0
                 };
 
             showGiftedCheckbox.Value ??= 
@@ -1208,7 +1204,8 @@ namespace SocialPageOrderRedux
                             ApplyFilter(page, true);
                     })
                 {
-                    myID = giftedId
+                    myID = giftedId,
+                    rightNeighborID = 0
                 };
 
             showTalkedCheckbox.Value.isBright = ShowTalked;

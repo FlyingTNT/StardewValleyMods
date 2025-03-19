@@ -1169,6 +1169,7 @@ namespace SocialPageOrderRedux
             button.Value ??= new ClickableTextureComponent(Rectangle.Empty, Game1.mouseCursors, buttonTextureSource, 4, false)
                 {
                     rightNeighborID = ClickableComponent.SNAP_AUTOMATIC,
+                    rightNeighborImmutable = true,
                     myID = buttonId
                 };
 

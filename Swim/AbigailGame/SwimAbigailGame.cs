@@ -78,11 +78,7 @@ namespace Swim.AbigailGame
 
             Game1.player.CurrentToolIndex = Game1.player.Items.Count;
 
-            List<NPC> list = location.characters.ToList().FindAll((n) => (n is Monster) && (n as Monster).Health <= 0);
-            foreach (NPC n in list)
-            {
-                location.characters.Remove(n);
-            }
+            location.characters.RemoveWhere(c => c is Monster m && m.Health <= 0);
 
             if (abigailTicks.Value < 0)
             {
@@ -262,7 +258,7 @@ namespace Swim.AbigailGame
                     location.setTileProperty(i, j, "Back", "Water", "I"); // "I" property to disable the water effect because the desert tiles don't play nice with it.
                 }
             }
-            SwimMaps.AddWaterTiles(location);
+            SwimMaps.ReloadWaterTiles(location);
         }
 
         private static void RemoveExitPool(GameLocation location)
@@ -276,7 +272,7 @@ namespace Swim.AbigailGame
                     location.removeMapTile(i, j, "Buildings");
                 }
             }
-            SwimMaps.AddWaterTiles(location);
+            SwimMaps.ReloadWaterTiles(location);
 
             location.setMapTile(8, 16, 97, "Back", "desert-new");
             location.setMapTile(9, 16, 97, "Back", "desert-new");

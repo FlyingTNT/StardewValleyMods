@@ -1,10 +1,10 @@
 ﻿using Microsoft.Xna.Framework;
 using StardewModdingAPI;
 using StardewValley;
+using StardewValley.Constants;
 using StardewValley.Extensions;
 using StardewValley.GameData.Locations;
 using StardewValley.Internal;
-using StardewValley.Locations;
 using StardewValley.Objects;
 using StardewValley.Tools;
 using System;
@@ -64,7 +64,7 @@ namespace Swim
                 gameLocation.overlayObjects[pos] = new Chest(new List<Item>() { new Boots(ModEntry.scubaFinsID) }, pos, false, 0);
             }
         }
-        public static void AddWaterTiles(GameLocation gameLocation)
+        public static void ReloadWaterTiles(GameLocation gameLocation)
         {
             gameLocation.waterTiles = new WaterTiles(new bool[gameLocation.map.Layers[0].LayerWidth, gameLocation.map.Layers[0].LayerHeight]);
             bool foundAnyWater = false;
@@ -90,12 +90,12 @@ namespace Swim
             }
             if (!foundAnyWater)
             {
-                SMonitor.Log($"{Game1.player.currentLocation.Name} has no water tiles");
+                SMonitor.Log($"{gameLocation.Name} has no water tiles");
                 gameLocation.waterTiles = null;
             }
             else
             {
-                SMonitor.Log($"Gave {Game1.player.currentLocation.Name} water tiles");
+                SMonitor.Log($"Gave {gameLocation.Name} water tiles");
             }
         }
 
@@ -410,223 +410,28 @@ namespace Swim
         public static void AddOceanTreasure(GameLocation l)
         {
             List<Vector2> spots = GetValidSpawnSpots(l);
-            int treasureNo = (int)(Game1.random.Next(Config.MinOceanChests, Config.MaxOceanChests));
+            int treasureNo = (Game1.random.Next(Config.MinOceanChests, Config.MaxOceanChests));
 
             foreach (Vector2 v in GetRandom(spots, treasureNo))
             {
-                List<Item> treasures = new List<Item>();
-                float chance = 1f;
-                while (Game1.random.NextDouble() <= (double)chance)
+                List<Item> treasures = null;
+                try
                 {
-                    chance *= 0.4f;
-                    if (Game1.random.NextDouble() < 0.5)
-                    {
-                        treasures.Add(new Object("774", 2 + ((Game1.random.NextDouble() < 0.25) ? 2 : 0), false, -1, 0));
-                    }
-                    switch (Game1.random.Next(4))
-                    {
-                        case 0:
-                            if (Game1.random.NextDouble() < 0.03)
-                            {
-                                treasures.Add(new Object("386", Game1.random.Next(1, 3), false, -1, 0));
-                            }
-                            else
-                            {
-                                List<string> possibles = new List<string>();
-                                possibles.Add("384");
-                                if (possibles.Count == 0 || Game1.random.NextDouble() < 0.6)
-                                {
-                                    possibles.Add("380");
-                                }
-                                if (possibles.Count == 0 || Game1.random.NextDouble() < 0.6)
-                                {
-                                    possibles.Add("378");
-                                }
-                                if (possibles.Count == 0 || Game1.random.NextDouble() < 0.6)
-                                {
-                                    possibles.Add("388");
-                                }
-                                if (possibles.Count == 0 || Game1.random.NextDouble() < 0.6)
-                                {
-                                    possibles.Add("390");
-                                }
-                                possibles.Add("382");
-                                treasures.Add(new Object(possibles.ElementAt(Game1.random.Next(possibles.Count)), Game1.random.Next(2, 7) * ((Game1.random.NextDouble() < 0.05 + (double)Game1.player.luckLevel.Value * 0.015) ? 2 : 1), false, -1, 0));
-                                if (Game1.random.NextDouble() < 0.05 + (double)Game1.player.LuckLevel * 0.03)
-                                {
-                                    treasures.Last().Stack *= 2;
-                                }
-                            }
-                            break;
-                        case 1:
-                            if (Game1.random.NextDouble() < 0.1)
-                            {
-                                treasures.Add(new Object("687", 1, false, -1, 0));
-                            }
-                            else if (Game1.random.NextDouble() < 0.25 && Game1.player.craftingRecipes.ContainsKey("Wild Bait"))
-                            {
-                                treasures.Add(new Object("774", 5 + ((Game1.random.NextDouble() < 0.25) ? 5 : 0), false, -1, 0));
-                            }
-                            else
-                            {
-                                treasures.Add(new Object("685", 10, false, -1, 0));
-                            }
-                            break;
-                        case 2:
-                            if (Game1.random.NextDouble() < 0.1 && Game1.netWorldState.Value.LostBooksFound < 21 && Game1.player.hasOrWillReceiveMail("lostBookFound"))
-                            {
-                                treasures.Add(new Object("102", 1, false, -1, 0));
-                            }
-                            else if (Game1.player.archaeologyFound.Count() > 0)
-                            {
-                                if (Game1.random.NextDouble() < 0.125)
-                                {
-                                    treasures.Add(new Object("585", 1, false, -1, 0));
-                                }
-                                else if (Game1.random.NextDouble() < 0.25)
-                                {
-                                    treasures.Add(new Object("588", 1, false, -1, 0));
-                                }
-                                else if (Game1.random.NextDouble() < 0.5)
-                                {
-                                    treasures.Add(new Object("103", 1, false, -1, 0));
-                                }
-                                if (Game1.random.NextDouble() < 0.5)
-                                {
-                                    treasures.Add(new Object("120", 1, false, -1, 0));
-                                }
+                    treasures = GenerateChestTreasure();
+                }
+                catch (Exception ex)
+                {
+                    SMonitor.Log($"Filed in {nameof(GenerateChestTreasure)}: {ex}");
+                }
 
-                                else
-                                {
-                                    treasures.Add(new Object("535", 1, false, -1, 0));
-                                }
-                            }
-                            else
-                            {
-                                treasures.Add(new Object("382", Game1.random.Next(1, 3), false, -1, 0));
-                            }
-                            break;
-                        case 3:
-                            switch (Game1.random.Next(3))
-                            {
-                                case 0:
-                                    switch (Game1.random.Next(3))
-                                    {
-                                        case 0:
-                                            treasures.Add(new Object((537 + ((Game1.random.NextDouble() < 0.4) ? Game1.random.Next(-2, 0) : 0)).ToString(), Game1.random.Next(1, 4), false, -1, 0));
-                                            break;
-                                        case 1:
-                                            treasures.Add(new Object((536 + ((Game1.random.NextDouble() < 0.4) ? -1 : 0)).ToString(), Game1.random.Next(1, 4), false, -1, 0));
-                                            break;
-                                        case 2:
-                                            treasures.Add(new Object("535", Game1.random.Next(1, 4), false, -1, 0));
-                                            break;
-                                    }
-                                    if (Game1.random.NextDouble() < 0.05 + (double)Game1.player.LuckLevel * 0.03)
-                                    {
-                                        treasures.Last().Stack *= 2;
-                                    }
-                                    break;
-                                case 1:
-                                    switch (Game1.random.Next(4))
-                                    {
-                                        case 0:
-                                            treasures.Add(new Object("382", Game1.random.Next(1, 4), false, -1, 0));
-                                            break;
-                                        case 1:
-                                            treasures.Add(new Object(((Game1.random.NextDouble() < 0.3) ? 82 : ((Game1.random.NextDouble() < 0.5) ? 64 : 60)).ToString(), Game1.random.Next(1, 3), false, -1, 0));
-                                            break;
-                                        case 2:
-                                            treasures.Add(new Object(((Game1.random.NextDouble() < 0.3) ? 84 : ((Game1.random.NextDouble() < 0.5) ? 70 : 62)).ToString(), Game1.random.Next(1, 3), false, -1, 0));
-                                            break;
-                                        case 3:
-                                            treasures.Add(new Object(((Game1.random.NextDouble() < 0.3) ? 86 : ((Game1.random.NextDouble() < 0.5) ? 66 : 68)).ToString(), Game1.random.Next(1, 3), false, -1, 0));
-                                            break;
-                                    }
-                                    if (Game1.random.NextDouble() < 0.05)
-                                    {
-                                        treasures.Add(new Object("72", 1, false, -1, 0));
-                                    }
-                                    if (Game1.random.NextDouble() < 0.05)
-                                    {
-                                        treasures.Last().Stack *= 2;
-                                    }
-                                    break;
-                                case 2:
-                                    if (Game1.player.FishingLevel < 2)
-                                    {
-                                        treasures.Add(new Object("770", Game1.random.Next(1, 4), false, -1, 0));
-                                    }
-                                    else
-                                    {
-                                        float luckModifier = (1f + (float)Game1.player.DailyLuck);
-                                        if (Game1.random.NextDouble() < 0.05 * (double)luckModifier && !Game1.player.specialItems.Contains("14"))
-                                        {
-                                            treasures.Add(new MeleeWeapon("14")
-                                            {
-                                                specialItem = true
-                                            });
-                                        }
-                                        if (Game1.random.NextDouble() < 0.05 * (double)luckModifier && !Game1.player.specialItems.Contains("51"))
-                                        {
-                                            treasures.Add(new MeleeWeapon("51")
-                                            {
-                                                specialItem = true
-                                            });
-                                        }
-                                        if (Game1.random.NextDouble() < 0.07 * (double)luckModifier)
-                                        {
-                                            switch (Game1.random.Next(3))
-                                            {
-                                                case 0:
-                                                    treasures.Add(new Ring("516" + ((Game1.random.NextDouble() < (double)((float)Game1.player.LuckLevel / 11f)) ? 1 : 0)));
-                                                    break;
-                                                case 1:
-                                                    treasures.Add(new Ring("518" + ((Game1.random.NextDouble() < (double)((float)Game1.player.LuckLevel / 11f)) ? 1 : 0)));
-                                                    break;
-                                                case 2:
-                                                    treasures.Add(new Ring(""+Game1.random.Next(529, 535)));
-                                                    break;
-                                            }
-                                        }
-                                        if (Game1.random.NextDouble() < 0.02 * (double)luckModifier)
-                                        {
-                                            treasures.Add(new Object("166", 1, false, -1, 0));
-                                        }
-                                        if (Game1.random.NextDouble() < 0.001 * (double)luckModifier)
-                                        {
-                                            treasures.Add(new Object("74", 1, false, -1, 0));
-                                        }
-                                        if (Game1.random.NextDouble() < 0.01 * (double)luckModifier)
-                                        {
-                                            treasures.Add(new Object("127", 1, false, -1, 0));
-                                        }
-                                        if (Game1.random.NextDouble() < 0.01 * (double)luckModifier)
-                                        {
-                                            treasures.Add(new Object("126", 1, false, -1, 0));
-                                        }
-                                        if (Game1.random.NextDouble() < 0.01 * (double)luckModifier)
-                                        {
-                                            treasures.Add(new Ring("527"));
-                                        }
-                                        if (Game1.random.NextDouble() < 0.01 * (double)luckModifier)
-                                        {
-                                            treasures.Add(new Boots("" + Game1.random.Next(504, 514)));
-                                        }
-                                        if (treasures.Count == 1)
-                                        {
-                                            treasures.Add(new Object("72", 1, false, -1, 0));
-                                        }
-                                    }
-                                    break;
-                            }
-                            break;
-                    }
-                }
-                if (treasures.Count == 0)
+                if(treasures is null)
                 {
-                    treasures.Add(new Object("685", Game1.random.Next(1, 4) * 5, false, -1, 0));
+                    continue;
                 }
+
+                // Remove any invalid items that GenerateChestTreasure may have added
+                treasures.RemoveAll(item => item is null || item.Name == Item.ErrorItemName);
+
                 if (treasures.Count > 0)
                 {
                     Color tint = Color.White;
@@ -639,6 +444,319 @@ namespace Swim
                 {
                     SMonitor.Log($"Treasures: {obj.QualifiedItemId} {obj.DisplayName}");
                 }
+            }
+        }
+
+        /// <summary>
+        /// This is ripped from <see cref="FishingRod.openTreasureMenuEndFunction(int)"/> with minor tweaks.
+        /// </summary>
+        public static List<Item> GenerateChestTreasure()
+        {
+            int clearWaterDistance = Game1.random.Next(1, 7);
+            Farmer who = Game1.player;
+            float chance = 1;
+            List<Item> treasures = new();
+            while (Game1.random.NextDouble() <= (double)chance)
+            {
+                chance *= 0.4f;
+                while (Utility.tryRollMysteryBox(0.08 + Game1.player.team.AverageDailyLuck() / 5.0))
+                {
+                    treasures.Add(ItemRegistry.Create((Game1.player.stats.Get(StatKeys.Mastery(2)) != 0) ? "(O)GoldenMysteryBox" : "(O)MysteryBox"));
+                }
+                if (Game1.player.stats.Get(StatKeys.Mastery(0)) != 0 && Game1.random.NextDouble() < 0.05)
+                {
+                    treasures.Add(ItemRegistry.Create("(O)GoldenAnimalCracker"));
+                }
+                if (Game1.random.NextDouble() < 0.5)
+                {
+                    switch (Game1.random.Next(13))
+                    {
+                        case 0:
+                            treasures.Add(ItemRegistry.Create("(O)337", Game1.random.Next(1, 6)));
+                            break;
+                        case 1:
+                            treasures.Add(ItemRegistry.Create("(O)SkillBook_" + Game1.random.Next(5)));
+                            break;
+                        case 2:
+                            treasures.Add(Utility.getRaccoonSeedForCurrentTimeOfYear(Game1.player, Game1.random, 8));
+                            break;
+                        case 3:
+                            treasures.Add(ItemRegistry.Create("(O)213"));
+                            break;
+                        case 4:
+                            treasures.Add(ItemRegistry.Create("(O)872", Game1.random.Next(3, 6)));
+                            break;
+                        case 5:
+                            treasures.Add(ItemRegistry.Create("(O)687"));
+                            break;
+                        case 6:
+                            treasures.Add(ItemRegistry.Create("(O)ChallengeBait", Game1.random.Next(3, 6)));
+                            break;
+                        case 7:
+                            treasures.Add(ItemRegistry.Create("(O)703", Game1.random.Next(3, 6)));
+                            break;
+                        case 8:
+                            treasures.Add(ItemRegistry.Create("(O)StardropTea"));
+                            break;
+                        case 9:
+                            treasures.Add(ItemRegistry.Create("(O)797"));
+                            break;
+                        case 10:
+                            treasures.Add(ItemRegistry.Create("(O)733"));
+                            break;
+                        case 11:
+                            treasures.Add(ItemRegistry.Create("(O)728"));
+                            break;
+                        case 12:
+                            treasures.Add(ItemRegistry.Create("(O)SonarBobber"));
+                            break;
+                    }
+                    continue;
+                }
+                switch (Game1.random.Next(4))
+                {
+                    case 0:
+                        {
+                            if (clearWaterDistance >= 5 && Game1.random.NextDouble() < 0.03)
+                            {
+                                treasures.Add(new Object("386", Game1.random.Next(1, 3)));
+                                break;
+                            }
+                            List<int> possibles = new List<int>();
+                            if (clearWaterDistance >= 4)
+                            {
+                                possibles.Add(384);
+                            }
+                            if (clearWaterDistance >= 3 && (possibles.Count == 0 || Game1.random.NextDouble() < 0.6))
+                            {
+                                possibles.Add(380);
+                            }
+                            if (possibles.Count == 0 || Game1.random.NextDouble() < 0.6)
+                            {
+                                possibles.Add(378);
+                            }
+                            if (possibles.Count == 0 || Game1.random.NextDouble() < 0.6)
+                            {
+                                possibles.Add(388);
+                            }
+                            if (possibles.Count == 0 || Game1.random.NextDouble() < 0.6)
+                            {
+                                possibles.Add(390);
+                            }
+                            possibles.Add(382);
+                            Item treasure = ItemRegistry.Create(Game1.random.ChooseFrom(possibles).ToString(), Game1.random.Next(2, 7) * ((!(Game1.random.NextDouble() < 0.05 + (double)who.luckLevel.Value * 0.015)) ? 1 : 2));
+                            if (Game1.random.NextDouble() < 0.05 + (double)who.LuckLevel * 0.03)
+                            {
+                                treasure.Stack *= 2;
+                            }
+                            treasures.Add(treasure);
+                            break;
+                        }
+                    case 1:
+                        if (clearWaterDistance >= 4 && Game1.random.NextDouble() < 0.1 && who.FishingLevel >= 6)
+                        {
+                            treasures.Add(ItemRegistry.Create("(O)687"));
+                        }
+                        else if (Game1.random.NextDouble() < 0.25 && who.craftingRecipes.ContainsKey("Wild Bait"))
+                        {
+                            treasures.Add(ItemRegistry.Create("(O)774", 5 + ((Game1.random.NextDouble() < 0.25) ? 5 : 0)));
+                        }
+                        else if (Game1.random.NextDouble() < 0.11 && who.FishingLevel >= 6)
+                        {
+                            treasures.Add(ItemRegistry.Create("(O)SonarBobber"));
+                        }
+                        else if (who.FishingLevel >= 6)
+                        {
+                            treasures.Add(ItemRegistry.Create("(O)DeluxeBait", 5));
+                        }
+                        else
+                        {
+                            treasures.Add(ItemRegistry.Create("(O)685", 10));
+                        }
+                        break;
+                    case 2:
+                        if (Game1.random.NextDouble() < 0.1 && Game1.netWorldState.Value.LostBooksFound < 21 && who != null && who.hasOrWillReceiveMail("lostBookFound"))
+                        {
+                            treasures.Add(ItemRegistry.Create("(O)102"));
+                        }
+                        else if (who.archaeologyFound.Length > 0)
+                        {
+                            if (Game1.random.NextDouble() < 0.25 && who.FishingLevel > 1)
+                            {
+                                treasures.Add(ItemRegistry.Create("(O)" + Game1.random.Next(585, 588)));
+                            }
+                            else if (Game1.random.NextBool() && who.FishingLevel > 1)
+                            {
+                                treasures.Add(ItemRegistry.Create("(O)" + Game1.random.Next(103, 120)));
+                            }
+                            else
+                            {
+                                treasures.Add(ItemRegistry.Create("(O)535"));
+                            }
+                        }
+                        else
+                        {
+                            treasures.Add(ItemRegistry.Create("(O)382", Game1.random.Next(1, 3)));
+                        }
+                        break;
+                    case 3:
+                        switch (Game1.random.Next(3))
+                        {
+                            case 0:
+                                {
+                                    Item treasure2 = ((clearWaterDistance >= 4) ? ItemRegistry.Create("(O)" + (537 + ((Game1.random.NextDouble() < 0.4) ? Game1.random.Next(-2, 0) : 0)), Game1.random.Next(1, 4)) : ((clearWaterDistance < 3) ? ItemRegistry.Create("(O)535", Game1.random.Next(1, 4)) : ItemRegistry.Create("(O)" + (536 + ((Game1.random.NextDouble() < 0.4) ? (-1) : 0)), Game1.random.Next(1, 4))));
+                                    if (Game1.random.NextDouble() < 0.05 + (double)who.LuckLevel * 0.03)
+                                    {
+                                        treasure2.Stack *= 2;
+                                    }
+                                    treasures.Add(treasure2);
+                                    break;
+                                }
+                            case 1:
+                                {
+                                    if (who.FishingLevel < 2)
+                                    {
+                                        treasures.Add(ItemRegistry.Create("(O)382", Game1.random.Next(1, 4)));
+                                        break;
+                                    }
+                                    Item treasure3;
+                                    if (clearWaterDistance >= 4)
+                                    {
+                                        treasures.Add(treasure3 = ItemRegistry.Create("(O)" + ((Game1.random.NextDouble() < 0.3) ? 82 : Game1.random.Choose(64, 60)), Game1.random.Next(1, 3)));
+                                    }
+                                    else if (clearWaterDistance >= 3)
+                                    {
+                                        treasures.Add(treasure3 = ItemRegistry.Create("(O)" + ((Game1.random.NextDouble() < 0.3) ? 84 : Game1.random.Choose(70, 62)), Game1.random.Next(1, 3)));
+                                    }
+                                    else
+                                    {
+                                        treasures.Add(treasure3 = ItemRegistry.Create("(O)" + ((Game1.random.NextDouble() < 0.3) ? 86 : Game1.random.Choose(66, 68)), Game1.random.Next(1, 3)));
+                                    }
+                                    if (Game1.random.NextDouble() < 0.028 * (double)((float)clearWaterDistance / 5f))
+                                    {
+                                        treasures.Add(treasure3 = ItemRegistry.Create("(O)72"));
+                                    }
+                                    if (Game1.random.NextDouble() < 0.05)
+                                    {
+                                        treasure3.Stack *= 2;
+                                    }
+                                    break;
+                                }
+                            case 2:
+                                {
+                                    if (who.FishingLevel < 2)
+                                    {
+                                        treasures.Add(new Object("770", Game1.random.Next(1, 4)));
+                                        break;
+                                    }
+                                    float luckModifier = (1f + (float)who.DailyLuck) * ((float)clearWaterDistance / 5f);
+                                    if (Game1.random.NextDouble() < 0.05 * (double)luckModifier && !who.specialItems.Contains("14"))
+                                    {
+                                        Item weapon2 = MeleeWeapon.attemptAddRandomInnateEnchantment(ItemRegistry.Create("(W)14"), Game1.random);
+                                        weapon2.specialItem = true;
+                                        treasures.Add(weapon2);
+                                    }
+                                    if (Game1.random.NextDouble() < 0.05 * (double)luckModifier && !who.specialItems.Contains("51"))
+                                    {
+                                        Item weapon = MeleeWeapon.attemptAddRandomInnateEnchantment(ItemRegistry.Create("(W)51"), Game1.random);
+                                        weapon.specialItem = true;
+                                        treasures.Add(weapon);
+                                    }
+                                    if (Game1.random.NextDouble() < 0.07 * (double)luckModifier)
+                                    {
+                                        switch (Game1.random.Next(3))
+                                        {
+                                            case 0:
+                                                treasures.Add(new Ring((516 + ((Game1.random.NextDouble() < (double)((float)who.LuckLevel / 11f)) ? 1 : 0)).ToString()));
+                                                break;
+                                            case 1:
+                                                treasures.Add(new Ring((518 + ((Game1.random.NextDouble() < (double)((float)who.LuckLevel / 11f)) ? 1 : 0)).ToString()));
+                                                break;
+                                            case 2:
+                                                treasures.Add(new Ring(Game1.random.Next(529, 535).ToString()));
+                                                break;
+                                        }
+                                    }
+                                    if (Game1.random.NextDouble() < 0.02 * (double)luckModifier)
+                                    {
+                                        treasures.Add(ItemRegistry.Create("(O)166"));
+                                    }
+                                    if (who.FishingLevel > 5 && Game1.random.NextDouble() < 0.001 * (double)luckModifier)
+                                    {
+                                        treasures.Add(ItemRegistry.Create("(O)74"));
+                                    }
+                                    if (Game1.random.NextDouble() < 0.01 * (double)luckModifier)
+                                    {
+                                        treasures.Add(ItemRegistry.Create("(O)127"));
+                                    }
+                                    if (Game1.random.NextDouble() < 0.01 * (double)luckModifier)
+                                    {
+                                        treasures.Add(ItemRegistry.Create("(O)126"));
+                                    }
+                                    if (Game1.random.NextDouble() < 0.01 * (double)luckModifier)
+                                    {
+                                        treasures.Add(new Ring("527"));
+                                    }
+                                    if (Game1.random.NextDouble() < 0.01 * (double)luckModifier)
+                                    {
+                                        treasures.Add(ItemRegistry.Create("(B)" + Game1.random.Next(504, 514)));
+                                    }
+                                    if (treasures.Count == 1)
+                                    {
+                                        treasures.Add(ItemRegistry.Create("(O)72"));
+                                    }
+                                    if (Game1.player.stats.Get("FishingTreasures") > 3)
+                                    {
+                                        Random r = Utility.CreateRandom(Game1.player.stats.Get("FishingTreasures") * 27973, Game1.uniqueIDForThisGame);
+                                        if (r.NextDouble() < 0.05 * (double)luckModifier)
+                                        {
+                                            treasures.Add(ItemRegistry.Create("(O)SkillBook_" + r.Next(5)));
+                                            chance = 0f;
+                                        }
+                                    }
+                                    break;
+                                }
+                        }
+                        break;
+                }
+            }
+            if (treasures.Count == 0)
+            {
+                treasures.Add(ItemRegistry.Create("(O)685", Game1.random.Next(1, 4) * 5));
+            }
+
+            return treasures;
+        }
+
+        /// <summary>
+        /// Method to test <see cref="GenerateChestTreasure"/> to check what items it is producing and at what rates.
+        /// </summary>
+        public static void TestGenerateChestTreasure()
+        {
+            Dictionary<string, int> counts = new();
+            int total = 0;
+            for (int i = 0; i < 1000000; i++)
+            {
+                foreach (Item item in GenerateChestTreasure())
+                {
+                    if (counts.ContainsKey(item.QualifiedItemId))
+                    {
+                        counts[item.QualifiedItemId]++;
+                    }
+                    else
+                    {
+                        counts[item.QualifiedItemId] = 1;
+                    }
+
+                    total++;
+                }
+            }
+
+            List<string> ids = counts.Keys.ToList();
+            ids.Sort((a, b) => counts[b].CompareTo(counts[a]));
+            foreach (string id in ids)
+            {
+                SMonitor.Log($"{ItemRegistry.Create(id).DisplayName} ({id}): {counts[id]} -> {counts[id] / (float)total}%");
             }
         }
 

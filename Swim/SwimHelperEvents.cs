@@ -340,7 +340,7 @@ namespace Swim
                 if (kvp.Value.Features.Contains("WaterTiles"))
                 {
                     SMonitor.Log($"Adding water tiles to GameLocation {location.Name} ");
-                    SwimMaps.AddWaterTiles(location);
+                    SwimMaps.ReloadWaterTiles(location);
                 }
                 if (kvp.Value.Features.Contains("Underwater"))
                 {

@@ -3,7 +3,6 @@ using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using StardewModdingAPI;
 using StardewValley;
-using StardewValley.Locations;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -439,9 +438,9 @@ namespace Swim
 
                 // Because the shape of the hitbox is weird, we offset it so that it makes sense visually and prevents the player from clipping into things.
                 int top = (int)Math.Round((position.Top - 48) / 64f, MidpointRounding.AwayFromZero);
-                int right = (int)Math.Round((position.Right - 16) / 64f, MidpointRounding.AwayFromZero);
+                int right = (int)Math.Round((position.Right - 32) / 64f, MidpointRounding.AwayFromZero);
                 int bottom = (int)Math.Round((position.Bottom - 16) / 64f, MidpointRounding.AwayFromZero);
-                int left = (int)Math.Round((position.Left - 48) / 64f, MidpointRounding.AwayFromZero);
+                int left = (int)Math.Round((position.Left - 32) / 64f, MidpointRounding.AwayFromZero);
 
                 int inWaterCount = 0;
                 int outOfBoundsCount = 0;

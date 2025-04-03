@@ -50,7 +50,7 @@
                     "LastTile": 49,
                     "DestinationHorizontal": false,
                     "OtherMapIndex": 120,
-                    "OtherMapFirstTile": 104,
+                    "OtherMapFirstTile": 102,
                     "OtherMapLastTile": 119,
                     "OtherMapName": "Forest"
                 }
@@ -93,7 +93,7 @@
                     "LastTile": 48,
                     "DestinationHorizontal": false,
                     "OtherMapIndex": 0,
-                    "OtherMapFirstTile": 95,
+                    "OtherMapFirstTile": 94,
                     "OtherMapLastTile": 104,
                     "OtherMapName":"Town",
                 },
@@ -194,7 +194,7 @@
                     "DestinationHorizontal": true,
                     "OtherMapIndex": 0,
                     "OtherMapFirstTile": 57,
-                    "OtherMapLastTile": 61,
+                    "OtherMapLastTile": 62,
                     "OtherMapName":"Beach",
                 },
                 {
@@ -212,8 +212,8 @@
                     "FirstTile": 94,
                     "LastTile": 104,
                     "DestinationHorizontal": false,
-                    "OtherMapIndex": 119,
-                    "OtherMapFirstTile": 39,
+                    "OtherMapIndex": 120,
+                    "OtherMapFirstTile": 37,
                     "OtherMapLastTile": 48,
                     "OtherMapName":"Forest",
                 },

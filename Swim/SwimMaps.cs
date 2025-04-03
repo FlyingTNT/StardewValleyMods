@@ -467,52 +467,6 @@ namespace Swim
                 {
                     treasures.Add(ItemRegistry.Create("(O)GoldenAnimalCracker"));
                 }
-                if (Game1.random.NextDouble() < 0.5)
-                {
-                    switch (Game1.random.Next(13))
-                    {
-                        case 0:
-                            treasures.Add(ItemRegistry.Create("(O)337", Game1.random.Next(1, 6)));
-                            break;
-                        case 1:
-                            treasures.Add(ItemRegistry.Create("(O)SkillBook_" + Game1.random.Next(5)));
-                            break;
-                        case 2:
-                            treasures.Add(Utility.getRaccoonSeedForCurrentTimeOfYear(Game1.player, Game1.random, 8));
-                            break;
-                        case 3:
-                            treasures.Add(ItemRegistry.Create("(O)213"));
-                            break;
-                        case 4:
-                            treasures.Add(ItemRegistry.Create("(O)872", Game1.random.Next(3, 6)));
-                            break;
-                        case 5:
-                            treasures.Add(ItemRegistry.Create("(O)687"));
-                            break;
-                        case 6:
-                            treasures.Add(ItemRegistry.Create("(O)ChallengeBait", Game1.random.Next(3, 6)));
-                            break;
-                        case 7:
-                            treasures.Add(ItemRegistry.Create("(O)703", Game1.random.Next(3, 6)));
-                            break;
-                        case 8:
-                            treasures.Add(ItemRegistry.Create("(O)StardropTea"));
-                            break;
-                        case 9:
-                            treasures.Add(ItemRegistry.Create("(O)797"));
-                            break;
-                        case 10:
-                            treasures.Add(ItemRegistry.Create("(O)733"));
-                            break;
-                        case 11:
-                            treasures.Add(ItemRegistry.Create("(O)728"));
-                            break;
-                        case 12:
-                            treasures.Add(ItemRegistry.Create("(O)SonarBobber"));
-                            break;
-                    }
-                    continue;
-                }
                 switch (Game1.random.Next(4))
                 {
                     case 0:

@@ -12,7 +12,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using xTile;
 using xTile.Dimensions;
+using xTile.Layers;
 using xTile.Tiles;
 
 namespace Swim
@@ -316,10 +318,80 @@ namespace Swim
             else
             {
                 Tile tile = location.map?.GetLayer("Buildings")?.PickTile(new Location((int)position.X * Game1.tileSize, (int)position.Y * Game1.tileSize), Game1.viewport.Size);
-                return tile is null || tile.TileIndex == 76;
+                return tile is null || tile.TileIndex == 76 || (!location.isTilePassable(position) && AreAdjascentTilesWater(position, location));
             }
         }
         #endregion
+
+        /// <summary>
+        /// Checks whether all the tiles adjascent to the given position are water tiles (excluding diagonals).
+        /// </summary>
+        public static bool AreAdjascentTilesWater(Vector2 position, GameLocation location)
+        {
+            foreach(Vector2 directionVector in Utility.DirectionsTileVectors)
+            {
+                if (!IsWaterTile(position + directionVector, location))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        public static bool HasAnyBuildingsAtPosition(GameLocation location, int x, int y)
+        {
+            if(!location.isTileOnMap(x, y))
+            {
+                return false;
+            }
+
+            Map map = location.map;
+            Layer layer = map.GetLayer("Buildings");
+            if(layer is null)
+            {
+                return false;
+            }
+
+            if(layer.Tiles[x, y] is not null)
+            {
+                return true;
+            }
+
+            int depth = 1;
+            bool wasLayer = true;
+
+            while (wasLayer)
+            {
+                wasLayer = false;
+
+                layer = map.GetLayer($"Buildings{depth}");
+                if(layer is not null)
+                {
+                    wasLayer = true;
+
+                    if (layer.Tiles[x, y] is not null)
+                    {
+                        return true;
+                    }
+                }
+
+                layer = map.GetLayer($"Buildings-{depth}");
+                if (layer is not null)
+                {
+                    wasLayer = true;
+
+                    if (layer.Tiles[x, y] is not null)
+                    {
+                        return true;
+                    }
+                }
+
+                depth++;
+            }
+
+            return false;
+        }
 
         #region Unused
         public static int CheckForBuriedItem(Farmer who)
@@ -459,7 +531,7 @@ namespace Swim
         #region Location State
         public static bool IsAllowedSwimLocation(GameLocation location)
         {
-            return (Config.SwimIndoors || location.IsOutdoors) && location is not VolcanoDungeon or BoatTunnel or BathHousePool && !(location is MineShaft mineshaft && mineshaft.mineLevel == 100);
+            return location is not VolcanoDungeon or BoatTunnel or BathHousePool && !(location is MineShaft mineshaft && mineshaft.mineLevel == 100);
         }
 
         public static bool CanSwimHere()
@@ -514,7 +586,7 @@ namespace Swim
 
         public static bool IsTilePassable(GameLocation location, Vector2 tileLocation)
         {
-            return location.isTilePassable(tileLocation) && !location.IsTileOccupiedBy(tileLocation, CollisionMask.TerrainFeatures, CollisionMask.All);
+            return location.isTilePassable(tileLocation) && !location.IsTileOccupiedBy(tileLocation, CollisionMask.TerrainFeatures | CollisionMask.Objects, CollisionMask.All);
         }
         #endregion
 

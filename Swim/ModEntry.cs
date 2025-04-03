@@ -419,13 +419,16 @@ namespace Swim
                 getValue: () => Config.SwimRestoresVitals,
                 setValue: value => Config.SwimRestoresVitals = value
             );
+
+            // Disabled because many of the locations we add are indoors, so disallowing swimming indoors breaks compatibility with our own mod.
+            /*
             configMenu.AddBoolOption(
                 mod: ModManifest,
                 name: () => SwimUtils.GetTranslation("GMCM-SwimIndoors-Name"),
                 tooltip: () => SwimUtils.GetTranslation("GMCM-SwimIndoors-Description"),
                 getValue: () => Config.SwimIndoors,
                 setValue: value => Config.SwimIndoors = value
-            );
+            );*/
 
             configMenu.AddPageLink(
                 mod: ModManifest,

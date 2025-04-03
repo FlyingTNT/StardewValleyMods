@@ -15,6 +15,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using xTile.Dimensions;
+using xTile.Tiles;
 using Rectangle = Microsoft.Xna.Framework.Rectangle;
 
 namespace Swim
@@ -459,7 +460,7 @@ namespace Swim
                 return;
             }
 
-            if (Config.SwimKey.JustPressed() && (!Game1.player.swimming.Value || !Config.ReadyToSwim) && !isJumping.Value)
+            if (Config.SwimKey.JustPressed() && !isJumping.Value)
             {
                 Config.ReadyToSwim = !Config.ReadyToSwim;
                 SHelper.WriteConfig(Config);
@@ -567,7 +568,6 @@ namespace Swim
                 Game1.player.position.Value = new Vector2(endJumpLoc.Value.X - (difx * completed), endJumpLoc.Value.Y - (dify * completed) - (float)Math.Sin(completed * Math.PI) * 64);
                 return;
             }
-
             if (!SwimUtils.CanSwimHere())
             {
                 return;
@@ -753,9 +753,10 @@ namespace Swim
 
         public static bool TryToJumpInDirection(Vector2 startingLocation, int direction, bool onlyOneTile = false) // Returns whether or not it is jumping
         {
+            GameLocation location = Game1.player.currentLocation;
             int maxDistance;
             Vector2 directionPoint;
-            Vector2 jumpLocation = Vector2.Zero;
+            bool jumpToLand = Game1.player.swimming.Value;
 
             switch (direction)
             {
@@ -779,23 +780,69 @@ namespace Swim
                     goto case 2;
             }
 
-            Vector2 location = startingLocation + directionPoint;
+            Vector2 jumpLocation = startingLocation + directionPoint;
+            bool hasFoundImpassableBuilding = false;
+            bool foundJumpLocation = false;
 
             do
             {
-                if(SwimUtils.IsValidJumpLocation(location))
+                if (!location.isTileOnMap(jumpLocation))
                 {
-                    jumpLocation = location;
-                    break;
+                    jumpLocation += directionPoint;
+                    continue;
                 }
 
-                location += directionPoint;
+                bool isWater = SwimUtils.IsWaterTile(jumpLocation);
+                if (jumpToLand == isWater)
+                {
+                    jumpLocation += directionPoint;
+                    continue;
+                }
+
+                if (jumpToLand)
+                {
+                    if(SwimUtils.IsTilePassable(location, jumpLocation))
+                    {
+                        foundJumpLocation = true;
+                        break;
+                    }
+                    jumpLocation += directionPoint;
+                    continue;
+                }
+                else
+                {
+                    Tile tile = location.map?.GetLayer("Buildings")?.PickTile(new Location((int)jumpLocation.X * Game1.tileSize, (int)jumpLocation.Y * Game1.tileSize), Game1.viewport.Size);
+
+                    if(tile is not null && !location.isTilePassable(jumpLocation))
+                    {
+                        hasFoundImpassableBuilding = true;
+                        if(SwimUtils.AreAdjascentTilesWater(jumpLocation, location))
+                        {
+                            foundJumpLocation = true;
+                            break;
+                        }
+                    }
+
+                    if(tile is null && (hasFoundImpassableBuilding || !SwimUtils.HasAnyBuildingsAtPosition(location, (int)jumpLocation.X, (int)jumpLocation.Y)))
+                    {
+                        foundJumpLocation = true;
+                        break;
+                    }
+
+                    if (tile is not null && tile.TileIndex is 76)
+                    {
+                        foundJumpLocation = true;
+                        break;
+                    }
+                }
+
+                jumpLocation += directionPoint;
             }
-            while (Math.Abs(location.X - startingLocation.X + location.Y - startingLocation.Y) * Game1.tileSize <= maxDistance && !onlyOneTile);
+            while (Math.Abs(jumpLocation.X - startingLocation.X + jumpLocation.Y - startingLocation.Y) * Game1.tileSize <= maxDistance && !onlyOneTile);
 
             //Monitor.Value.Log($"next passable {Game1.player.currentLocation.isTilePassable(new Location((int)tiles.Last().X, (int)tiles.Last().Y), Game1.viewport)} next to land: {nextToLand}, next to water: {nextToWater}");
 
-            if (jumpLocation != Vector2.Zero)
+            if (foundJumpLocation)
             {
                 DoJump(jumpLocation, direction);
                 return true;

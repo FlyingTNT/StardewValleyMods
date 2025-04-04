@@ -533,7 +533,7 @@ namespace Swim
         #region Location State
         public static bool IsAllowedSwimLocation(GameLocation location)
         {
-            return location is not VolcanoDungeon or BoatTunnel or BathHousePool && !(location is MineShaft mineshaft && mineshaft.mineLevel == 100);
+            return location is not (VolcanoDungeon or BoatTunnel or BathHousePool or Caldera) && !(location is MineShaft mineshaft && mineshaft.mineLevel == 100);
         }
 
         public static bool CanSwimHere()

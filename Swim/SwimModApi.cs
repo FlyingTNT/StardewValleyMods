@@ -1,4 +1,5 @@
 ﻿using StardewModdingAPI;
+using Swim.Models;
 
 namespace Swim
 {

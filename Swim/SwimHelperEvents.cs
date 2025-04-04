@@ -11,6 +11,7 @@ using StardewValley.Locations;
 using StardewValley.Menus;
 using StardewValley.Objects;
 using Swim.AbigailGame;
+using Swim.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;

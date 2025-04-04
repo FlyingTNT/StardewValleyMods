@@ -6,7 +6,9 @@ using StardewModdingAPI;
 using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.Extensions;
+using StardewValley.ItemTypeDefinitions;
 using StardewValley.Locations;
+using Swim.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -19,7 +21,7 @@ using xTile.Tiles;
 
 namespace Swim
 {
-    internal class SwimUtils
+    public static class SwimUtils
     {
         private static IMonitor SMonitor;
         private static ModConfig Config => ModEntry.Config;
@@ -673,7 +675,29 @@ namespace Swim
 
             return null;
         }
-        #endregion
+
+        public static void VerifySwimForageAsset(string assetName)
+        {
+            #if DEBUG
+            SMonitor.Log(assetName);
+            #endif
+            List<SwimForageData> data = SHelper.GameContent.Load<List<SwimForageData>>(assetName);
+            foreach(SwimForageData entry in data)
+            {
+                ParsedItemData itemData = ItemRegistry.GetDataOrErrorItem(entry.ItemId);
+                if (itemData.IsErrorItem)
+                {
+                    SMonitor.Log($"Error item with id {entry.ItemId} found in {assetName}", LogLevel.Debug);
+                }
+                else
+                {
+                    #if DEBUG
+                    SMonitor.Log(itemData.DisplayName);
+                    #endif
+                }
+            }
+        }
+#endregion
 
         #region Misc
         public static bool IsMouseButtonDown(KeybindList keybindList)

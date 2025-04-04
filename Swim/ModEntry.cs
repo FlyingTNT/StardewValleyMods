@@ -15,6 +15,8 @@ using Rectangle = Microsoft.Xna.Framework.Rectangle;
 using StardewValley.Extensions;
 using StardewValley.Locations;
 using Swim.AbigailGame;
+using StardewValley.GameData.Locations;
+using Swim.Models;
 
 namespace Swim
 {
@@ -29,6 +31,8 @@ namespace Swim
         public const string scubaFinsID = "Swim_ScubaFins";
         public const string scubaTankID = "Swim_ScubaTank";
         public const string ProhibitSwimmingMapPropertyKey = "ProhibitSwimming";
+        public const string mineralsAssetName = "FlyingTNT.Swim/Minerals";
+        public const string oceanForageAssetName = "FlyingTNT.Swim/OceanForage";
 
         // Location variables
         /// <summary> Whether the current location uses the PoolEntry touch action to manage swimming. Most of this mod is disabled if this is true. </summary>
@@ -96,6 +100,7 @@ namespace Swim
             helper.Events.Player.Warped += SwimHelperEvents.Player_Warped;
             helper.Events.Content.LocaleChanged += SwimHelperEvents.Content_LocaleChanged;
             helper.Events.Content.AssetRequested += Content_AssetRequested;
+            helper.Events.Content.AssetReady += Content_AssetReady;
 
             var harmony = new Harmony(ModManifest.UniqueID);
 
@@ -200,43 +205,43 @@ namespace Swim
             {
                 e.LoadFrom(() => SwimUtils.Geti18nDict(), AssetLoadPriority.Medium);
             }
-            else if (e.NameWithoutLocale.IsEquivalentTo("FlyingTNT.Swim/OceanForage"))
+            else if (e.NameWithoutLocale.IsEquivalentTo(oceanForageAssetName))
             {
                 // Item id, weight
-                e.LoadFrom(() => new List<(string, int)>(new[] {
-                    ("(O)152", 25), // Seaweed
-                    ("(O)153", 15), // Green Algae
-                    ("(O)157", 20), // White Algae
-                    ("(O)372", 15), // Clam
-                    ("(O)393", 10), // Coral
-                    ("(O)397", 9), // Sea Urchin
-                    ("(O)394", 3), // Rainbow Shell
-                    ("(O)392", 3), // Nautilus Shell
-                    ("(O)719", 6), // Mussel
-                    ("(O)723", 6), // Oyster
-                    ("(O)718", 6) // Cockle
+                e.LoadFrom(() => new List<SwimForageData>(new[] {
+                    new SwimForageData("(O)152", -1, 25), // Seaweed
+                    new SwimForageData("(O)153", -1, 15), // Green Algae
+                    new SwimForageData("(O)157", -1, 20), // White Algae
+                    new SwimForageData("(O)372", -1, 15), // Clam
+                    new SwimForageData("(O)393", -1, 10), // Coral
+                    new SwimForageData("(O)397", -1, 9), // Sea Urchin
+                    new SwimForageData("(O)394", -1, 3), // Rainbow Shell
+                    new SwimForageData("(O)392", -1, 3), // Nautilus Shell
+                    new SwimForageData("(O)719", -1, 6), // Mussel
+                    new SwimForageData("(O)723", -1, 6), // Oyster
+                    new SwimForageData("(O)718", -1, 6) // Cockle
                 }), AssetLoadPriority.Medium);
             }
-            else if (e.NameWithoutLocale.IsEquivalentTo("FlyingTNT.Swim/Minerals"))
+            else if (e.NameWithoutLocale.IsEquivalentTo(mineralsAssetName))
             {
                 // (Item id, rock hp or -1 if forage), weight
-                e.LoadFrom(() => new List<((string, int), int)>(new[] {
-                    (("(O)751", 2), 20), // Copper Stone
-                    (("(O)290", 4), 10), // Iron Stone
-                    (("(O)764", 8), 5), // Gold Stone
-                    (("(O)765", 1), 1), // Iridium Stone
-                    (("(O)80", -1), 9), // Quartz
-                    (("(O)82", -1), 9), // Fire Quartz
-                    (("(O)84", -1), 9), // Frozen Tear
-                    (("(O)86", -1), 7), // Earth Crystal
-                    (("(O)2", 10), 1), // Diamond Stone
-                    (("(O)4", 5), 1), // Ruby Stone
-                    (("(O)6", 5), 1), // Jade Stone
-                    (("(O)8", 5), 1), // Amethyst Stone
-                    (("(O)10", 5), 1), // Topaz Stone
-                    (("(O)12", 5), 1), // Emerald Stone
-                    (("(O)14", 5), 1), // Aquamarine Stone
-                    (("(O)44", 5), 1), // Gem Stone
+                e.LoadFrom(() => new List<SwimForageData>(new[] {
+                    new SwimForageData("(O)751", 2, 20), // Copper Stone
+                    new SwimForageData("(O)290", 4, 10), // Iron Stone
+                    new SwimForageData("(O)764", 8, 5), // Gold Stone
+                    new SwimForageData("(O)765", 1, 1), // Iridium Stone
+                    new SwimForageData("(O)80", -1, 9), // Quartz
+                    new SwimForageData("(O)82", -1, 9), // Fire Quartz
+                    new SwimForageData("(O)84", -1, 9), // Frozen Tear
+                    new SwimForageData("(O)86", -1, 7), // Earth Crystal
+                    new SwimForageData("(O)2", 10, 1), // Diamond Stone
+                    new SwimForageData("(O)4", 5, 1), // Ruby Stone
+                    new SwimForageData("(O)6", 5, 1), // Jade Stone
+                    new SwimForageData("(O)8", 5, 1), // Amethyst Stone
+                    new SwimForageData("(O)10", 5, 1), // Topaz Stone
+                    new SwimForageData("(O)12", 5, 1), // Emerald Stone
+                    new SwimForageData("(O)14", 5, 1), // Aquamarine Stone
+                    new SwimForageData("(O)44", 5, 1), // Gem Stone
                 }), AssetLoadPriority.Medium);
             }
             else if(e.NameWithoutLocale.IsEquivalentTo("FlyingTNT.Swim/DebuffedMinerals")) // Unused because stone drops don't work outside of the mines
@@ -326,6 +331,14 @@ namespace Swim
             else
             {
                 AnimationManager.EditAssets(sender, e);
+            }
+        }
+
+        public void Content_AssetReady(object sender, AssetReadyEventArgs e)
+        {
+            if(e.Name.IsEquivalentTo(oceanForageAssetName) || e.Name.IsEquivalentTo(mineralsAssetName))
+            {
+                SwimUtils.VerifySwimForageAsset(e.Name.Name);
             }
         }
 

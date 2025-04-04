@@ -7,6 +7,7 @@ using StardewValley.GameData.Locations;
 using StardewValley.Internal;
 using StardewValley.Objects;
 using StardewValley.Tools;
+using Swim.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -104,22 +105,21 @@ namespace Swim
             List<Vector2> spots = GetValidSpawnSpots(l);
             int mineralNo = (int)Math.Round(Game1.random.Next(Config.MineralPerThousandMin, Config.MineralPerThousandMax) / 1000f * spots.Count);
 
-            // FlyingTNT.Swim/Minerals is a list of ((id, hp), weight) pairs
-            ((string, int), int)[] mineralData = SHelper.GameContent.Load<List<((string, int), int)>>("FlyingTNT.Swim/Minerals").ToArray();
+            SwimForageData[] mineralData = SHelper.GameContent.Load<List<SwimForageData>>(ModEntry.mineralsAssetName).ToArray();
 
-            ((string, int), float)[] weightedMinerals = GenerateWeitghedThreshholds(mineralData);
+            (SwimForageData, float)[] weightedMinerals = GenerateWeitghedThreshholds(mineralData, data => data.Weight);
 
             foreach (Vector2 v in GetRandom(spots, mineralNo))
             {
-                (string id, int hp) = GetRandom(weightedMinerals);
+                SwimForageData data = GetRandom(weightedMinerals);
                
-                if(hp is -1)
+                if(data.Hp is -1)
                 {
-                    SpawnForageItem(l, v, id);
+                    SpawnForageItem(l, v, data.ItemId);
                 }
                 else
                 {
-                    SpawnWorldItem(l, v, id).MinutesUntilReady = hp;
+                    SpawnWorldItem(l, v, data.ItemId).MinutesUntilReady = data.Hp;
                 }
             }
         }
@@ -226,17 +226,17 @@ namespace Swim
             return ShuffleLast(list, count).TakeLast(count > list.Count ? list.Count : count);
         }
 
-        private static (T, float)[] GenerateWeitghedThreshholds<T>((T, int)[] weightedPairs)
+        private static (T, float)[] GenerateWeitghedThreshholds<T>(T[] items, Func<T, int> weightFunction)
         {
-            float total = weightedPairs.Select(pair => pair.Item2).Sum();
-            (T, float)[] output = new (T, float)[weightedPairs.Length];
+            float total = items.Select(item => weightFunction(item)).Sum();
+            (T, float)[] output = new (T, float)[items.Length];
 
             float accumulated = 0;
 
-            for(int i = 0; i < weightedPairs.Length; i++)
+            for(int i = 0; i < items.Length; i++)
             {
-                accumulated += weightedPairs[i].Item2 / total;
-                output[i] = (weightedPairs[i].Item1, accumulated);
+                accumulated += weightFunction(items[i]) / total;
+                output[i] = (items[i], accumulated);
             }
 
             output[^1].Item2 = 1; // In case any precision errors would cause it to be less than 1
@@ -265,13 +265,22 @@ namespace Swim
         public static void AddOceanForage(GameLocation l)
         {
             List<Vector2> spots = GetValidSpawnSpots(l);
-            int forageNo = (int)(Game1.random.Next(Config.OceanForagePerThousandMin, Config.OceanForagePerThousandMax) / 1000f * spots.Count);
+            int forageCount = (int)(Game1.random.Next(Config.OceanForagePerThousandMin, Config.OceanForagePerThousandMax) / 1000f * spots.Count);
 
-            (string, float)[] weightedForage = GenerateWeitghedThreshholds(SHelper.GameContent.Load<List<(string, int)>>("FlyingTNT.Swim/OceanForage").ToArray());
+            (SwimForageData, float)[] weightedForage = GenerateWeitghedThreshholds(SHelper.GameContent.Load<List<SwimForageData>>(ModEntry.oceanForageAssetName).ToArray(), item => item.Weight);
 
-            foreach (Vector2 v in GetRandom(spots, forageNo))
+            foreach (Vector2 v in GetRandom(spots, forageCount))
             {
-                SpawnForageItem(l, v, GetRandom(weightedForage));
+                SwimForageData data = GetRandom(weightedForage);
+
+                if (data.Hp is -1)
+                {
+                    SpawnForageItem(l, v, data.ItemId);
+                }
+                else
+                {
+                    SpawnWorldItem(l, v, data.ItemId).MinutesUntilReady = data.Hp;
+                }
             }
         }
 

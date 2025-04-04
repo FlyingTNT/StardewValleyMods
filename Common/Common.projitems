@@ -9,6 +9,7 @@
     <Import_RootNamespace>Common</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)integrations\bettergamemenu\IBetterGameMenu.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)integrations\ContentPatcher\IContentPatcherAPI.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)integrations\CustomGiftLimits\ICustomGiftLimitsAPI.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Integrations\GenericModConfigMenu\IGenericModConfigMenuApi.cs" />

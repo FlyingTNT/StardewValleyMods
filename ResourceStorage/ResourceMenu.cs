@@ -10,6 +10,7 @@ using StardewValley.Menus;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Object = StardewValley.Object;
 
 namespace ResourceStorage
@@ -92,7 +93,7 @@ namespace ResourceStorage
             width = Math.Min(64 * 12, Game1.uiViewport.Width);
             height = Math.Min(Game1.uiViewport.Height + 72, Math.Min(linesPerPage, resourceList.Count) * lineHeight + (borderWidth + spaceToClearTopBorder) * 2 - 32);
             xPositionOnScreen = (Game1.uiViewport.Width - width) / 2;
-            yPositionOnScreen = Math.Max(-72, (Game1.uiViewport.Height - height) / 2 - 32);
+            yPositionOnScreen = Math.Max(-72, (Game1.uiViewport.Height - (Math.Min(linesPerPage, resources.Count) * lineHeight + (borderWidth + spaceToClearTopBorder) * 2 - 32)) / 2 - 32);
 
             //allComponents.Clear();
             autoCCs.Clear();
@@ -183,7 +184,7 @@ namespace ResourceStorage
 
         public override void draw(SpriteBatch b)
         {
-            if (resourceListDirty.Value)
+            if (resourceListDirty.Value || LastSearchedValue != SearchBar.Text)
             {
                 RepopulateComponentList();
             }
@@ -538,7 +539,20 @@ namespace ResourceStorage
                 return;
 
             LastSearchedValue = SearchBar.Text;
-            resourceList.RemoveAll(resource => (!resource?.DisplayName.ToLower().StartsWith(SearchBar.Text.ToLower())) ?? true);
+
+            Regex regex;
+
+            // Load the regex for the string in the text box, and don't filter anything if the regex is invalid
+            try
+            {
+                regex = new(LastSearchedValue, RegexOptions.IgnoreCase);
+            }
+            catch
+            {
+                return;
+            }
+
+            resourceList.RemoveAll(resource => !regex.IsMatch(resource.DisplayName));
         }
 
         private static Comparison<Object> GetSortComparison(int sortType)

@@ -199,14 +199,8 @@ namespace SocialPageOrderRedux
             {
                 BetterGameMenuAPI.OnTabChanged(BetterGameMenuChangeTab);
                 BetterGameMenuAPI.OnMenuCreated(BetterGameMenuMenuCreated);
-
-                // Add the receiveLeftClick patches to BetterGameMenu. These just set a flag when the method is entered and left that makes it so the filter being selected does not make readyToClose on the SocialPage be false.
-                // This is necessary because BetterGameMenu (and the base game) checks readyToClose before changing tabs, so without this it would not be possible to click on another tab when the filter is selected.
-                var harmony = new Harmony(ModManifest.UniqueID);
-                harmony.Patch(AccessTools.Method(BetterGameMenuAPI.GetMenuType(), nameof(IClickableMenu.receiveLeftClick)), // The Better Game Menu left click has necessarily the same name as IClickableMenu.receiveLeftClick
-                    prefix: new HarmonyMethod(typeof(ModEntry), nameof(GameMenu_receiveLeftClick_Prefix)),
-                    postfix: new HarmonyMethod(typeof(ModEntry), nameof(GameMenu_receiveLeftClick_Postfix))
-                );
+                BetterGameMenuAPI.OnPageReadyToClose(BetterGameMenuPageReadyToClose);
+                BetterGameMenuAPI.OnPageCreated(BetterGameMenuPageCreated);
             }
 
             // get Generic Mod Config Menu's API (if it's installed)
@@ -587,12 +581,52 @@ namespace SocialPageOrderRedux
         public static void IClickableMenu_readyToClose_Postfix(IClickableMenu __instance, ref bool __result)
         {
             // isInGameMenuLeftClick is necessary so that the player doesn't need to deselect the field before moving to another tab
-            if (!Config.EnableMod || __instance is not SocialPage || filterField.Value is null || isInGameMenuLeftClick.Value)
+            if (!Config.EnableMod || __instance is not SocialPage || filterField.Value is null || isInGameMenuLeftClick.Value || BetterGameMenuAPI is not null)
                 return;
 
             // If the filter is selected, make the result false. This is because some mods that add their own menus will overwrite the current one when their menu's key is pressed,
             // but if the player has the filter selected, they didn't mean to open the other menu; they were just typing in the search bar.
             __result &= !filterField.Value.Selected;
+        }
+
+        /// <summary>
+        /// Mirror of <see cref="IClickableMenu_readyToClose_Postfix(IClickableMenu, ref bool)"/> for BetterGameMenu
+        /// </summary>
+        public static void BetterGameMenuPageReadyToClose(IPageReadyToCloseEvent readyToCloseEvent)
+        {
+            try
+            {
+                if (filterField.Value is null)
+                {
+                    return;
+                }
+
+                if (readyToCloseEvent.Page is not SocialPage)
+                {
+                    return;
+                }
+
+                if (SHelper.Input.IsDown(SButton.Escape))
+                {
+                    return;
+                }
+
+                // We need to check this instead of checking PageReadyToCloseReason.MenuClosing because PageReadyToCloseReason.MenuClosing is flagged both for clicking the X and pressing the menu button, and
+                // we don't want to close for the menu button if the filter is selected.
+                if (readyToCloseEvent.Menu.upperRightCloseButton.bounds.Contains(Game1.getMousePosition(true)))
+                {
+                    return;
+                }
+
+                if (readyToCloseEvent.Reason is not (PageReadyToCloseReason.TabChanging or PageReadyToCloseReason.TabReloading))
+                {
+                    readyToCloseEvent.ReadyToClose &= !filterField.Value.Selected;
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(BetterGameMenuPageReadyToClose)}: {ex}", LogLevel.Error);
+            }
         }
 
         public static void SocialPage_performHoverAction_Postfix(SocialPage __instance, int x, int y, ref string ___hoverText)
@@ -735,6 +769,9 @@ namespace SocialPageOrderRedux
             }
         }
 
+        /// <summary>
+        /// Mirror of <see cref="GameMenu_changeTab_Postfix(GameMenu)"/> for BetterGameMenu
+        /// </summary>
         public static void BetterGameMenuChangeTab(ITabChangedEvent e)
         {
             try
@@ -760,7 +797,23 @@ namespace SocialPageOrderRedux
             {
                 SMonitor.Log($"Failed in {nameof(BetterGameMenuChangeTab)}: {ex}", LogLevel.Error);
             }
+        }
 
+        /// <summary>
+        /// Makes sure the filter is selected as necessary when the page is loaded
+        /// </summary>
+        /// <remarks>
+        /// This is usually handled by <see cref="BetterGameMenuChangeTab(ITabChangedEvent)"/>, but that method doesn't fire when returning from ProfileMenus and the such
+        /// </remarks>
+        public static void BetterGameMenuPageCreated(IPageCreatedEvent e)
+        {
+            if(e.Page is SocialPage)
+            {
+                if (Config.UseFilter && filterField.Value is not null && !Game1.options.gamepadControls)
+                {
+                    filterField.Value.Selected = Config.SearchBarAutoFocus;
+                }
+            }
         }
 
         #endregion

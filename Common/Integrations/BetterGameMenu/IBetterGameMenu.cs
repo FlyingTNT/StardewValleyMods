@@ -10,6 +10,70 @@ using System;
 namespace Common.Integrations;
 
 /// <summary>
+/// A tab changed event is emitted whenever the currently
+/// active tab of a Better Game Menu changes.
+/// </summary>
+public interface ITabChangedEvent
+{
+
+    /// <summary>
+    /// The Better Game Menu instance involved in the event. You
+    /// can use <see cref="IBetterGameMenuApi.AsMenu(IClickableMenu)"/>
+    /// to get a more useful interface for this menu.
+    /// </summary>
+    IClickableMenu Menu { get; }
+
+    /// <summary>
+    /// The id of the tab the Game Menu was changed to.
+    /// </summary>
+    string Tab { get; }
+
+    /// <summary>
+    /// The id of the previous tab the Game Menu displayed.
+    /// </summary>
+    string OldTab { get; }
+
+}
+
+/// <summary>
+/// A page created event is emitted whenever a new page
+/// is created for a tab by Better Game Menu.
+/// </summary>
+public interface IPageCreatedEvent
+{
+
+    /// <summary>
+    /// The Better Game Menu instance involved in the event. You
+    /// can use <see cref="IBetterGameMenuApi.AsMenu(IClickableMenu)"/>
+    /// to get a more useful interface for this menu.
+    /// </summary>
+    IClickableMenu Menu { get; }
+
+    /// <summary>
+    /// The id of the tab the page was created for.
+    /// </summary>
+    string Tab { get; }
+
+    /// <summary>
+    /// The id of the provider the page was created with.
+    /// </summary>
+    string Source { get; }
+
+    /// <summary>
+    /// The new page that was just created.
+    /// </summary>
+    IClickableMenu Page { get; }
+
+    /// <summary>
+    /// If the page was previously created and is being replaced,
+    /// this will be the old page instance. Otherwise, this will
+    /// be <c>null</c>.
+    /// </summary>
+    IClickableMenu? OldPage { get; }
+
+}
+
+/// <summary>
 /// A page ready to close event is emitted whenever Better Game Menu
 /// checks if a page can be closed, such as when switching to another
 /// tab or when preparing to close the menu. This can be useful for
@@ -292,6 +356,7 @@ public interface IBetterGameMenuApi
     #region Menu Events
     public delegate void TabChangedDelegate(ITabChangedEvent evt);
     public delegate void MenuCreatedDelegate(IClickableMenu menu);
+    public delegate void PageCreatedDelegate(IPageCreatedEvent evt);
     public delegate void PageOverlayCreationDelegate(IPageOverlayCreationEvent evt);
     public delegate void PageReadyToCloseDelegate(IPageReadyToCloseEvent evt);
 
@@ -309,6 +374,16 @@ public interface IBetterGameMenuApi
     void OnMenuCreated(MenuCreatedDelegate handler, EventPriority priority = EventPriority.Normal);
 
     /// <summary>
+	/// This event fires whenever a new page instance is created. This can happen
+	/// the first time a page is accessed, whenever something calls
+	/// <see cref="TryGetPage(string, out IClickableMenu?, bool)"/> with the
+	/// <c>forceCreation</c> flag set to true, or when the menu has been resized
+	/// and the tab implementation's <c>OnResize</c> method returned a new
+	/// page instance.
+	/// </summary>
+	void OnPageCreated(PageCreatedDelegate handler, EventPriority priority = EventPriority.Normal);
+
+    /// <summary>
 	/// This event fires whenever page overlays are being created for a page. This
 	/// happens the first time a page is ready to be displayed because it becomes
 	/// the current page, or when the current tab's page is recreated.
@@ -321,31 +396,5 @@ public interface IBetterGameMenuApi
 	/// </summary>
 	void OnPageReadyToClose(PageReadyToCloseDelegate handler, EventPriority priority = EventPriority.Normal);
     #endregion
-
-}
-
-/// <summary>
-/// A tab changed event is emitted whenever the currently
-/// active tab of a Better Game Menu changes.
-/// </summary>
-public interface ITabChangedEvent
-{
-
-    /// <summary>
-    /// The Better Game Menu instance involved in the event. You
-    /// can use <see cref="IBetterGameMenuApi.AsMenu(IClickableMenu)"/>
-    /// to get a more useful interface for this menu.
-    /// </summary>
-    IClickableMenu Menu { get; }
-
-    /// <summary>
-    /// The id of the tab the Game Menu was changed to.
-    /// </summary>
-    string Tab { get; }
-
-    /// <summary>
-    /// The id of the previous tab the Game Menu displayed.
-    /// </summary>
-    string OldTab { get; }
 
 }

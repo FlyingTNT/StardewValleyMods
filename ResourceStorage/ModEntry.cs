@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using Common.Integrations;
 using Common.Utilities;
 using System.Linq;
+using Microsoft.Xna.Framework;
 
 namespace ResourceStorage
 {
@@ -28,6 +29,7 @@ namespace ResourceStorage
 
         public const string sharedDictionaryKey = "FlyingTNT.ResourceStorage/sharedDictionary";
         public const string autoStoreKey = "FlyingTNT.ResourceStorage/autoStore";
+        public const string resourceIconKey = "FlyingTNT.ResourceStorage/resourceIcon";
 
         public static PerScreen<GameMenu> gameMenu = new PerScreen<GameMenu>();
         public static PerScreen<ClickableTextureComponent> resourceButton = new PerScreen<ClickableTextureComponent>();
@@ -51,6 +53,8 @@ namespace ResourceStorage
             Helper.Events.GameLoop.ReturnedToTitle += GameLoop_ReturnedToTitle;
             Helper.Events.GameLoop.SaveLoaded += GameLoop_SaveLoaded;
             Helper.Events.GameLoop.Saving += GameLoop_Saving;
+            Helper.Events.Content.AssetRequested += Content_AssetRequested;
+            Helper.Events.Content.AssetsInvalidated += Content_AssetsInvalidated;
 
             SharedResourceManager.Initialize(Monitor, helper, Config, ModManifest);
 
@@ -346,6 +350,29 @@ namespace ResourceStorage
                     GameLoop_SaveLoaded(o, new SaveLoadedEventArgs());
                     SharedResourceManager.GameLoop_SaveLoaded(o, new SaveLoadedEventArgs());
                 };
+            }
+        }
+
+        public static void Content_AssetRequested(object sender, AssetRequestedEventArgs args)
+        {
+            if(args.NameWithoutLocale.IsEquivalentTo(resourceIconKey))
+            {
+                args.LoadFrom(() =>
+                {
+                    Texture2D texture = new(Game1.graphics.GraphicsDevice, 22, 22);
+                    Color[] data = new Color[22 * 22];
+                    Game1.mouseCursors.GetData(0, new Rectangle(116, 442, 22, 22), data, 0, 22 * 22);
+                    texture.SetData(data);
+                    return texture;
+                }, AssetLoadPriority.Low);
+            }
+        }
+
+        public static void Content_AssetsInvalidated(object sender, AssetsInvalidatedEventArgs args)
+        {
+            if(args.NamesWithoutLocale.Any(name => name.IsEquivalentTo(Game1.mouseCursorsName)))
+            {
+                SHelper.GameContent.InvalidateCache(resourceIconKey);
             }
         }
     }

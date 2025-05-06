@@ -1,6 +1,7 @@
 ﻿using Common.Utilities;
 using HarmonyLib;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
 using Newtonsoft.Json;
 using ResourceStorage.BetterCrafting;
 using StardewModdingAPI;
@@ -306,7 +307,8 @@ namespace ResourceStorage
         {
             if(resourceButton.Value is null)
             {
-                resourceButton.Value = new ClickableTextureComponent("Up", new Rectangle(menu.xPositionOnScreen + menu.width + 8 + Config.IconOffsetX, menu.yPositionOnScreen + 256 + Config.IconOffsetY, 44, 44), "", SHelper.Translation.Get("resources"), Game1.mouseCursors, new Rectangle(116, 442, 22, 22), 2)
+                Texture2D texture = SHelper.GameContent.Load<Texture2D>(resourceIconKey);
+                resourceButton.Value = new ClickableTextureComponent("Up", new Rectangle(menu.xPositionOnScreen + menu.width + 8 + Config.IconOffsetX, menu.yPositionOnScreen + 256 + Config.IconOffsetY, 44, 44), "", SHelper.Translation.Get("resources"), texture, texture.Bounds, 2)
                 {
                     myID = 42999,
                     upNeighborID = 106,

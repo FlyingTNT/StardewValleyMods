@@ -77,6 +77,7 @@ namespace SocialPageOrderRedux
         private static readonly PerScreen<bool> isInGameMenuLeftClick = new(() => false);
 
         private static ICustomGiftLimitsAPI CustomGiftLimitsAPI;
+        private static IBetterGameMenuApi BetterGameMenuAPI;
 
         /// <summary>
         /// The sort curently selected by Game1.player. It is stored in their mod data so that it is preserved between sessions, and for splitscreen support (it used to be stored in the config file,
@@ -192,6 +193,15 @@ namespace SocialPageOrderRedux
         private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
             CustomGiftLimitsAPI = SHelper.ModRegistry.GetApi<ICustomGiftLimitsAPI>(IDs.CustomGiftLimits);
+            BetterGameMenuAPI = SHelper.ModRegistry.GetApi<IBetterGameMenuApi>(IDs.BetterGameMenu);
+
+            if(BetterGameMenuAPI is not null)
+            {
+                BetterGameMenuAPI.OnTabChanged(BetterGameMenuChangeTab);
+                BetterGameMenuAPI.OnMenuCreated(BetterGameMenuMenuCreated);
+                BetterGameMenuAPI.OnPageReadyToClose(BetterGameMenuPageReadyToClose);
+                BetterGameMenuAPI.OnPageCreated(BetterGameMenuPageCreated);
+            }
 
             // get Generic Mod Config Menu's API (if it's installed)
             var configMenu = Helper.ModRegistry.GetApi<IGenericModConfigMenuApi>(IDs.GMCM);
@@ -350,7 +360,7 @@ namespace SocialPageOrderRedux
 
         private void Input_ButtonsChanged(object sender, ButtonsChangedEventArgs e)
         {
-            if (!WasModEnabled || Game1.activeClickableMenu is not GameMenu menu || menu.GetCurrentPage() is not SocialPage page)
+            if (!WasModEnabled || GetGameMenuPage(Game1.activeClickableMenu) is not SocialPage page)
                 return;
             if (Config.prevButton.JustPressed())
             {
@@ -419,6 +429,21 @@ namespace SocialPageOrderRedux
         #endregion
 
         #region SOCIAL_PAGE_SETUP_PATCHES
+
+        /// <summary>
+        /// Prevents a null error due to the order that BetterGameMenu events fire relative to our patches.
+        /// </summary>
+        public static void BetterGameMenuMenuCreated(IClickableMenu menu)
+        {
+            try
+            {
+                InitElements();
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(BetterGameMenuMenuCreated)}: {ex}", LogLevel.Error);
+            }
+        }
 
         public static void SocialPage_Constructor_Postfix(SocialPage __instance)
         {
@@ -556,12 +581,52 @@ namespace SocialPageOrderRedux
         public static void IClickableMenu_readyToClose_Postfix(IClickableMenu __instance, ref bool __result)
         {
             // isInGameMenuLeftClick is necessary so that the player doesn't need to deselect the field before moving to another tab
-            if (!Config.EnableMod || __instance is not SocialPage || filterField.Value is null || isInGameMenuLeftClick.Value)
+            if (!Config.EnableMod || __instance is not SocialPage || filterField.Value is null || isInGameMenuLeftClick.Value || BetterGameMenuAPI is not null)
                 return;
 
             // If the filter is selected, make the result false. This is because some mods that add their own menus will overwrite the current one when their menu's key is pressed,
             // but if the player has the filter selected, they didn't mean to open the other menu; they were just typing in the search bar.
             __result &= !filterField.Value.Selected;
+        }
+
+        /// <summary>
+        /// Mirror of <see cref="IClickableMenu_readyToClose_Postfix(IClickableMenu, ref bool)"/> for BetterGameMenu
+        /// </summary>
+        public static void BetterGameMenuPageReadyToClose(IPageReadyToCloseEvent readyToCloseEvent)
+        {
+            try
+            {
+                if (filterField.Value is null)
+                {
+                    return;
+                }
+
+                if (readyToCloseEvent.Page is not SocialPage)
+                {
+                    return;
+                }
+
+                if (SHelper.Input.IsDown(SButton.Escape))
+                {
+                    return;
+                }
+
+                // We need to check this instead of checking PageReadyToCloseReason.MenuClosing because PageReadyToCloseReason.MenuClosing is flagged both for clicking the X and pressing the menu button, and
+                // we don't want to close for the menu button if the filter is selected.
+                if (readyToCloseEvent.Menu.upperRightCloseButton.bounds.Contains(Game1.getMousePosition(true)))
+                {
+                    return;
+                }
+
+                if (readyToCloseEvent.Reason is not (PageReadyToCloseReason.TabChanging or PageReadyToCloseReason.TabReloading))
+                {
+                    readyToCloseEvent.ReadyToClose &= !filterField.Value.Selected;
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(BetterGameMenuPageReadyToClose)}: {ex}", LogLevel.Error);
+            }
         }
 
         public static void SocialPage_performHoverAction_Postfix(SocialPage __instance, int x, int y, ref string ___hoverText)
@@ -704,6 +769,53 @@ namespace SocialPageOrderRedux
             }
         }
 
+        /// <summary>
+        /// Mirror of <see cref="GameMenu_changeTab_Postfix(GameMenu)"/> for BetterGameMenu
+        /// </summary>
+        public static void BetterGameMenuChangeTab(ITabChangedEvent e)
+        {
+            try
+            {
+                if (BetterGameMenuAPI.ActivePage is SocialPage page)
+                {
+                    if (Config.UseFilter && filterField.Value is not null && !Game1.options.gamepadControls)
+                        filterField.Value.Selected = Config.SearchBarAutoFocus;
+
+                    // I don't think this is necessary, but I'm not removing it because it also isn't hurting anything.
+                    ApplyFilter(page);
+                    if (Game1.options.SnappyMenus)
+                    {
+                        page.snapToDefaultClickableComponent();
+                    }
+                }
+                else
+                {
+                    filterField.Value.Selected = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                SMonitor.Log($"Failed in {nameof(BetterGameMenuChangeTab)}: {ex}", LogLevel.Error);
+            }
+        }
+
+        /// <summary>
+        /// Makes sure the filter is selected as necessary when the page is loaded
+        /// </summary>
+        /// <remarks>
+        /// This is usually handled by <see cref="BetterGameMenuChangeTab(ITabChangedEvent)"/>, but that method doesn't fire when returning from ProfileMenus and the such
+        /// </remarks>
+        public static void BetterGameMenuPageCreated(IPageCreatedEvent e)
+        {
+            if(e.Page is SocialPage)
+            {
+                if (Config.UseFilter && filterField.Value is not null && !Game1.options.gamepadControls)
+                {
+                    filterField.Value.Selected = Config.SearchBarAutoFocus;
+                }
+            }
+        }
+
         #endregion
 
         #region SORT_AND_FILTER_METHODS
@@ -712,19 +824,13 @@ namespace SocialPageOrderRedux
         {
             if(page is null)
             {
-                if (Game1.activeClickableMenu is not GameMenu activeMenu)
+                if (GetGameMenuPage(Game1.activeClickableMenu) is not SocialPage sp)
                 {
                     SMonitor.Log("Skipping sort.");
                     return;
                 }
 
-                if (GameMenu.socialTab >= activeMenu.pages.Count || activeMenu.pages[GameMenu.socialTab] is not SocialPage)
-                {
-                    SMonitor.Log("Skipping sort..");
-                    return;
-                }
-
-                page = activeMenu.pages[GameMenu.socialTab] as SocialPage;
+                page = sp;
             }
 
             List<NameSpriteSlot> nameSprites = new();
@@ -1006,6 +1112,15 @@ namespace SocialPageOrderRedux
 
         #region ELEMENT_SETUP_METHODS
 
+        private static IClickableMenu GetGameMenuPage(IClickableMenu menu)
+        {
+            if (menu is GameMenu gameMenu)
+                return gameMenu.GetCurrentPage();
+            else if (BetterGameMenuAPI is not null && menu is not null)
+                return BetterGameMenuAPI.GetCurrentPage(menu);
+            return null;
+        }
+
         private static void UpdateElementPositions(SocialPage page)
         {
             if(Config.UseButton)
@@ -1043,7 +1158,7 @@ namespace SocialPageOrderRedux
 
         public static int GetButtonX(SocialPage page)
         {
-            return page.xPositionOnScreen + buttonXOffset + Config.ButtonOffsetX;
+            return page.xPositionOnScreen + buttonXOffset + Config.ButtonOffsetX + (BetterGameMenuAPI is null ? 0 : -16);
         }
 
         public static int GetButtonY(SocialPage page)
@@ -1106,7 +1221,8 @@ namespace SocialPageOrderRedux
 
             button.Value ??= new ClickableTextureComponent(Rectangle.Empty, Game1.mouseCursors, buttonTextureSource, 4, false)
                 {
-                    rightNeighborID = GameMenu.region_inventoryTab,
+                    rightNeighborID = ClickableComponent.SNAP_AUTOMATIC,
+                    rightNeighborImmutable = true,
                     myID = buttonId
                 };
 
@@ -1120,19 +1236,12 @@ namespace SocialPageOrderRedux
                     onClicked: value =>
                     {
                         ShowTalked = value;
-                        if (Game1.activeClickableMenu is not GameMenu activeMenu)
-                        {
-                            return;
-                        }
-
-                        if (GameMenu.socialTab >= activeMenu.pages.Count || activeMenu.pages[GameMenu.socialTab] is not SocialPage page)
-                        {
-                            return;
-                        }
-                        ApplyFilter(page, true);
+                        if (GetGameMenuPage(Game1.activeClickableMenu) is SocialPage page)
+                            ApplyFilter(page, true);
                     })
                 {
-                    myID = talkedId
+                    myID = talkedId,
+                    rightNeighborID = 0
                 };
 
             showGiftedCheckbox.Value ??= 
@@ -1145,19 +1254,12 @@ namespace SocialPageOrderRedux
                     onClicked: value =>
                     {
                         ShowGifted = value;
-                        if (Game1.activeClickableMenu is not GameMenu activeMenu)
-                        {
-                            return;
-                        }
-
-                        if (GameMenu.socialTab >= activeMenu.pages.Count || activeMenu.pages[GameMenu.socialTab] is not SocialPage page)
-                        {
-                            return;
-                        }
-                        ApplyFilter(page, true);
+                        if (GetGameMenuPage(Game1.activeClickableMenu) is SocialPage page)
+                            ApplyFilter(page, true);
                     })
                 {
-                    myID = giftedId
+                    myID = giftedId,
+                    rightNeighborID = 0
                 };
 
             showTalkedCheckbox.Value.isBright = ShowTalked;

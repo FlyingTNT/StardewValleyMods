@@ -43,12 +43,6 @@ namespace SocialPageOrderRedux
         /// <summary> The unique id of the sort button Clickable Component. </summary>
         private const int buttonId = 231445356;
 
-        /// <summary> The unique id of the show talked NPCs Clickable Component. </summary>
-        private const int talkedId = buttonId + 1;
-
-        /// <summary> The unique id of the show gifted NPCs Clickable Component. </summary>
-        private const int giftedId = buttonId + 2;
-
         /// <summary> The dropdown object. </summary>
         public static readonly PerScreen<MyOptionsDropDown> dropDown = new();
 
@@ -56,16 +50,16 @@ namespace SocialPageOrderRedux
         public static readonly PerScreen<ClickableTextureComponent> button = new();
 
         /// <summary> The string that was in the filter field the last time it was checked. </summary>
-        private static readonly PerScreen<string> lastFilterString = new PerScreen<string>(()=>"");
+        private static readonly PerScreen<string> lastFilterString = new PerScreen<string>(() => "");
 
         /// <summary> The filter field (search bar) object. </summary>
         private static readonly PerScreen<TextBox> filterField = new();
 
-        /// <summary> The checkbox for hiding NPCs that have been talked to today. </summary>
-        private static readonly PerScreen<BrightDarkBox> showTalkedCheckbox = new();
-
-        /// <summary> The checkbox for hiding NPCs that have max gifts. </summary>
-        private static readonly PerScreen<BrightDarkBox> showGiftedCheckbox = new();
+        private static SocialPageFilter talkedFilter;
+        private static SocialPageFilter giftedFilter;
+        private static SocialPageFilter maxFriendFilter;
+        private static SocialPageFilter unmetFilter;
+        internal static readonly List<SocialPageFilter> filters = new();
 
         /// <summary> All of the entries in the social page, before we removed any when searching. Used to restore the page when we clear the search bar. </summary>
         private static readonly PerScreen<List<SocialEntry>> allEntries = new PerScreen<List<SocialEntry>>(() => new List<SocialEntry>());
@@ -76,7 +70,6 @@ namespace SocialPageOrderRedux
         /// <summary> Whether the GameMenu.receiveLeftClick method is currently being called. Used in <see cref="IClickableMenu_readyToClose_Postfix(IClickableMenu, ref bool)"/>. </summary>
         private static readonly PerScreen<bool> isInGameMenuLeftClick = new(() => false);
 
-        private static ICustomGiftLimitsAPI CustomGiftLimitsAPI;
         private static IBetterGameMenuApi BetterGameMenuAPI;
 
         /// <summary>
@@ -95,30 +88,6 @@ namespace SocialPageOrderRedux
             }
         }
 
-        public static bool ShowTalked
-        {
-            get
-            {
-                return !Config.UseShowTalked || PerPlayerConfig.LoadConfigOption(Game1.player, "FlyingTNT.SocialPageOrderRedux.ShowTalked", defaultValue: true);
-            }
-            set
-            {
-                PerPlayerConfig.SaveConfigOption(Game1.player, "FlyingTNT.SocialPageOrderRedux.ShowTalked", value);
-            }
-        }
-
-        public static bool ShowGifted
-        {
-            get
-            {
-                return !Config.UseShowGifted || PerPlayerConfig.LoadConfigOption(Game1.player, "FlyingTNT.SocialPageOrderRedux.ShowGifted", defaultValue: true);
-            }
-            set
-            {
-                PerPlayerConfig.SaveConfigOption(Game1.player, "FlyingTNT.SocialPageOrderRedux.ShowGifted", value);
-            }
-        }
-
         public override void Entry(IModHelper helper)
         {
             Config = Helper.ReadConfig<ModConfig>();
@@ -132,6 +101,7 @@ namespace SocialPageOrderRedux
             helper.Events.Input.ButtonsChanged += Input_ButtonsChanged;
             helper.Events.Display.MenuChanged += Display_MenuChanged;
             helper.Events.Content.LocaleChanged += Content_LocaleChanged;
+            helper.Events.Content.AssetRequested += Content_AssetRequested;
 
             var harmony = new Harmony(ModManifest.UniqueID);
 
@@ -192,7 +162,15 @@ namespace SocialPageOrderRedux
         #region EVENTS
         private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
-            CustomGiftLimitsAPI = SHelper.ModRegistry.GetApi<ICustomGiftLimitsAPI>(IDs.CustomGiftLimits);
+            talkedFilter = new(0, 0, new Filters.TalkedFilter(), OnFilterClicked);
+            giftedFilter = new(0, 0, new Filters.GiftedFilter(), OnFilterClicked);
+            maxFriendFilter = new(0, 0, new Filters.MaxedFriendshipFilter(), OnFilterClicked);
+            unmetFilter = new(0, 0, new Filters.UnmetFilter(), OnFilterClicked);
+            filters.Add(talkedFilter);
+            filters.Add(giftedFilter);
+            filters.Add(maxFriendFilter);
+            filters.Add(unmetFilter);
+
             BetterGameMenuAPI = SHelper.ModRegistry.GetApi<IBetterGameMenuApi>(IDs.BetterGameMenu);
 
             if(BetterGameMenuAPI is not null)
@@ -250,6 +228,20 @@ namespace SocialPageOrderRedux
                 setValue: value => Config.toggleShowGifted = value
             );
 
+            configMenu.AddKeybindList(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM-ToggleShowMaxFriendshipKey"),
+                getValue: () => Config.toggleShowMaxFriendship,
+                setValue: value => Config.toggleShowMaxFriendship = value
+            );
+
+            configMenu.AddKeybindList(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM-ToggleShowUnmetKey"),
+                getValue: () => Config.toggleShowUnmet,
+                setValue: value => Config.toggleShowUnmet = value
+            );
+
             configMenu.AddBoolOption(
                 mod: ModManifest,
                 name: () => SHelper.Translation.Get("GMCM-UseFilter"),
@@ -290,6 +282,26 @@ namespace SocialPageOrderRedux
                 getValue: () => Config.UseShowGifted,
                 setValue: (value) => {
                     Config.UseShowGifted = value;
+                    InitElements();
+                }
+            );
+
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM-UseShowMaxFriendship"),
+                getValue: () => Config.UseShowMaxFriendship,
+                setValue: (value) => {
+                    Config.UseShowMaxFriendship = value;
+                    InitElements();
+                }
+            );
+
+            configMenu.AddBoolOption(
+                mod: ModManifest,
+                name: () => SHelper.Translation.Get("GMCM-UseShowUnmet"),
+                getValue: () => Config.UseShowMaxFriendship,
+                setValue: (value) => {
+                    Config.UseShowMaxFriendship = value;
                     InitElements();
                 }
             );
@@ -378,17 +390,25 @@ namespace SocialPageOrderRedux
 
             if(Config.UseShowGifted && Config.toggleShowGifted.JustPressed())
             {
-                bool newValue = !ShowGifted;
-                showGiftedCheckbox.Value.isBright = newValue;
-                ShowGifted = newValue;
+                giftedFilter.IsFiltering = !giftedFilter.IsFiltering;
                 ApplyFilter(page, true);
             }
 
             if (Config.UseShowTalked && Config.toggleShowTalked.JustPressed())
             {
-                bool newValue = !ShowTalked;
-                showTalkedCheckbox.Value.isBright = newValue;
-                ShowTalked = newValue;
+                talkedFilter.IsFiltering = !talkedFilter.IsFiltering;
+                ApplyFilter(page, true);
+            }
+
+            if (Config.UseShowMaxFriendship && Config.toggleShowMaxFriendship.JustPressed())
+            {
+                maxFriendFilter.IsFiltering = !maxFriendFilter.IsFiltering;
+                ApplyFilter(page, true);
+            }
+
+            if (Config.UseShowUnmet && Config.toggleShowUnmet.JustPressed())
+            {
+                unmetFilter.IsFiltering = !unmetFilter.IsFiltering;
                 ApplyFilter(page, true);
             }
         }
@@ -424,6 +444,18 @@ namespace SocialPageOrderRedux
             }
 
             dropDown.Value.RecalculateBounds();
+        }
+
+        public static void Content_AssetRequested(object sender, AssetRequestedEventArgs args)
+        {
+            if(args.NameWithoutLocale.IsEquivalentTo("Mods/FlyingTNT.SocialPageOrderRedux/MaxHeartsIcon"))
+            {
+                args.LoadFromModFile<Texture2D>("assets/MaxHeartsIcon.png", AssetLoadPriority.Medium);
+            }
+            else if (args.NameWithoutLocale.IsEquivalentTo("Mods/FlyingTNT.SocialPageOrderRedux/UnmetIcon"))
+            {
+                args.LoadFromModFile<Texture2D>("assets/UnmetIcon.png", AssetLoadPriority.Medium);
+            }
         }
 
         #endregion
@@ -477,15 +509,7 @@ namespace SocialPageOrderRedux
                 __instance.allClickableComponents.Add(button.Value);
             }
 
-            if(Config.UseShowTalked)
-            {
-                __instance.allClickableComponents.Add(showTalkedCheckbox.Value);
-            }
-
-            if(Config.UseShowGifted)
-            {
-                __instance.allClickableComponents.Add(showGiftedCheckbox.Value);
-            }
+            __instance.allClickableComponents.AddRange(filters.Where(filter => filter.IsEnabled));
         }
 
         /// <remarks>
@@ -549,14 +573,12 @@ namespace SocialPageOrderRedux
                     button.Value.draw(b);
                 }
 
-                if(Config.UseShowGifted)
+                foreach(SocialPageFilter filter in filters)
                 {
-                    showGiftedCheckbox.Value.draw(b);
-                }
-
-                if (Config.UseShowTalked)
-                {
-                    showTalkedCheckbox.Value.draw(b);
+                    if(filter.IsEnabled)
+                    {
+                        filter.draw(b);
+                    }
                 }
             }
             catch(Exception ex)
@@ -629,7 +651,7 @@ namespace SocialPageOrderRedux
             }
         }
 
-        public static void SocialPage_performHoverAction_Postfix(SocialPage __instance, int x, int y, ref string ___hoverText)
+        public static void SocialPage_performHoverAction_Postfix(SocialPage __instance, int x, int y)
         {
             if (!Config.EnableMod)
                 return;
@@ -643,23 +665,15 @@ namespace SocialPageOrderRedux
             {
                 if (button.Value.bounds.Contains(x, y))
                 {
-                    ___hoverText = SHelper.Translation.Get($"sort-by") + SHelper.Translation.Get($"sort-{CurrentSort}");
+                    __instance.hoverText = SHelper.Translation.Get($"sort-by") + SHelper.Translation.Get($"sort-{CurrentSort}");
                 }
             }
 
-            if(Config.UseShowGifted && showGiftedCheckbox.Value is not null)
+            foreach(SocialPageFilter filter in filters)
             {
-                if(showGiftedCheckbox.Value.bounds.Contains(x, y))
+                if(filter.IsEnabled && filter.bounds.Contains(x, y))
                 {
-                    ___hoverText = SHelper.Translation.Get($"{(ShowGifted ? "showing" : "hiding")}-gifted");
-                }
-            }
-
-            if (Config.UseShowTalked && showTalkedCheckbox.Value is not null)
-            {
-                if (showTalkedCheckbox.Value.bounds.Contains(x, y))
-                {
-                    ___hoverText = SHelper.Translation.Get($"{(ShowTalked ? "showing" : "hiding")}-talked");
+                    __instance.hoverText = filter.HoverText;
                 }
             }
         }
@@ -687,14 +701,12 @@ namespace SocialPageOrderRedux
             if (Config.UseFilter)
                 filterField.Value.Update();
 
-            if(Config.UseShowGifted)
+            foreach (SocialPageFilter filter in filters)
             {
-                showGiftedCheckbox.Value.receiveLeftClick(x, y);
-            }
-
-            if (Config.UseShowTalked)
-            {
-                showTalkedCheckbox.Value.receiveLeftClick(x, y);
+                if (filter.IsEnabled)
+                {
+                    filter.receiveLeftClick(x, y);
+                }
             }
 
             return true;
@@ -779,7 +791,11 @@ namespace SocialPageOrderRedux
                 if (BetterGameMenuAPI.ActivePage is SocialPage page)
                 {
                     if (Config.UseFilter && filterField.Value is not null && !Game1.options.gamepadControls)
+                    {
                         filterField.Value.Selected = Config.SearchBarAutoFocus;
+                    }
+
+                    UpdateElementPositions(page);
 
                     // I don't think this is necessary, but I'm not removing it because it also isn't hurting anything.
                     ApplyFilter(page);
@@ -1064,48 +1080,23 @@ namespace SocialPageOrderRedux
             entries.Clear();
             entries.AddRange(filterString is "" ? allEntries.Value : allEntries.Value.Where((entry) => entry.DisplayName.ToLower().StartsWith(filterString.ToLower())));
 
-            if (!ShowGifted)
+            foreach (SocialPageFilter filter in filters)
             {
-                entries.RemoveAll(entry => IsMaxGifted(entry));
-            }
-            if (!ShowTalked)
-            {
-                entries.RemoveAll(entry => entry.Friendship?.TalkedToToday ?? false);
+                if (filter.IsEnabled && filter.IsFiltering)
+                {
+                    entries.RemoveAll(entry => filter.Filter.ShouldFilter(entry));
+                }
             }
 
             lastFilterString.Value = filterString;
         }
 
-        private static bool IsMaxGifted(SocialEntry entry)
+        internal static void OnFilterClicked(bool _)
         {
-            if(entry.Friendship is null)
+            if (GetGameMenuPage(Game1.activeClickableMenu) is SocialPage page)
             {
-                return false;
+                ApplyFilter(page, true);
             }
-
-            int perDayLimit;
-            int perWeekLimit;
-            if(CustomGiftLimitsAPI is not null)
-            {
-                CustomGiftLimitsAPI.GetGiftLimits(entry.Friendship, out perWeekLimit, out perDayLimit);
-            }
-            else
-            {
-                perDayLimit = 1;
-                perWeekLimit = entry.IsMarriedToCurrentPlayer() ? -1 : 2;
-            }
-
-            return ((entry.Friendship.GiftsThisWeek >= perWeekLimit && perWeekLimit >= 0) || (entry.Friendship.GiftsToday >= perDayLimit && perDayLimit >= 0)) && !(IsBirthday(entry) && entry.Friendship.GiftsToday < 1);
-        }
-
-        private static bool IsBirthday(SocialEntry entry)
-        {
-            if (entry.Data is null)
-            {
-                return false;
-            }
-
-            return entry.Data.BirthSeason == Game1.season && entry.Data.BirthDay == Game1.dayOfMonth;
         }
 
         #endregion
@@ -1134,16 +1125,20 @@ namespace SocialPageOrderRedux
                 filterField.Value.Y = page.yPositionOnScreen + page.height + (Config.UseDropdown ? dropDown.Value.bounds.Height + dropdownYOffset + 20 : 0) + Config.FilterOffsetY;
             }
 
-            if(Config.UseShowGifted)
-            {
-                showGiftedCheckbox.Value.bounds.X = GetShowGiftedX(page);
-                showGiftedCheckbox.Value.bounds.Y = GetShowGiftedY(page);
-            }
+            int baseFilterOffsetX = page.xPositionOnScreen + talkedXOffset + Config.TalkedOffsetX;
+            int baseFilterOffsetY = page.yPositionOnScreen + talkedYOffset + Config.TalkedOffsetY;
 
-            if (Config.UseShowTalked)
+            foreach (SocialPageFilter filter in filters)
             {
-                showTalkedCheckbox.Value.bounds.X = GetShowTalkedX(page);
-                showTalkedCheckbox.Value.bounds.Y = GetShowTalkedY(page);
+                if(!filter.IsEnabled)
+                {
+                    continue;
+                }
+
+                filter.bounds.X = baseFilterOffsetX + filter.Filter.OffsetX;
+                filter.bounds.Y = baseFilterOffsetY + filter.Filter.OffsetY;
+
+                baseFilterOffsetY += filter.bounds.Height + 4;
             }
         }
 
@@ -1169,25 +1164,6 @@ namespace SocialPageOrderRedux
         public static Rectangle GetButtonRectangle(SocialPage page)
         {
             return new Rectangle(GetButtonX(page), GetButtonY(page), buttonTextureSource.Width * 4, buttonTextureSource.Height * 4);
-        }
-
-        public static int GetShowTalkedX(SocialPage page)
-        {
-            return page.xPositionOnScreen + talkedXOffset + Config.TalkedOffsetX;
-        }
-
-        public static int GetShowTalkedY(SocialPage page)
-        {
-            return page.yPositionOnScreen + talkedYOffset + Config.TalkedOffsetY;
-        }
-
-        public static int GetShowGiftedX(SocialPage page)
-        {
-            return page.xPositionOnScreen + talkedXOffset + Config.TalkedOffsetX;
-        }
-        public static int GetShowGiftedY(SocialPage page)
-        {
-            return page.yPositionOnScreen + talkedYOffset + Config.TalkedOffsetY + (Config.UseShowTalked ? 12 * 4 : 0);
         }
 
         public static void InitElements()
@@ -1226,67 +1202,41 @@ namespace SocialPageOrderRedux
                     myID = buttonId
                 };
 
-            showTalkedCheckbox.Value ??= 
-                new BrightDarkBox(
-                    "Hide Talked", 
-                    0, 
-                    0, 
-                    "LooseSprites/Cursors2",
-                    new(181, 175, 12, 11),
-                    onClicked: value =>
-                    {
-                        ShowTalked = value;
-                        if (GetGameMenuPage(Game1.activeClickableMenu) is SocialPage page)
-                            ApplyFilter(page, true);
-                    })
-                {
-                    myID = talkedId,
-                    rightNeighborID = 0
-                };
+            SetupFilterNeighbors();
+        }
 
-            showGiftedCheckbox.Value ??= 
-                new BrightDarkBox(
-                    "Hide Gifted",
-                    0,
-                    0,
-                    "LooseSprites/Cursors2",
-                    new(167, 175, 12, 11),
-                    onClicked: value =>
-                    {
-                        ShowGifted = value;
-                        if (GetGameMenuPage(Game1.activeClickableMenu) is SocialPage page)
-                            ApplyFilter(page, true);
-                    })
-                {
-                    myID = giftedId,
-                    rightNeighborID = 0
-                };
+        public static void SetupFilterNeighbors()
+        {
+            ClickableComponent upNeighbor = Config.UseButton ? button.Value : null;
+            int currentId = buttonId;
 
-            showTalkedCheckbox.Value.isBright = ShowTalked;
-            showGiftedCheckbox.Value.isBright = ShowGifted;
-
-            if(Config.UseButton)
+            foreach(SocialPageFilter filter in filters)
             {
-                // Set its down neighbor id to the gifted or talked checkbox as necessary
-                if (Config.UseShowTalked)
+                if(!filter.IsEnabled)
                 {
-                    button.Value.downNeighborID = talkedId;
-                    showTalkedCheckbox.Value.upNeighborID = buttonId;
+                    continue;
                 }
-                else if (Config.UseShowGifted)
-                {
-                    button.Value.downNeighborID = giftedId;
-                    showGiftedCheckbox.Value.upNeighborID = buttonId;
-                }
-            }
 
-            if(Config.UseShowGifted && Config.UseShowTalked)
-            {
-                showTalkedCheckbox.Value.downNeighborID = giftedId;
-                showGiftedCheckbox.Value.upNeighborID = talkedId;
+                filter.myID = ++currentId;
+                filter.rightNeighborID = 0;
+
+                if(upNeighbor is not null)
+                {
+                    filter.upNeighborID = upNeighbor.myID;
+                    upNeighbor.downNeighborID = filter.myID;
+                }
+
+                upNeighbor = filter;
             }
         }
 
+        #endregion
+
+        #region API
+        public override object GetApi()
+        {
+            return new SocialPageOrderAPI();
+        }
         #endregion
     }
 

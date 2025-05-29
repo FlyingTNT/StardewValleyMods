@@ -1,4 +1,5 @@
 ﻿using StardewModdingAPI;
+using StardewModdingAPI.Utilities;
 
 namespace ResourceStorage
 {
@@ -14,7 +15,8 @@ namespace ResourceStorage
         public int ModKey1Amount { get; set; } = 999;
         public int ModKey2Amount { get; set; } = 100;
         public int ModKey3Amount { get; set; } = 10;
-        public SButton ResourcesKey { get; set; } = SButton.R;
+        public KeybindList ResourcesKey { get; set; } = KeybindList.Parse("R");
+        public bool AutoSelectSearchBar = true;
         public int IconOffsetX { get; set; } = 0;
         public int IconOffsetY { get; set; } = 0;
         public int SortButtonOffsetX { get; set; } = 0;

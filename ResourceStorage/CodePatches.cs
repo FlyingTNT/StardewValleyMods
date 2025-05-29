@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common.Integrations;
+using HarmonyLib;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using StardewModdingAPI;
@@ -226,6 +227,14 @@ namespace ResourceStorage
             SetupResourceButton(__instance);
         }
 
+        public static void BetterGameMenuMenuCreated(IClickableMenu menu)
+        {
+            if (!Config.ModEnabled)
+                return;
+            gameMenu.Value = null;
+            SetupResourceButton(menu);
+        }
+
         public static void InventoryPage_Constructor_Postfix(InventoryPage __instance)
         {
             if (!Config.ModEnabled)
@@ -240,15 +249,15 @@ namespace ResourceStorage
 
         public static void InventoryPage_draw_Prefix(SpriteBatch b)
         {
-            if (!Config.ModEnabled || Game1.activeClickableMenu is not GameMenu menu)
+            if (!Config.ModEnabled || !IsGameMenu(Game1.activeClickableMenu))
                 return;
-            SetupResourceButton(menu); // Update the button's bounds
+            SetupResourceButton(Game1.activeClickableMenu); // Update the button's bounds
             resourceButton.Value.draw(b);
         }
 
         public static bool InventoryPage_performHoverAction_Prefix(ref string ___hoverText, int x, int y)
         {
-            if (!Config.ModEnabled || Game1.activeClickableMenu is not GameMenu)
+            if (!Config.ModEnabled || !IsGameMenu(Game1.activeClickableMenu))
                 return true;
 
             if (resourceButton.Value.containsPoint(x, y))
@@ -259,39 +268,9 @@ namespace ResourceStorage
             return true;
         }
 
-        public static bool InventoryPage_receiveKeyPressPrefix(Keys key, ref string ___hoverText)
-        {
-            if (!Config.ModEnabled || Game1.activeClickableMenu is not GameMenu)
-                return true;
-            if (SButtonExtensions.ToSButton(key) == Config.ResourcesKey)
-            {
-                ___hoverText = "";
-                Game1.playSound("bigSelect");
-                gameMenu.Value = Game1.activeClickableMenu as GameMenu;
-                Game1.activeClickableMenu = new ResourceMenu();
-                return false;
-            }
-            return true;
-        }
-
-        public static bool InventoryPage_receiveGamePadButton_Prefix(Buttons button, ref string ___hoverText)
-        {
-            if (!Config.ModEnabled || Game1.activeClickableMenu is not GameMenu)
-                return true;
-            if (SButtonExtensions.ToSButton(button) == Config.ResourcesKey)
-            {
-                ___hoverText = "";
-                Game1.playSound("bigSelect");
-                gameMenu.Value = Game1.activeClickableMenu as GameMenu;
-                Game1.activeClickableMenu = new ResourceMenu();
-                return false;
-            }
-            return true;
-        }
-
         public static bool InventoryPage_receiveLeftClick_Prefix(ref string ___hoverText, int x, int y)
         {
-            if (!Config.ModEnabled || Game1.activeClickableMenu is not GameMenu)
+            if (!Config.ModEnabled || !IsGameMenu(Game1.activeClickableMenu))
                 return true;
             if (resourceButton.Value.containsPoint(x, y))
             {
@@ -308,7 +287,7 @@ namespace ResourceStorage
                 {
                     ___hoverText = "";
                     Game1.playSound("bigSelect");
-                    gameMenu.Value = Game1.activeClickableMenu as GameMenu;
+                    gameMenu.Value = Game1.activeClickableMenu;
                     Game1.activeClickableMenu = new ResourceMenu();
 
                 }

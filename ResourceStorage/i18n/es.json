@@ -10,6 +10,7 @@
   "GMCM_Option_ModKey2Amount_Name": "Segunda tecla cantidad",
   "GMCM_Option_ModKey3Amount_Name": "Tercera tecla cantidad",
   "GMCM_Option_ModKeyMax_Name": "Tecla para tomar todo",
+  "GMCM_Option_AutoSelectSearchBar_Name": "Enfocar automáticamente la\nbarra de búsqueda",
   "GMCM_Option_IconOffsetX_Name": "Ubicación del icono en X",
   "GMCM_Option_IconOffsetY_Name": "Ubicación del icono en Y",
   "auto": "Guardar automáticamente",

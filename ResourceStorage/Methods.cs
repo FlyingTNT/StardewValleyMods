@@ -1,4 +1,5 @@
-﻿using Common.Utilities;
+﻿using Common.Integrations;
+using Common.Utilities;
 using HarmonyLib;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -353,6 +354,33 @@ namespace ResourceStorage
             {
                 SMonitor.Log($"No resource dictionary for {farmer.Name}");
             }
+        }
+
+        public static bool IsGameMenu(IClickableMenu menu)
+        {
+            if (menu is GameMenu)
+            {
+                return true;
+            }
+            else if(menu is null)
+            {
+                return false;
+            }
+            else if (BetterGameMenuAPI is not null && BetterGameMenuAPI.IsMenu(menu))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public static IClickableMenu GetGameMenuPage(IClickableMenu menu)
+        {
+            if (menu is GameMenu gameMenu)
+                return gameMenu.GetCurrentPage();
+            else if (BetterGameMenuAPI is not null && menu is not null)
+                return BetterGameMenuAPI.GetCurrentPage(menu);
+            return null;
         }
     }
 }

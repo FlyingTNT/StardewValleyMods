@@ -7,6 +7,7 @@ using StardewModdingAPI.Utilities;
 using StardewValley;
 using StardewValley.BellsAndWhistles;
 using StardewValley.Menus;
+using StardewValley.SDKs.Steam;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -73,7 +74,7 @@ namespace ResourceStorage
 
             snapToDefaultClickableComponent();
 
-            SearchBar.Selected = !Game1.options.gamepadControls;
+            SearchBar.Selected = !Game1.options.gamepadControls && Config.AutoSelectSearchBar;
         }
 
         public void RepopulateComponentList()
@@ -288,6 +289,11 @@ namespace ResourceStorage
                         Game1.playSound("Ship");
                         ModEntry.ModifyResourceLevel(Game1.player, obj.QualifiedItemId, -(stack - amountLeft), auto: false);
                         RepopulateComponentList();
+                        if (Game1.options.SnappyMenus && takeCCs.Count > i)
+                        {
+                            currentlySnappedComponent = takeCCs[i];
+                            snapCursorToCurrentSnappedComponent();
+                        }
                     }
                     else
                     {
@@ -367,7 +373,7 @@ namespace ResourceStorage
                 SearchBar.Selected = false;
             }
 
-            if((Game1.options.doesInputListContain(Game1.options.menuButton, key) || SButtonExtensions.ToSButton(key) == Config.ResourcesKey) && readyToClose())
+            if(Game1.options.doesInputListContain(Game1.options.menuButton, key) && readyToClose())
             {
                 exitThisMenu();
                 Game1.activeClickableMenu = ModEntry.gameMenu.Value;
@@ -379,17 +385,6 @@ namespace ResourceStorage
             }
 
             base.receiveKeyPress(key);
-        }
-
-        public override void receiveGamePadButton(Buttons button)
-        {
-            if (SButtonExtensions.ToSButton(button) == Config.ResourcesKey && readyToClose())
-            {
-                exitThisMenu();
-                Game1.activeClickableMenu = ModEntry.gameMenu.Value;
-                return;
-            }
-            base.receiveGamePadButton(button);
         }
 
         public override bool readyToClose()
@@ -426,7 +421,7 @@ namespace ResourceStorage
                         next = getComponentWithID(currentlySnappedComponent.leftNeighborID);
                         break;
                 }
-                if (next is null && (currentlySnappedComponent.myID % 1000 == 0))
+                if (next is null && (currentlySnappedComponent.myID % 1000 == 0 || ((currentlySnappedComponent.myID - 1) % 1000 == 0)))
                 {
                     if (direction == 0)
                     {
@@ -522,7 +517,7 @@ namespace ResourceStorage
         public override void gameWindowSizeChanged(Rectangle oldBounds, Rectangle newBounds)
         {
             base.gameWindowSizeChanged(oldBounds, newBounds);
-            scrolled = Math.Min(scrolled, resourceList.Count - ((Game1.uiViewport.Height + 72 - spaceToClearTopBorder * 2 - 108) / 64));
+            scrolled = Math.Max(0, Math.Min(scrolled, resourceList.Count - ((Game1.uiViewport.Height + 72 - spaceToClearTopBorder * 2 - 108) / 64)));
             resourceListDirty.Value = true; // Make sure the menu is updated next draw
         }
 

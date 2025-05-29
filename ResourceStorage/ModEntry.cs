@@ -31,7 +31,8 @@ namespace ResourceStorage
         public const string autoStoreKey = "FlyingTNT.ResourceStorage/autoStore";
         public const string resourceIconKey = "FlyingTNT.ResourceStorage/resourceIcon";
 
-        public static PerScreen<GameMenu> gameMenu = new PerScreen<GameMenu>();
+        public static IBetterGameMenuApi BetterGameMenuAPI = null;
+        public static PerScreen<IClickableMenu> gameMenu = new PerScreen<IClickableMenu>();
         public static PerScreen<ClickableTextureComponent> resourceButton = new PerScreen<ClickableTextureComponent>();
 
         private static readonly PerScreen<List<string>> cachedAutoStore = new PerScreen<List<string>>(() => new());
@@ -55,6 +56,7 @@ namespace ResourceStorage
             Helper.Events.GameLoop.Saving += GameLoop_Saving;
             Helper.Events.Content.AssetRequested += Content_AssetRequested;
             Helper.Events.Content.AssetsInvalidated += Content_AssetsInvalidated;
+            Helper.Events.Input.ButtonsChanged += Input_ButtonsChanged;
 
             SharedResourceManager.Initialize(Monitor, helper, Config, ModManifest);
 
@@ -157,16 +159,6 @@ namespace ResourceStorage
             );
             
             harmony.Patch(
-                original: AccessTools.Method(typeof(InventoryPage), nameof(InventoryPage.receiveKeyPress)),
-                prefix: new HarmonyMethod(typeof(ModEntry), nameof(InventoryPage_receiveKeyPressPrefix))
-            );
-            
-            harmony.Patch(
-                original: AccessTools.Method(typeof(InventoryPage), nameof(InventoryPage.receiveGamePadButton)),
-                prefix: new HarmonyMethod(typeof(ModEntry), nameof(InventoryPage_receiveGamePadButton_Prefix))
-            );
-            
-            harmony.Patch(
                 original: AccessTools.Method(typeof(InventoryPage), nameof(InventoryPage.receiveLeftClick)),
                 prefix: new HarmonyMethod(typeof(ModEntry), nameof(InventoryPage_receiveLeftClick_Prefix))
             );
@@ -201,12 +193,40 @@ namespace ResourceStorage
             resourceDict.Remove(Game1.player.UniqueMultiplayerID);
         }
 
+        public void Input_ButtonsChanged(object sender, ButtonsChangedEventArgs args)
+        {
+            if(!Config.ResourcesKey.JustPressed())
+            {
+                return;
+            }
+
+            if(IsGameMenu(Game1.activeClickableMenu) && GetGameMenuPage(Game1.activeClickableMenu) is InventoryPage page)
+            {
+                page.hoverText = "";
+                Game1.playSound("bigSelect");
+                gameMenu.Value = Game1.activeClickableMenu;
+                Game1.activeClickableMenu = new ResourceMenu();
+            }
+            else if(Game1.activeClickableMenu is ResourceMenu resourceMenu && resourceMenu.readyToClose())
+            {
+                resourceMenu.exitThisMenu();
+                Game1.activeClickableMenu = gameMenu.Value;
+            }
+        }
+
         public void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
+            BetterGameMenuAPI = SHelper.ModRegistry.GetApi<IBetterGameMenuApi>(IDs.BetterGameMenu);
+
+            if (BetterGameMenuAPI is not null)
+            {
+                BetterGameMenuAPI.OnMenuCreated(BetterGameMenuMenuCreated);
+            }    
+
             BetterCraftingIntegration.Initialize(SMonitor, SHelper, Config);
 
             // get Generic Mod Config Menu's API (if it's installed)
-            var configMenu = SHelper.ModRegistry.GetApi<IGenericModConfigMenuApi>("spacechase0.GenericModConfigMenu");
+            var configMenu = SHelper.ModRegistry.GetApi<IGenericModConfigMenuApi>(IDs.GMCM);
             if (configMenu is not null)
             {
                 // register mod
@@ -244,8 +264,15 @@ namespace ResourceStorage
                     setValue: value => SharedResourceManager.ChangeShouldUseShared(value)
                 );
 
+                configMenu.AddBoolOption(
+                    mod: ModManifest,
+                    name: () => SHelper.Translation.Get("GMCM_Option_AutoSelectSearchBar_Name"),
+                    getValue: () => Config.AutoSelectSearchBar,
+                    setValue: value => Config.AutoSelectSearchBar = value
+                );
+
                 // KEYBINDS
-                configMenu.AddKeybind(
+                configMenu.AddKeybindList(
                     mod: ModManifest,
                     name: () => SHelper.Translation.Get("GMCM_Option_ResourcesKey_Name"),
                     getValue: () => Config.ResourcesKey,

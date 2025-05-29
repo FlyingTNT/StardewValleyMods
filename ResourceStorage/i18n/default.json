@@ -10,6 +10,7 @@
   "GMCM_Option_ModKey1Amount_Name": "Mod Key 1 Amount",
   "GMCM_Option_ModKey2Amount_Name": "Mod Key 2 Amount",
   "GMCM_Option_ModKey3Amount_Name": "Mod Key 3 Amount",
+  "GMCM_Option_AutoSelectSearchBar_Name": "Auto-Select Search Bar",
   "GMCM_Option_IconOffsetX_Name": "Icon Offset X",
   "GMCM_Option_IconOffsetY_Name": "Icon Offset Y",
   "GMCM_Option_SearchBarOffsetX_Name": "Search Bar Offset X",
